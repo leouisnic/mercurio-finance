@@ -2,11 +2,11 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-from ingestion_worker.extrato import carregar_extrato, resumir_por_titularidade
+from ingestion_worker.extrato import carregar_extrato, resumir_por_conta
 
 FIXTURE = Path(__file__).parent / "fixtures" / "extrato_ficticio.csv"
 
-COLUNAS = "data,valor,descricao,titularidade,tipo,identificador_externo"
+COLUNAS = "data,valor,descricao,conta_id,tipo,identificador_externo"
 
 
 def _escrever_csv(tmp_path: Path, linhas: list[str]) -> Path:
@@ -37,8 +37,8 @@ def test_mesmo_conteudo_com_identificador_diferente_fica_como_possivel_nao_confi
     caminho = _escrever_csv(
         tmp_path,
         [
-            "2026-08-05,8.00,Cafeteria Central,pf,despesa,TXN1",
-            "2026-08-05,8.00,Cafeteria Central,pf,despesa,TXN2",
+            "2026-08-05,8.00,Cafeteria Central,conta-a,despesa,TXN1",
+            "2026-08-05,8.00,Cafeteria Central,conta-a,despesa,TXN2",
         ],
     )
     extrato = carregar_extrato(caminho)
@@ -47,14 +47,14 @@ def test_mesmo_conteudo_com_identificador_diferente_fica_como_possivel_nao_confi
     assert extrato["duplicado_possivel"].all()
 
 
-def test_resumir_por_titularidade_ignora_so_duplicidade_confirmada() -> None:
+def test_resumir_por_conta_ignora_so_duplicidade_confirmada() -> None:
     extrato = carregar_extrato(FIXTURE)
-    resumo = resumir_por_titularidade(extrato).set_index("titularidade")["total"]
+    resumo = resumir_por_conta(extrato).set_index("conta_id")["total"]
 
-    # pj: 150 (Genux, uma vez só) + 80 (Tragial) - 200 (retirada para o titular)
-    assert resumo["pj"] == pytest.approx(150.00 + 80.00 - 200.00)
-    # pf: 200 (aporte vindo da PJ, espelha a retirada) - 45.90 (despesa)
-    assert resumo["pf"] == pytest.approx(200.00 - 45.90)
+    # conta-a: 150 (Genux, uma vez só) + 80 (Tragial) - 200 (retirada)
+    assert resumo["conta-a"] == pytest.approx(150.00 + 80.00 - 200.00)
+    # conta-b: 200 (aporte vindo da conta-a, espelha a retirada) - 45.90 (despesa)
+    assert resumo["conta-b"] == pytest.approx(200.00 - 45.90)
 
 
 def test_duas_compras_iguais_no_mesmo_dia_com_ids_diferentes_nao_somem_do_resumo(
@@ -63,68 +63,53 @@ def test_duas_compras_iguais_no_mesmo_dia_com_ids_diferentes_nao_somem_do_resumo
     caminho = _escrever_csv(
         tmp_path,
         [
-            "2026-08-05,8.00,Cafeteria Central,pf,despesa,TXN1",
-            "2026-08-05,8.00,Cafeteria Central,pf,despesa,TXN2",
+            "2026-08-05,8.00,Cafeteria Central,conta-a,despesa,TXN1",
+            "2026-08-05,8.00,Cafeteria Central,conta-a,despesa,TXN2",
         ],
     )
     extrato = carregar_extrato(caminho)
-    resumo = resumir_por_titularidade(extrato).set_index("titularidade")["total"]
+    resumo = resumir_por_conta(extrato).set_index("conta_id")["total"]
 
-    assert resumo["pf"] == pytest.approx(-16.00)
+    assert resumo["conta-a"] == pytest.approx(-16.00)
 
 
-def test_titularidade_invalida_e_rejeitada(tmp_path: Path) -> None:
+def test_conta_id_ausente_e_rejeitado(tmp_path: Path) -> None:
     caminho = _escrever_csv(
-        tmp_path, ["2026-08-05,10.00,Compra qualquer,xx,despesa,TXN1"]
+        tmp_path, ["2026-08-05,10.00,Compra qualquer,,despesa,TXN1"]
     )
 
-    with pytest.raises(ValueError, match="Titularidade ou tipo inválido"):
+    with pytest.raises(ValueError, match="conta_id ausente ou tipo inválido"):
         carregar_extrato(caminho)
 
 
 def test_tipo_invalido_e_rejeitado(tmp_path: Path) -> None:
     caminho = _escrever_csv(
-        tmp_path, ["2026-08-05,10.00,Compra qualquer,pf,estorno,TXN1"]
+        tmp_path, ["2026-08-05,10.00,Compra qualquer,conta-a,estorno,TXN1"]
     )
 
-    with pytest.raises(ValueError, match="Titularidade ou tipo inválido"):
+    with pytest.raises(ValueError, match="conta_id ausente ou tipo inválido"):
         carregar_extrato(caminho)
 
 
 def test_valor_ausente_e_rejeitado(tmp_path: Path) -> None:
-    caminho = _escrever_csv(tmp_path, ["2026-08-05,,Tarifa nao informada,pj,despesa,TXN1"])
+    caminho = _escrever_csv(tmp_path, ["2026-08-05,,Tarifa nao informada,conta-a,despesa,TXN1"])
 
     with pytest.raises(ValueError, match="Valor ausente"):
         carregar_extrato(caminho)
 
 
 def test_valor_negativo_ou_zero_e_rejeitado(tmp_path: Path) -> None:
-    caminho = _escrever_csv(tmp_path, ["2026-08-05,-45.90,Mercado,pf,despesa,TXN1"])
+    caminho = _escrever_csv(tmp_path, ["2026-08-05,-45.90,Mercado,conta-a,despesa,TXN1"])
 
     with pytest.raises(ValueError, match="deve ser positivo"):
         carregar_extrato(caminho)
 
 
 def test_data_fora_do_formato_iso_e_rejeitada(tmp_path: Path) -> None:
-    caminho = _escrever_csv(tmp_path, ["05/08/2026,10.00,Compra qualquer,pf,despesa,TXN1"])
+    caminho = _escrever_csv(tmp_path, ["05/08/2026,10.00,Compra qualquer,conta-a,despesa,TXN1"])
 
     with pytest.raises(ValueError, match="Data inválida"):
         carregar_extrato(caminho)
-
-
-def test_titularidade_e_normalizada_antes_de_agrupar(tmp_path: Path) -> None:
-    caminho = _escrever_csv(
-        tmp_path,
-        [
-            "2026-08-05,100.00,Pagamento A,PJ,receita,TXN1",
-            "2026-08-06,50.00,Pagamento B,pj,receita,TXN2",
-        ],
-    )
-    extrato = carregar_extrato(caminho)
-    resumo = resumir_por_titularidade(extrato).set_index("titularidade")["total"]
-
-    assert list(resumo.index) == ["pj"]
-    assert resumo["pj"] == pytest.approx(150.00)
 
 
 def test_fingerprint_bate_com_o_pacote_compartilhado_para_valor_float_e_decimal() -> None:
@@ -134,7 +119,7 @@ def test_fingerprint_bate_com_o_pacote_compartilhado_para_valor_float_e_decimal(
 
     linha = pd.Series(
         {
-            "titularidade": "pj",
+            "conta_id": "conta-a",
             "valor": 1500.5,
             "descricao": "Nota fiscal",
             "tipo": "receita",
@@ -143,14 +128,14 @@ def test_fingerprint_bate_com_o_pacote_compartilhado_para_valor_float_e_decimal(
     import datetime as _dt
 
     do_worker = fingerprint(
-        linha["titularidade"],
+        linha["conta_id"],
         _dt.date(2026, 8, 5),
         linha["valor"],
         linha["descricao"],
         linha["tipo"],
     )
     da_api = fingerprint(
-        "pj", _dt.date(2026, 8, 5), Decimal("1500.50"), "Nota fiscal", "receita"
+        "conta-a", _dt.date(2026, 8, 5), Decimal("1500.50"), "Nota fiscal", "receita"
     )
 
     assert do_worker == da_api

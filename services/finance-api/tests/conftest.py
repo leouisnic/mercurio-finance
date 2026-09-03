@@ -10,8 +10,8 @@ import pytest
 from finance_api.config import TEST_DATABASE_URL
 from finance_api.db import obter_sessao
 from finance_api.main import app
-from finance_api.models import MovimentoORM, ObrigacaoDasORM
-from finance_api.repositorio import inserir_movimentos
+from finance_api.models import ContaORM, MovimentoORM
+from finance_api.repositorio import inserir_movimentos, upsert_contas
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
@@ -35,8 +35,9 @@ app.dependency_overrides[obter_sessao] = _obter_sessao_teste
 
 async def _limpar_movimentos() -> None:
     async with _sessao_teste() as sessao:
+        # movimentos primeiro: tem chave estrangeira para contas.
         await sessao.execute(delete(MovimentoORM))
-        await sessao.execute(delete(ObrigacaoDasORM))
+        await sessao.execute(delete(ContaORM))
         await sessao.commit()
 
 
@@ -57,6 +58,21 @@ def sessao_de_teste_factory() -> async_sessionmaker:
     (ex: `finance_api.jobs`), garantindo que nenhum job rodado em teste
     escreva no banco de desenvolvimento."""
     return _sessao_teste
+
+
+@pytest.fixture
+def semear_contas() -> Callable[[list[dict]], None]:
+    """Devolve uma função síncrona que grava contas no banco de teste.
+    Precisa rodar antes de `semear_movimentos` (chave estrangeira)."""
+
+    def _semear(contas: list[dict]) -> None:
+        async def gravar() -> None:
+            async with _sessao_teste() as sessao:
+                await upsert_contas(sessao, contas)
+
+        asyncio.run(gravar())
+
+    return _semear
 
 
 @pytest.fixture

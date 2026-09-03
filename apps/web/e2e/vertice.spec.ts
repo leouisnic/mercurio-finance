@@ -4,16 +4,11 @@ test("Vértice mostra o resumo calculado pelo finance-api de verdade", async ({ 
   await page.goto("/");
 
   await expect(page.getByRole("heading", { level: 1, name: "Vértice" })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: "Pessoa Física" })).toBeVisible();
-  await expect(
-    page.getByRole("heading", { level: 2, name: "Pessoa Jurídica (MEI)" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Conta A (fictícia)" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Conta B (fictícia)" })).toBeVisible();
 
-  // Valores batendo com dados/extrato_ficticio.csv do finance-api, não mais
+  // Valores batendo com o que finance_api.seed grava nas contas, não mais
   // hardcoded no componente: prova de que apps/web busca o dado de verdade.
-  await expect(page.getByText("R$ 254,50")).toBeVisible();
   await expect(page.getByText("R$ 2.898,40")).toBeVisible();
-
-  await expect(page.getByRole("heading", { level: 2, name: /DAS \(\d{4}-\d{2}\)/ })).toBeVisible();
-  await expect(page.getByText("R$ 86,05")).toBeVisible();
+  await expect(page.getByText("R$ 254,50")).toBeVisible();
 });

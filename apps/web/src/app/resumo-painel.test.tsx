@@ -5,44 +5,40 @@ import type { ResumoFinanceiro } from "./buscar-resumo";
 
 const RESUMO_FICTICIO: ResumoFinanceiro = {
   atualizadoEm: "2026-08-15",
-  titularidades: [
-    { id: "pf", nome: "Pessoa Física", saldo: 254.5 },
-    { id: "pj", nome: "Pessoa Jurídica (MEI)", saldo: 2898.4 },
+  contas: [
+    { id: "c1", nome: "Banco X", tipo: "BANK", saldo: 480.2, limite: null, disponivel: null },
+    {
+      id: "c2",
+      nome: "Cartão gold",
+      tipo: "CREDIT",
+      saldo: 340.04,
+      limite: 350,
+      disponivel: 9.96,
+    },
   ],
-  obrigacaoDas: {
-    competencia: "2026-08",
-    valor: 86.05,
-    paga: false,
-  },
 };
 
-test("mostra PF e PJ (MEI) com o saldo formatado em reais", () => {
+test("mostra saldo de conta corrente em verde", () => {
   render(<ResumoPainel resumo={RESUMO_FICTICIO} />);
 
-  expect(screen.getByRole("heading", { level: 2, name: "Pessoa Física" })).toBeDefined();
-  expect(
-    screen.getByRole("heading", { level: 2, name: "Pessoa Jurídica (MEI)" }),
-  ).toBeDefined();
-  expect(screen.getByText("R$ 254,50")).toBeDefined();
-  expect(screen.getByText("R$ 2.898,40")).toBeDefined();
+  expect(screen.getByRole("heading", { level: 2, name: "Banco X" })).toBeDefined();
+  expect(screen.getByText("Saldo")).toBeDefined();
+  const saldo = screen.getByText("R$ 480,20");
+  expect(saldo.className).toContain("emerald");
 });
 
-test("mostra o valor e o status da obrigação do DAS", () => {
+test("mostra fatura de cartão de crédito com limite disponível, em laranja", () => {
   render(<ResumoPainel resumo={RESUMO_FICTICIO} />);
 
-  expect(
-    screen.getByRole("heading", { level: 2, name: /DAS \(2026-08\)/ }),
-  ).toBeDefined();
-  expect(screen.getByText("R$ 86,05")).toBeDefined();
-  expect(screen.getByText("Ainda não pago nesta competência.")).toBeDefined();
+  expect(screen.getByRole("heading", { level: 2, name: "Cartão gold" })).toBeDefined();
+  expect(screen.getByText("Fatura atual")).toBeDefined();
+  const fatura = screen.getByText("R$ 340,04");
+  expect(fatura.className).toContain("amber");
+  expect(screen.getByText("R$ 9,96 disponível de R$ 350,00")).toBeDefined();
 });
 
-test("mostra que o DAS já foi pago quando paga é true", () => {
-  render(
-    <ResumoPainel
-      resumo={{ ...RESUMO_FICTICIO, obrigacaoDas: { ...RESUMO_FICTICIO.obrigacaoDas, paga: true } }}
-    />,
-  );
+test("mostra a data de atualização", () => {
+  render(<ResumoPainel resumo={RESUMO_FICTICIO} />);
 
-  expect(screen.getByText("Já pago nesta competência.")).toBeDefined();
+  expect(screen.getByText("Atualizado em 2026-08-15")).toBeDefined();
 });

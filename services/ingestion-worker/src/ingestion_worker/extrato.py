@@ -16,11 +16,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 import pandas as pd
-from mercurio_domain import (
-    SINAL_POR_TIPO,
-    TIPOS_VALIDOS,
-    TITULARIDADES_VALIDAS,
-)
+from mercurio_domain import SINAL_POR_TIPO, TIPOS_VALIDOS
 from mercurio_domain import (
     fingerprint as calcular_fingerprint,
 )
@@ -29,7 +25,7 @@ COLUNAS_ESPERADAS = [
     "data",
     "valor",
     "descricao",
-    "titularidade",
+    "conta_id",
     "tipo",
     "identificador_externo",
 ]
@@ -50,7 +46,7 @@ def _parse_data(valor: object) -> date:
 
 def _fingerprint_linha(linha: pd.Series) -> str:
     return calcular_fingerprint(
-        titularidade=linha["titularidade"],
+        conta_id=linha["conta_id"],
         data=linha["_data_parseada"],
         valor=linha["valor"],
         descricao=linha["descricao"],
@@ -63,10 +59,11 @@ def processar_movimentos(movimentos: pd.DataFrame) -> pd.DataFrame:
     movimentos, venha de onde vier (CSV, Pluggy, XML de NFS-e).
 
     Rejeita a importação (levanta `ValueError`) se alguma linha tiver
-    titularidade ou tipo fora do esperado, valor ausente ou não positivo,
-    ou data em formato diferente de AAAA-MM-DD. Antes desta checagem,
-    esses casos eram descartados em silêncio pelo pandas em vez de barrar
-    a importação.
+    `conta_id` ou tipo ausente, valor ausente ou não positivo, ou data em
+    formato diferente de AAAA-MM-DD. Antes desta checagem, esses casos
+    eram descartados em silêncio pelo pandas em vez de barrar a
+    importação. `conta_id` não é validado contra uma lista fixa: contas
+    são dinâmicas, vêm da Pluggy (ver `finance_api.repositorio`).
     """
     extrato = movimentos.copy()
 
@@ -74,17 +71,19 @@ def processar_movimentos(movimentos: pd.DataFrame) -> pd.DataFrame:
     if colunas_faltando:
         raise ValueError(f"Colunas faltando no extrato: {sorted(colunas_faltando)}")
 
-    extrato["titularidade"] = extrato["titularidade"].astype(str).str.strip().str.lower()
-    extrato["tipo"] = extrato["tipo"].astype(str).str.strip().str.lower()
+    # isna() primeiro: astype(str) numa célula vazia do CSV não vira
+    # sempre a string "nan" (depende do dtype de string do pandas), então
+    # checar isna() antes de mexer no valor é a forma confiável.
+    conta_id_ausente = extrato["conta_id"].isna()
+    extrato["conta_id"] = extrato["conta_id"].astype(str).str.strip()
+    conta_id_ausente = conta_id_ausente | (extrato["conta_id"] == "")
 
-    titularidade_invalida = ~extrato["titularidade"].isin(TITULARIDADES_VALIDAS)
+    extrato["tipo"] = extrato["tipo"].astype(str).str.strip().str.lower()
     tipo_invalido = ~extrato["tipo"].isin(TIPOS_VALIDOS)
-    if titularidade_invalida.any() or tipo_invalido.any():
-        linhas = sorted(
-            (extrato.index[titularidade_invalida | tipo_invalido] + 2).tolist()
-        )
+    if conta_id_ausente.any() or tipo_invalido.any():
+        linhas = sorted((extrato.index[conta_id_ausente | tipo_invalido] + 2).tolist())
         raise ValueError(
-            f"Titularidade ou tipo inválido no extrato, linhas (1 = cabeçalho): {linhas}"
+            f"conta_id ausente ou tipo inválido no extrato, linhas (1 = cabeçalho): {linhas}"
         )
 
     valor_numerico = pd.to_numeric(extrato["valor"], errors="coerce")
@@ -122,18 +121,23 @@ def carregar_extrato(caminho: Path) -> pd.DataFrame:
     return processar_movimentos(pd.read_csv(caminho, dtype=str))
 
 
-def resumir_por_titularidade(extrato: pd.DataFrame) -> pd.DataFrame:
+def resumir_por_conta(extrato: pd.DataFrame) -> pd.DataFrame:
     """Soma o saldo dos lançamentos sem duplicidade confirmada, agrupados
-    por titularidade.
+    por conta.
 
     Receita e aporte do titular somam; despesa e retirada do titular
-    subtraem. Retirada e aporte do titular não são despesa nem receita,
-    mas ainda mudam o saldo de cada conta.
+    subtraem. Retirada e aporte do titular não são despesa nem receita
+    (são transferência entre contas do próprio Leonardo), mas ainda mudam
+    o saldo de cada conta.
 
     Lançamentos marcados como `duplicado_possivel` (mesmo fingerprint,
     identificador externo diferente) continuam somados: sem mais contexto
     não dá para saber se são duplicidade real ou dois eventos legítimos
     iguais, então a decisão de remover fica para revisão humana.
+
+    Nota: `finance-api` não usa mais esta função para o saldo mostrado no
+    painel (isso vem direto da Pluggy, mais confiável). Fica disponível
+    para uma futura tela de gastos por período.
     """
     sem_duplicidade_confirmada = extrato.drop_duplicates(
         subset=["fingerprint", "identificador_externo"]
@@ -145,7 +149,7 @@ def resumir_por_titularidade(extrato: pd.DataFrame) -> pd.DataFrame:
     )
 
     return (
-        sem_duplicidade_confirmada.groupby("titularidade")["valor_com_sinal"]
+        sem_duplicidade_confirmada.groupby("conta_id")["valor_com_sinal"]
         .sum()
         .round(2)
         .reset_index()

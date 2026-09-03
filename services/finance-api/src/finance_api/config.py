@@ -29,14 +29,10 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
 PLUGGY_CLIENT_ID = os.environ.get("PLUGGY_CLIENT_ID")
 PLUGGY_CLIENT_SECRET = os.environ.get("PLUGGY_CLIENT_SECRET")
 
-# Nomeadas pelo banco, não pela titularidade: as duas contas conectadas
-# hoje (Nubank e Mercado Pago) são PF. A PJ (Nubank, CNPJ do MEI) existe
-# de verdade, mas não está conectada no Pluggy, só intermediária para
-# receber pagamento de nota fiscal, sempre com saldo perto de zero. Ver
-# docs/domain-rules.md.
-PLUGGY_ITEM_ID_NUBANK = os.environ.get("PLUGGY_ITEM_ID_NUBANK")
-PLUGGY_ITEM_ID_MERCADOPAGO = os.environ.get("PLUGGY_ITEM_ID_MERCADOPAGO")
-
-# DAS-MEI: valor fixo mensal por tabela, reajustado uma vez por ano
-# (não percentual de faturamento). O Leonardo informou o valor real.
-DAS_VALOR = os.environ.get("DAS_VALOR", "86.05")
+# Lista de item id do Pluggy, um por banco conectado. Adicionar um banco
+# novo (ou trocar de banco) é só acrescentar/trocar aqui, sem mexer em
+# código: nome, saldo e limite de cada conta vêm sempre da própria
+# Pluggy. Ver docs/domain-rules.md.
+PLUGGY_ITEM_IDS = [
+    item.strip() for item in os.environ.get("PLUGGY_ITEM_IDS", "").split(",") if item.strip()
+]

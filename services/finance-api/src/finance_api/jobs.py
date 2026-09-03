@@ -9,24 +9,10 @@ import asyncio
 import pandas as pd
 from mercurio_domain import Proveniencia
 
-from finance_api.config import (
-    PLUGGY_CLIENT_ID,
-    PLUGGY_CLIENT_SECRET,
-    PLUGGY_ITEM_ID_MERCADOPAGO,
-    PLUGGY_ITEM_ID_NUBANK,
-)
-
-# As duas contas conectadas hoje são PF (Nubank e Mercado Pago). A PJ
-# existe (Nubank, CNPJ do MEI) mas não está conectada no Pluggy: é só
-# intermediária para receber nota fiscal, sempre com saldo perto de zero.
-# Ver docs/domain-rules.md. Adicionar aqui se um dia ela for conectada.
-CONTAS_PLUGGY = [
-    (PLUGGY_ITEM_ID_NUBANK, "pf"),
-    (PLUGGY_ITEM_ID_MERCADOPAGO, "pf"),
-]
+from finance_api.config import PLUGGY_CLIENT_ID, PLUGGY_CLIENT_SECRET, PLUGGY_ITEM_IDS
 from finance_api.db import async_session
-from finance_api.repositorio import inserir_movimentos
-from finance_api.seed import EXTRATO_FICTICIO
+from finance_api.repositorio import inserir_movimentos, upsert_contas
+from finance_api.seed import EXTRATO_FICTICIO, seed_contas_ficticias
 
 
 def job_reimportar_seed() -> int:
@@ -39,6 +25,7 @@ def job_reimportar_seed() -> int:
 
     async def inserir() -> int:
         async with async_session() as sessao:
+            await upsert_contas(sessao, seed_contas_ficticias())
             return await inserir_movimentos(
                 sessao, extrato, proveniencia=Proveniencia.IMPORTACAO_MANUAL.value
             )
@@ -47,55 +34,55 @@ def job_reimportar_seed() -> int:
 
 
 def job_sincronizar_pluggy() -> dict[str, int]:
-    """Busca transações reais no Pluggy (hoje, Nubank e Mercado Pago,
-    as duas PF, ver `CONTAS_PLUGGY`) e grava no Postgres. Só leitura na
-    Pluggy; idempotente na escrita (reimportar não duplica saldo).
+    """Busca contas e transações reais no Pluggy (um item por banco
+    conectado, `PLUGGY_ITEM_IDS`) e grava no Postgres. Só leitura na
+    Pluggy; idempotente na escrita (reimportar não duplica saldo, e
+    atualizar uma conta que já existe só atualiza saldo/limite).
 
-    Inclui conta corrente e cartão de crédito de cada titularidade: sem
-    separar o pagamento da fatura do cartão da compra em si ainda, então
-    pode haver dupla contagem entre "compra no cartão" e "pagamento da
-    fatura" até essa regra ser desenhada. Decisão registrada em
-    docs/decisions.md.
+    Inclui conta corrente e cartão de crédito de cada banco: sem separar
+    o pagamento da fatura do cartão da compra em si ainda, então pode
+    haver dupla contagem entre "compra no cartão" e "pagamento da
+    fatura" no histórico de movimentos (decisão registrada em
+    docs/decisions.md). O saldo mostrado no painel não depende disso: vem
+    direto do que a Pluggy relata para cada conta, não de somar
+    movimentos.
     """
     from ingestion_worker.extrato import processar_movimentos
     from ingestion_worker.pluggy import (
         autenticar,
         listar_contas,
         listar_transacoes,
+        mapear_conta,
         mapear_para_movimento,
     )
 
-    if not (PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET) or not all(
-        item_id for item_id, _ in CONTAS_PLUGGY
-    ):
+    if not (PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET and PLUGGY_ITEM_IDS):
         raise RuntimeError(
             "Credenciais do Pluggy não configuradas (PLUGGY_CLIENT_ID, "
-            "PLUGGY_CLIENT_SECRET, PLUGGY_ITEM_ID_NUBANK, "
-            "PLUGGY_ITEM_ID_MERCADOPAGO)."
+            "PLUGGY_CLIENT_SECRET, PLUGGY_ITEM_IDS)."
         )
 
     api_key = autenticar(PLUGGY_CLIENT_ID, PLUGGY_CLIENT_SECRET)
 
+    contas: list[dict] = []
     movimentos: list[dict] = []
-    contas_processadas = 0
-    for item_id, titularidade in CONTAS_PLUGGY:
+    for item_id in PLUGGY_ITEM_IDS:
         for conta in listar_contas(api_key, item_id):
-            contas_processadas += 1
+            contas.append(mapear_conta(conta))
             for transacao in listar_transacoes(api_key, conta["id"]):
-                movimentos.append(mapear_para_movimento(transacao, titularidade))
+                movimentos.append(mapear_para_movimento(transacao))
 
-    if not movimentos:
-        return {"contas": contas_processadas, "transacoes_encontradas": 0, "inseridos": 0}
-
-    extrato = processar_movimentos(pd.DataFrame(movimentos))
-
-    async def inserir() -> int:
+    async def gravar() -> int:
         async with async_session() as sessao:
+            await upsert_contas(sessao, contas)
+            if not movimentos:
+                return 0
+            extrato = processar_movimentos(pd.DataFrame(movimentos))
             return await inserir_movimentos(sessao, extrato, proveniencia=Proveniencia.PLUGGY.value)
 
-    inseridos = asyncio.run(inserir())
+    inseridos = asyncio.run(gravar())
     return {
-        "contas": contas_processadas,
+        "contas": len(contas),
         "transacoes_encontradas": len(movimentos),
         "inseridos": inseridos,
     }

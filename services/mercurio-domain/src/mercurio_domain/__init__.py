@@ -18,17 +18,6 @@ from decimal import Decimal, InvalidOperation
 from enum import Enum
 
 
-class Titularidade(str, Enum):
-    """PF é a pessoa física. PJ é a empresa: no caso do Leonardo, um único
-    CNPJ registrado como MEI, então PJ e MEI são a mesma conta e o mesmo
-    saldo, não duas titularidades separadas. MEI aqui é o regime
-    tributário da PJ (usado para calcular o DAS pela tabela certa), não
-    um terceiro lugar onde o dinheiro fica."""
-
-    PF = "pf"
-    PJ = "pj"
-
-
 class Proveniencia(str, Enum):
     EXTRATO_BANCARIO = "extrato_bancario"
     NFSE_XML = "nfse_xml"
@@ -40,9 +29,9 @@ class TipoMovimento(str, Enum):
     RECEITA = "receita"
     DESPESA = "despesa"
     RETIRADA_TITULAR = "retirada_titular"
-    """Saída de uma titularidade para outra do mesmo dono. Não é despesa."""
+    """Saída de uma conta para outra do mesmo dono. Não é despesa."""
     APORTE_TITULAR = "aporte_titular"
-    """Entrada em uma titularidade vinda de outra do mesmo dono. Espelha
+    """Entrada em uma conta vinda de outra do mesmo dono. Espelha
     RETIRADA_TITULAR do lado de origem. Não é receita."""
 
 
@@ -55,7 +44,6 @@ SINAL_POR_TIPO: dict[TipoMovimento, int] = {
     TipoMovimento.APORTE_TITULAR: 1,
 }
 
-TITULARIDADES_VALIDAS = frozenset(item.value for item in Titularidade)
 TIPOS_VALIDOS = frozenset(item.value for item in TipoMovimento)
 
 
@@ -76,7 +64,7 @@ def normalizar_valor(valor: Decimal | float | str) -> Decimal:
 
 
 def fingerprint(
-    titularidade: Titularidade | str,
+    conta_id: str,
     data: date,
     valor: Decimal | float | str,
     descricao: str,
@@ -84,7 +72,7 @@ def fingerprint(
 ) -> str:
     """Chave de conciliação composta a partir do conteúdo do movimento.
 
-    Dois movimentos com o mesmo fingerprint têm titularidade, data, valor,
+    Dois movimentos com o mesmo fingerprint têm conta, data, valor,
     descrição e tipo iguais: são o mesmo evento financeiro, independente
     do identificador dado pelo banco ou pela fonte, que já foi observado
     reaproveitado em lançamentos diferentes nos dados reais do Leonardo.
@@ -92,7 +80,7 @@ def fingerprint(
     valor_normalizado = normalizar_valor(valor)
     base = "|".join(
         [
-            Titularidade(titularidade).value,
+            str(conta_id).strip().lower(),
             data.isoformat(),
             f"{valor_normalizado:.2f}",
             descricao.strip().lower(),

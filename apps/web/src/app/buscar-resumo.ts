@@ -1,36 +1,36 @@
-export type ResumoTitularidade = {
-  id: "pf" | "pj";
+export type Conta = {
+  id: string;
   nome: string;
+  tipo: "BANK" | "CREDIT";
   saldo: number;
+  limite: number | null;
+  disponivel: number | null;
 };
 
 export type ResumoFinanceiro = {
   atualizadoEm: string;
-  titularidades: ResumoTitularidade[];
-  obrigacaoDas: {
-    competencia: string;
-    valor: number;
-    paga: boolean;
-  };
+  contas: Conta[];
 };
 
-type RespostaApiTitularidade = {
-  titularidade: "pf" | "pj";
+type RespostaApiConta = {
+  id: string;
   nome: string;
+  tipo: "BANK" | "CREDIT";
   saldo: string;
+  limite: string | null;
+  disponivel: string | null;
 };
 
 type RespostaApi = {
   atualizado_em: string;
-  titularidades: RespostaApiTitularidade[];
-  obrigacao_das: {
-    competencia: string;
-    valor: string;
-    paga: boolean;
-  };
+  contas: RespostaApiConta[];
 };
 
 const FINANCE_API_URL = process.env.FINANCE_API_URL ?? "http://localhost:8000";
+
+function paraNumeroOuNull(valor: string | null): number | null {
+  return valor === null ? null : Number(valor);
+}
 
 /**
  * Busca o resumo financeiro no finance-api. Os valores chegam como string no
@@ -55,16 +55,14 @@ export async function buscarResumo(): Promise<ResumoFinanceiro | null> {
 
     return {
       atualizadoEm: corpo.atualizado_em,
-      titularidades: corpo.titularidades.map((item) => ({
-        id: item.titularidade,
-        nome: item.nome,
-        saldo: Number(item.saldo),
+      contas: corpo.contas.map((conta) => ({
+        id: conta.id,
+        nome: conta.nome,
+        tipo: conta.tipo,
+        saldo: Number(conta.saldo),
+        limite: paraNumeroOuNull(conta.limite),
+        disponivel: paraNumeroOuNull(conta.disponivel),
       })),
-      obrigacaoDas: {
-        competencia: corpo.obrigacao_das.competencia,
-        valor: Number(corpo.obrigacao_das.valor),
-        paga: corpo.obrigacao_das.paga,
-      },
     };
   } catch {
     return null;

@@ -76,10 +76,11 @@ def listar_transacoes(api_key: str, account_id: str, limite_paginas: int = 50) -
     return todas
 
 
-def mapear_para_movimento(transacao: dict, titularidade: str) -> dict:
+def mapear_para_movimento(transacao: dict) -> dict:
     """Converte uma transação da Pluggy para o formato que
     `finance_api.repositorio.inserir_movimentos` espera (mesmo shape que
-    `ingestion_worker.extrato.carregar_extrato` produz)."""
+    `ingestion_worker.extrato.carregar_extrato` produz). `conta_id` vem
+    direto do `accountId` da própria transação, sem mapeamento externo."""
     valor = float(transacao["amount"])
     e_transferencia_propria = transacao.get("category") == CATEGORIA_TRANSFERENCIA_PROPRIA
 
@@ -91,10 +92,34 @@ def mapear_para_movimento(transacao: dict, titularidade: str) -> dict:
     data = datetime.fromisoformat(transacao["date"]).date()
 
     return {
-        "titularidade": titularidade,
+        "conta_id": transacao["accountId"],
         "data": data.isoformat(),
         "valor": abs(valor),
         "descricao": transacao["description"],
         "tipo": tipo,
         "identificador_externo": transacao["id"],
+    }
+
+
+def mapear_conta(conta: dict) -> dict:
+    """Converte uma conta da Pluggy para o formato da tabela `contas`.
+
+    Conta corrente (`BANK`): só tem saldo. Cartão de crédito (`CREDIT`):
+    `balance` já é o valor usado da fatura em aberto; `creditData` traz o
+    limite total e o quanto ainda está disponível.
+    """
+    dados_credito = conta.get("creditData") or {}
+    return {
+        "id": conta["id"],
+        "nome": conta.get("marketingName") or conta.get("name") or conta["id"],
+        "tipo": conta["type"],
+        "saldo": float(conta["balance"]),
+        "limite": (
+            float(dados_credito["creditLimit"]) if "creditLimit" in dados_credito else None
+        ),
+        "disponivel": (
+            float(dados_credito["availableCreditLimit"])
+            if "availableCreditLimit" in dados_credito
+            else None
+        ),
     }

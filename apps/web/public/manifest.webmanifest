@@ -1,7 +1,7 @@
 {
   "name": "Vértice · Mercúrio",
   "short_name": "Vértice",
-  "description": "Painel consolidado de pessoa física e PJ (MEI) do Mercúrio.",
+  "description": "Painel consolidado do Mercúrio: saldo das suas contas conectadas.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fafafa",

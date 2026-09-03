@@ -8,11 +8,18 @@ from ingestion_worker import pluggy
 
 pytestmark = pytest.mark.usefixtures("banco_de_teste_limpo")
 
-# As duas contas conectadas no Pluggy hoje são PF (Nubank e Mercado Pago).
-CONTA_NUBANK = {"id": "conta-nubank", "type": "BANK"}
+CONTA_NUBANK = {
+    "id": "conta-nubank",
+    "type": "BANK",
+    "name": "Nu Pagamentos",
+    "marketingName": "Nubank",
+    "balance": 480.20,
+    "creditData": None,
+}
 TRANSACOES_NUBANK = [
     {
         "id": "txn-1",
+        "accountId": "conta-nubank",
         "date": "2026-08-05T10:00:00.000Z",
         "description": "Pagamento cliente Genux",
         "amount": 2500.0,
@@ -20,16 +27,25 @@ TRANSACOES_NUBANK = [
     },
     {
         "id": "txn-2",
+        "accountId": "conta-nubank",
         "date": "2026-08-08T10:00:00.000Z",
         "description": "Transferencia para Mercado Pago",
         "amount": -500.0,
         "category": "Same person transfer",
     },
 ]
-CONTA_MERCADOPAGO = {"id": "conta-mercadopago", "type": "BANK"}
+CONTA_MERCADOPAGO = {
+    "id": "conta-mercadopago",
+    "type": "BANK",
+    "name": "Mercado Pago",
+    "marketingName": "Mercado Pago",
+    "balance": 168.63,
+    "creditData": None,
+}
 TRANSACOES_MERCADOPAGO = [
     {
         "id": "txn-3",
+        "accountId": "conta-mercadopago",
         "date": "2026-08-08T10:00:00.000Z",
         "description": "Transferencia recebida do Nubank",
         "amount": 500.0,
@@ -42,9 +58,7 @@ def _configurar_mocks(monkeypatch: pytest.MonkeyPatch, sessao_de_teste_factory) 
     monkeypatch.setattr(jobs, "async_session", sessao_de_teste_factory)
     monkeypatch.setattr(jobs, "PLUGGY_CLIENT_ID", "id-de-teste")
     monkeypatch.setattr(jobs, "PLUGGY_CLIENT_SECRET", "segredo-de-teste")
-    monkeypatch.setattr(
-        jobs, "CONTAS_PLUGGY", [("item-nubank", "pf"), ("item-mercadopago", "pf")]
-    )
+    monkeypatch.setattr(jobs, "PLUGGY_ITEM_IDS", ["item-nubank", "item-mercadopago"])
 
     monkeypatch.setattr(pluggy, "autenticar", lambda client_id, client_secret: "chave-falsa")
 
@@ -58,8 +72,8 @@ def _configurar_mocks(monkeypatch: pytest.MonkeyPatch, sessao_de_teste_factory) 
     monkeypatch.setattr(pluggy, "listar_transacoes", _listar_transacoes_falso)
 
 
-def test_job_sincronizar_pluggy_grava_movimentos_reais(
-    monkeypatch: pytest.MonkeyPatch, sessao_de_teste_factory, semear_movimentos
+def test_job_sincronizar_pluggy_grava_contas_e_movimentos(
+    monkeypatch: pytest.MonkeyPatch, sessao_de_teste_factory
 ) -> None:
     _configurar_mocks(monkeypatch, sessao_de_teste_factory)
 

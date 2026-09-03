@@ -8,15 +8,17 @@ afterEach(() => {
 test("converte a resposta do finance-api (snake_case, valores em string) para o formato do painel", async () => {
   const corpoDaApi = {
     atualizado_em: "2026-08-15",
-    titularidades: [
-      { titularidade: "pf", nome: "Pessoa Física", saldo: "254.50" },
-      { titularidade: "pj", nome: "Pessoa Jurídica", saldo: "2550.00" },
+    contas: [
+      { id: "c1", nome: "Banco X", tipo: "BANK", saldo: "254.50", limite: null, disponivel: null },
+      {
+        id: "c2",
+        nome: "Cartão gold",
+        tipo: "CREDIT",
+        saldo: "340.04",
+        limite: "350.00",
+        disponivel: "9.96",
+      },
     ],
-    obrigacao_das: {
-      competencia: "2026-08",
-      valor: "86.05",
-      paga: false,
-    },
   };
 
   vi.stubGlobal(
@@ -31,15 +33,10 @@ test("converte a resposta do finance-api (snake_case, valores em string) para o 
 
   expect(resumo).toEqual({
     atualizadoEm: "2026-08-15",
-    titularidades: [
-      { id: "pf", nome: "Pessoa Física", saldo: 254.5 },
-      { id: "pj", nome: "Pessoa Jurídica", saldo: 2550 },
+    contas: [
+      { id: "c1", nome: "Banco X", tipo: "BANK", saldo: 254.5, limite: null, disponivel: null },
+      { id: "c2", nome: "Cartão gold", tipo: "CREDIT", saldo: 340.04, limite: 350, disponivel: 9.96 },
     ],
-    obrigacaoDas: {
-      competencia: "2026-08",
-      valor: 86.05,
-      paga: false,
-    },
   });
 });
 

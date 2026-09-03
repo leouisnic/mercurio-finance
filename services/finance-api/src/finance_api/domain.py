@@ -1,8 +1,8 @@
-"""Modelo de domínio do Mercúrio: titularidades, movimentos e reserva do DAS.
+"""Modelo de domínio do Mercúrio: contas e movimentos.
 
-Titularidade, tipo de movimento e o cálculo de fingerprint vêm do pacote
-compartilhado `mercurio_domain`, para que finance-api e ingestion-worker
-nunca divirjam na regra de conciliação. Ver `mercurio_domain` para o porquê.
+Tipo de movimento e o cálculo de fingerprint vêm do pacote compartilhado
+`mercurio_domain`, para que finance-api e ingestion-worker nunca divirjam
+na regra de conciliação. Ver `mercurio_domain` para o porquê.
 """
 
 from __future__ import annotations
@@ -10,33 +10,26 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from mercurio_domain import (
-    Proveniencia,
-    TipoMovimento,
-    Titularidade,
-    normalizar_valor,
-)
+from mercurio_domain import Proveniencia, TipoMovimento, normalizar_valor
 from mercurio_domain import (
     fingerprint as calcular_fingerprint,
 )
 from pydantic import BaseModel, Field, field_validator
 
 __all__ = [
+    "Conta",
     "Movimento",
-    "ObrigacaoDas",
     "Proveniencia",
     "ResumoFinanceiro",
-    "ResumoTitularidade",
     "TipoMovimento",
-    "Titularidade",
     "encontrar_duplicidades",
 ]
 
 
 class Movimento(BaseModel):
-    """Um lançamento financeiro já classificado por titularidade."""
+    """Um lançamento financeiro já ligado a uma conta."""
 
-    titularidade: Titularidade
+    conta_id: str
     data: date
     valor: Decimal
     descricao: str
@@ -63,7 +56,7 @@ class Movimento(BaseModel):
         Ver `mercurio_domain.fingerprint`.
         """
         return calcular_fingerprint(
-            self.titularidade, self.data, self.valor, self.descricao, self.tipo
+            self.conta_id, self.data, self.valor, self.descricao, self.tipo
         )
 
 
@@ -84,27 +77,19 @@ def encontrar_duplicidades(movimentos: list[Movimento]) -> list[list[Movimento]]
     return [grupo for grupo in grupos.values() if len(grupo) > 1]
 
 
-class ResumoTitularidade(BaseModel):
-    titularidade: Titularidade
+class Conta(BaseModel):
+    """Uma conta conectada no Pluggy. `nome`, `saldo` e (para cartão de
+    crédito) `limite`/`disponivel` vêm sempre da própria Pluggy, atualizados
+    a cada sincronização; nunca fixos no código."""
+
+    id: str
     nome: str
+    tipo: str  # "BANK" ou "CREDIT"
     saldo: Decimal
-
-
-class ObrigacaoDas(BaseModel):
-    """O DAS-MEI é um valor fixo mensal (não percentual de faturamento).
-
-    Não é derivado de movimento importado: nada no extrato conectado hoje
-    mostra o pagamento do DAS, porque ele sai da conta PJ, que não está
-    conectada no Pluggy (ver docs/domain-rules.md). `paga` é marcada à
-    mão via POST /das/pagar, não inferida automaticamente.
-    """
-
-    competencia: str  # "AAAA-MM"
-    valor: Decimal
-    paga: bool
+    limite: Decimal | None = None
+    disponivel: Decimal | None = None
 
 
 class ResumoFinanceiro(BaseModel):
     atualizado_em: date
-    titularidades: list[ResumoTitularidade]
-    obrigacao_das: ObrigacaoDas
+    contas: list[Conta]

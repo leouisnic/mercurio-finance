@@ -1,23 +1,23 @@
 # Arquitetura
 
-Mercúrio é uma plataforma financeira pessoal com separação entre pessoa
-física (PF) e a empresa (PJ, registrada como MEI). O painel consolidado
-principal é o Vértice.
+Mercúrio é uma plataforma financeira pessoal. O painel consolidado
+principal, Vértice, mostra o saldo de cada conta que o Leonardo conecta
+via Open Finance (Pluggy), uma por card, sempre com o nome e o valor que
+o próprio banco relata.
 
 ## Componentes
 
 ```
 apps/web                  Next.js + React + TypeScript. PWA responsiva.
-                           Painel Vértice e telas por titularidade.
+                           Painel Vértice, um card por conta conectada.
 
-services/finance-api       FastAPI. Regras de domínio, resumo financeiro
-                           calculado a partir de movimentos, conciliação
-                           por fingerprint. Usa o importador do
-                           ingestion-worker para carregar o extrato.
+services/finance-api       FastAPI. Contas e movimentos no Postgres,
+                           fila de sincronização no Redis.
 
-services/ingestion-worker  ETL com Pandas. Importa extrato bancário,
-                           planilha e XML de NFS-e. Roda como worker
-                           assíncrono junto com Redis.
+services/ingestion-worker  ETL com Pandas e cliente da Pluggy (só
+                           leitura). Importa extrato bancário, planilha e
+                           XML de NFS-e; roda como worker assíncrono
+                           junto com Redis.
 
 services/mercurio-domain   Tipos e regra de fingerprint compartilhados
                            entre finance-api e ingestion-worker.
@@ -49,43 +49,51 @@ mantém seu próprio `pyproject.toml` e suas próprias dependências; o
 entre os dois serviços (formatação de valor e data diferentes fizeram o
 mesmo movimento gerar fingerprints diferentes conforme a origem). Em vez
 de manter as duas em sincronia manualmente, os tipos de domínio
-(`Titularidade`, `TipoMovimento`, `Proveniencia`) e a função `fingerprint`
-vivem só ali; `finance-api` e `ingestion-worker` importam, não
-reimplementam.
+(`TipoMovimento`, `Proveniencia`) e a função `fingerprint` vivem só ali;
+`finance-api` e `ingestion-worker` importam, não reimplementam.
 
 ## Fluxo de dado
 
 ```
-extrato (CSV fictício em dev, Pluggy mais adiante)
-  -> carregar_extrato() (ingestion-worker): valida, calcula fingerprint,
-     marca duplicidade confirmada/possível
-  -> inserir_movimentos() (finance-api/repositorio.py): grava no Postgres,
-     idempotente (reimportar não duplica, ON CONFLICT DO NOTHING)
-  -> GET /resumo (finance-api): lê do Postgres, agrega com
-     resumir_por_titularidade() (mesma função do ingestion-worker)
+Pluggy: /accounts (saldo, limite) e /v2/transactions (histórico)
+  -> mapear_conta() / mapear_para_movimento() (ingestion-worker/pluggy.py)
+  -> processar_movimentos() (ingestion-worker/extrato.py): valida, calcula
+     fingerprint, marca duplicidade confirmada/possível
+  -> upsert_contas() + inserir_movimentos() (finance-api/repositorio.py):
+     grava no Postgres, idempotente
+  -> GET /resumo (finance-api): lê a tabela `contas` direto, sem agregar
+     movimentos (o saldo já vem certo da própria Pluggy)
   -> fetch em Server Component, cache: "no-store" (apps/web)
-  -> painel Vértice
+  -> painel Vértice, um card por conta
 ```
 
 `apps/web` busca `finance-api` de verdade a cada carregamento da página
-(`src/app/buscar-resumo.ts`); não há mais número fixo no componente. Se o
+(`src/app/buscar-resumo.ts`); não há número fixo no componente. Se o
 `finance-api` não estiver no ar, a página mostra uma mensagem em vez de
-quebrar. A reserva do DAS ainda é um valor fixo dentro do `finance-api`: a
-regra real de cálculo é decisão de negócio do Leonardo, ainda pendente.
+quebrar.
+
+O saldo mostrado no painel vem direto da tabela `contas`, atualizada a
+cada sincronização com o que a Pluggy relata (`balance`, e para cartão de
+crédito `creditData.creditLimit`/`availableCreditLimit`), não de somar o
+histórico de movimentos, que pode ficar incompleto ou defasado. Os
+movimentos continuam gravados (para histórico e conciliação), só não são
+mais a fonte do número que aparece no card.
 
 ## Persistência
 
 `finance-api` usa SQLAlchemy 2.0 assíncrono (`asyncpg`) e Alembic para
-migração. Uma tabela só, `movimentos`, com constraint única em
-`(fingerprint, identificador_externo)`: é o que torna a importação
-idempotente, reimportar a mesma origem (CSV ou, mais adiante, Pluggy) não
-duplica saldo. `uv run --package finance-api python -m finance_api.seed`
-popula o banco de desenvolvimento com o extrato fictício.
+migração. Duas tabelas: `contas` (id da Pluggy, nome, tipo, saldo,
+limite/disponível, atualizada a cada sincronização) e `movimentos`
+(ligado a uma conta por `conta_id`, com constraint única em
+`(fingerprint, identificador_externo)`, o que torna a importação
+idempotente: reimportar a mesma origem não duplica). `uv run --package
+finance-api python -m finance_api.seed` popula o banco de desenvolvimento
+com contas e extrato fictícios, para rodar sem Pluggy configurado.
 
 Banco de teste é **separado** do de desenvolvimento
 (`mercurio_test`, não `mercurio`, criado por `infra/postgres-init/`): os
-testes truncam a tabela a cada execução, e o banco de desenvolvimento é o
-que vai receber dado real do Pluggy. Rodar `pytest` nunca apaga dado real.
+testes truncam as tabelas a cada execução, e o banco de desenvolvimento é
+o que recebe dado real do Pluggy. Rodar `pytest` nunca apaga dado real.
 
 Nota de ambiente Windows: `DATABASE_URL` e `REDIS_URL` usam `127.0.0.1`,
 não `localhost`. Resolver `localhost` tenta IPv6 antes de cair para IPv4
@@ -93,26 +101,24 @@ nesta máquina, e isso sozinho já custava ~2s por conexão nova.
 
 ## Estado desta entrega
 
-- `apps/web`: painel Vértice buscando o resumo real do `finance-api` a
-  cada carregamento (Server Component assíncrono).
-- `services/finance-api`: `/health`, `/resumo` (calculado a partir dos
-  movimentos no Postgres), `/sync/seed` e `/sync/pluggy` (enfileiram
-  importação e sincronização real, `/sync/{job_id}` confere o resultado),
-  modelo de domínio com fingerprint de conciliação e validação de valor
-  positivo.
+- `apps/web`: painel Vértice, um card por conta conectada (Server
+  Component assíncrono buscando `/resumo` a cada carregamento).
+- `services/finance-api`: `/health`, `/resumo` (contas direto do
+  Postgres), `/sync/seed` e `/sync/pluggy` (enfileiram importação e
+  sincronização real, `/sync/{job_id}` confere o resultado), modelo de
+  domínio com fingerprint de conciliação e validação de valor positivo.
 - `services/ingestion-worker`: importador de extrato CSV e cliente da
-  Pluggy (`pluggy.py`, só leitura), com validação explícita (titularidade,
-  tipo, valor, data) e duas camadas de duplicidade (confirmada e
-  possível), usado tanto pelos próprios testes quanto pelo `finance-api`.
-  Ver [domain-rules.md](./domain-rules.md#conciliação-e-duplicidade).
+  Pluggy (`pluggy.py`, só leitura: contas, saldo, limite e transações),
+  com validação explícita (conta, tipo, valor, data) e duas camadas de
+  duplicidade (confirmada e possível), usado tanto pelos próprios testes
+  quanto pelo `finance-api`. Ver
+  [domain-rules.md](./domain-rules.md#conciliação-e-duplicidade).
 - `services/mercurio-domain`: fingerprint e tipos compartilhados.
 - `infra`: PostgreSQL (com banco de teste separado) e Redis com healthcheck
-  e bind só em `127.0.0.1`, usados de verdade agora (persistência e fila).
+  e bind só em `127.0.0.1`, usados de verdade (persistência e fila).
 
-Pluggy está sincronizando dado real (Nubank e Mercado Pago, as duas PF; a
-conta PJ existe mas não está conectada, ver
-[domain-rules.md](./domain-rules.md#contas-reais-e-o-que-está-conectado-no-pluggy))
-no banco de desenvolvimento local; esse dado nunca entra no Git. Ainda não
-wireados: Telegram, autenticação do painel, regra real de cálculo do DAS.
-Ver [decisions.md](./decisions.md) para o que foi decidido e o que falta
-decidir.
+Pluggy está sincronizando dado real (Nubank e Mercado Pago, conta
+corrente e cartão de crédito de cada um) no banco de desenvolvimento
+local; esse dado nunca entra no Git. Ainda não wireados: Telegram,
+autenticação do painel. Ver [decisions.md](./decisions.md) para o que foi
+decidido, incluindo o que já foi tentado e revertido.

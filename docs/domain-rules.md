@@ -1,58 +1,36 @@
 # Regras de domínio
 
-## Titularidades
+## Contas, não titularidade
 
-Todo movimento financeiro pertence a exatamente uma titularidade: PF ou
-PJ. Nunca fica ambíguo entre as duas.
+O painel mostra uma conta por vez (não um agregado por PF/PJ): cada conta
+que o Leonardo conecta no Pluggy vira um card, com o nome, o tipo
+(`BANK` ou `CREDIT`) e o saldo que a própria Pluggy relata. Nada disso é
+fixo no código; conectar um banco novo é só acrescentar o `itemId` dele
+em `PLUGGY_ITEM_IDS`.
 
-MEI não é uma terceira titularidade com saldo próprio. O CNPJ do Leonardo
-é registrado como MEI, e a conta Nubank PJ é a conta desse mesmo CNPJ: PJ
-e MEI são a mesma empresa, a mesma conta, o mesmo saldo. MEI importa como
-**regime tributário** da PJ, não como um lugar separado onde o dinheiro
-fica. Isso muda a forma de calcular o DAS: o MEI paga um valor mensal
-fixo por tabela (varia por tipo de atividade: comércio/indústria, serviço,
-ou os dois), reajustado uma vez por ano, não um percentual do faturamento
-como em outros regimes do Simples Nacional.
+Hoje duas contas estão conectadas (Nubank e Mercado Pago), cada uma com
+conta corrente e cartão de crédito, quatro contas ao todo. O Leonardo
+também tem uma conta PJ (CNPJ do MEI), mas ela não está conectada: por
+instrução do contador, serve só de intermediária para receber pagamento
+de nota fiscal (o dinheiro sai de lá quase no mesmo momento que entra,
+paga o DAS e transfere o resto), então o saldo dela fica sempre perto de
+zero e não há um número relevante para mostrar ali.
 
-## Contas reais e o que está conectado no Pluggy
+Conta corrente mostra **saldo**. Cartão de crédito mostra a **fatura
+atual** (o valor já usado, não o saldo disponível), com o limite como
+contexto: são naturezas diferentes, um é dinheiro disponível, o outro é
+dívida.
 
-O Leonardo tem três contas na prática, só duas conectadas no Pluggy hoje:
+## Movimento entre contas do próprio Leonardo
 
-- **Nubank PF** (conectada): conta pessoal, uso do dia a dia.
-- **Mercado Pago PF** (conectada): outra conta pessoal.
-- **Nubank PJ** (não conectada): a conta do CNPJ (MEI). Por instrução do
-  contador, ela é só intermediária: recebe o pagamento da nota fiscal do
-  cliente e o dinheiro sai de lá logo em seguida (paga o DAS, transfere o
-  resto para a PF). O saldo dela fica sempre perto de zero por causa
-  disso, então não há um "saldo da PJ" relevante para acompanhar hoje.
-  `Titularidade.PJ` continua existindo no código porque a conta é real;
-  ela só não tem movimento importado até (e se) for conectada no Pluggy.
-
-Transferência entre titularidades (por exemplo, da PJ para a PF, quando o
-Leonardo retira o que sobrou depois do DAS) é retirada do titular na
-origem e aporte do titular no destino: não é despesa de quem manda nem
-receita de quem recebe, mas ainda reduz o saldo de origem e aumenta o de
-destino, porque o dinheiro muda de conta de verdade. Cada perna é um
-movimento próprio (`retirada_titular` na origem, `aporte_titular` no
-destino). O mesmo vale para transferência entre as duas contas PF
-conectadas (Nubank PF ↔ Mercado Pago PF): mesmo sendo a mesma
-titularidade nos dois lados, a Pluggy já identifica esse caso como
-`"Same person transfer"` e o Mercúrio trata do mesmo jeito, não como
-receita nem despesa.
-
-## Obrigação do DAS
-
-Não existe reserva progressiva: o Leonardo recebe o pagamento da nota
-fiscal na conta PJ, paga o DAS como prioridade e transfere o resto para a
-PF no mesmo momento, então não há um valor "sendo reservado" ao longo do
-mês para acompanhar. O DAS-MEI é um valor fixo mensal (R$ 86,05, hoje;
-configurável por `DAS_VALOR`), reajustado uma vez por ano pela tabela do
-MEI, não percentual de faturamento.
-
-O pagamento do DAS sai da conta PJ, que não está conectada no Pluggy (ver
-acima), então nenhum movimento importado mostra esse pagamento. Por isso
-`ObrigacaoDas.paga` não é inferida do extrato: é marcada à mão
-(`POST /das/pagar`), uma vez por competência.
+Transferência entre duas contas dele (por exemplo, da PJ não conectada
+para uma conta PF, ou entre Nubank e Mercado Pago) é retirada na origem e
+aporte no destino: não é despesa de quem manda nem receita de quem
+recebe, mas ainda reduz o saldo de origem e aumenta o de destino, porque
+o dinheiro muda de conta de verdade. Cada perna é um movimento próprio
+(`retirada_titular` na origem, `aporte_titular` no destino). A Pluggy já
+identifica esse caso como `"Same person transfer"`; o Mercúrio usa essa
+categoria para decidir o tipo, em vez de tentar adivinhar pela descrição.
 
 ## Conciliação e duplicidade
 
@@ -64,7 +42,7 @@ foram encontrados nos dados reais do Leonardo:
 - Uma NFS-e presente nos XMLs mas ausente na planilha de controle.
 
 Por isso a conciliação usa um fingerprint calculado a partir do conteúdo
-do próprio movimento (titularidade, data, valor, descrição, tipo), e
+do próprio movimento (conta, data, valor, descrição, tipo), e
 registra a proveniência (extrato bancário, XML de NFS-e, importação
 manual). A regra de fingerprint fica em um único lugar,
 `services/mercurio-domain`, usada tanto pela `finance-api` quanto pelo

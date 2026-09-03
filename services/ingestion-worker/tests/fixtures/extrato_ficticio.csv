@@ -1,7 +1,7 @@
-data,valor,descricao,titularidade,tipo,identificador_externo
-2026-08-05,150.00,Pagamento cliente Genux,pj,receita,TXN123
-2026-08-05,150.00,Pagamento cliente Genux,pj,receita,TXN123
-2026-08-06,80.00,Pagamento cliente Tragial,pj,receita,TXN123
-2026-08-08,200.00,Transferencia para Mercado Pago,pj,retirada_titular,TXN201
-2026-08-08,200.00,Transferencia recebida do Nubank PJ,pf,aporte_titular,TXN301
-2026-08-08,45.90,Mercado,pf,despesa,TXN300
+data,valor,descricao,conta_id,tipo,identificador_externo
+2026-08-05,150.00,Pagamento cliente Genux,conta-a,receita,TXN123
+2026-08-05,150.00,Pagamento cliente Genux,conta-a,receita,TXN123
+2026-08-06,80.00,Pagamento cliente Tragial,conta-a,receita,TXN123
+2026-08-08,200.00,Transferencia para conta B,conta-a,retirada_titular,TXN201
+2026-08-08,200.00,Transferencia recebida da conta A,conta-b,aporte_titular,TXN301
+2026-08-08,45.90,Mercado,conta-b,despesa,TXN300

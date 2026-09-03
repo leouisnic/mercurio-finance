@@ -1,16 +1,35 @@
-"""Modelo de persistência da tabela `movimentos`.
+"""Modelo de persistência: tabelas `contas` e `movimentos`.
 
-Separado de `finance_api.domain` de propósito: `domain.py` tem o `Movimento`
-Pydantic (validação e regra), este módulo tem só o mapeamento para a tabela.
+Separado de `finance_api.domain` de propósito: `domain.py` tem os modelos
+Pydantic (validação e regra), este módulo tem só o mapeamento para as
+tabelas.
 """
 
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, DateTime, Numeric, String, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from finance_api.db import Base
+
+
+class ContaORM(Base):
+    """Uma conta bancária conectada no Pluggy (corrente ou cartão de
+    crédito). Nome, saldo e (para cartão) limite vêm sempre da Pluggy,
+    atualizados a cada `job_sincronizar_pluggy`; nada fixo no código."""
+
+    __tablename__ = "contas"
+
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    nome: Mapped[str] = mapped_column(String(200))
+    tipo: Mapped[str] = mapped_column(String(20))  # "BANK" ou "CREDIT"
+    saldo: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    limite: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    disponivel: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class MovimentoORM(Base):
@@ -24,7 +43,7 @@ class MovimentoORM(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    titularidade: Mapped[str] = mapped_column(String(2))
+    conta_id: Mapped[str] = mapped_column(ForeignKey("contas.id"), index=True)
     data: Mapped[date] = mapped_column(Date)
     valor: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     descricao: Mapped[str] = mapped_column(String(500))
@@ -34,11 +53,3 @@ class MovimentoORM(Base):
     fingerprint: Mapped[str] = mapped_column(String(16), index=True)
     duplicado_possivel: Mapped[bool] = mapped_column(Boolean, default=False)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-
-class ObrigacaoDasORM(Base):
-    __tablename__ = "obrigacoes_das"
-
-    # "AAAA-MM": uma linha por competência, criada só quando marcada como paga.
-    competencia: Mapped[str] = mapped_column(String(7), primary_key=True)
-    paga_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

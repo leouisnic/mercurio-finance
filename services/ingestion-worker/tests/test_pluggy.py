@@ -53,66 +53,110 @@ def test_listar_transacoes_segue_a_paginacao_por_cursor(monkeypatch: pytest.Monk
 
 
 @pytest.mark.parametrize(
-    ("transacao", "titularidade_esperada", "tipo_esperado", "valor_esperado"),
+    ("transacao", "tipo_esperado", "valor_esperado"),
     [
         (
             {
                 "id": "d1",
+                "accountId": "conta-nubank-corrente",
                 "date": "2026-08-29T13:13:45.216Z",
                 "description": "Compra no débito|SESC BAURU",
                 "amount": -12,
                 "category": "Shopping",
             },
-            "pj",
             "despesa",
             12.0,
         ),
         (
             {
                 "id": "c1",
+                "accountId": "conta-nubank-corrente",
                 "date": "2026-08-28T21:11:50.804Z",
                 "description": "Pagamento recebido|Cliente Genux",
                 "amount": 850.0,
                 "category": "Business income",
             },
-            "pj",
             "receita",
             850.0,
         ),
         (
             {
                 "id": "s1",
+                "accountId": "conta-mercadopago-corrente",
                 "date": "2026-08-28T21:11:50.804Z",
                 "description": "Transferência Recebida|Leonardo Colacio Nicolau",
                 "amount": 23.9,
                 "category": "Same person transfer",
             },
-            "pj",
             "aporte_titular",
             23.9,
         ),
         (
             {
                 "id": "s2",
+                "accountId": "conta-nubank-corrente",
                 "date": "2026-08-28T21:11:50.804Z",
                 "description": "Transferência enviada|Leonardo Colacio Nicolau",
                 "amount": -200.0,
                 "category": "Same person transfer",
             },
-            "pj",
             "retirada_titular",
             200.0,
         ),
     ],
 )
-def test_mapear_para_movimento(
-    transacao: dict, titularidade_esperada: str, tipo_esperado: str, valor_esperado: float
-) -> None:
-    movimento = pluggy.mapear_para_movimento(transacao, titularidade_esperada)
+def test_mapear_para_movimento(transacao: dict, tipo_esperado: str, valor_esperado: float) -> None:
+    movimento = pluggy.mapear_para_movimento(transacao)
 
-    assert movimento["titularidade"] == titularidade_esperada
+    assert movimento["conta_id"] == transacao["accountId"]
     assert movimento["tipo"] == tipo_esperado
     assert movimento["valor"] == valor_esperado
     assert movimento["data"] == "2026-08-29" or movimento["data"] == "2026-08-28"
     assert movimento["identificador_externo"] == transacao["id"]
     assert movimento["descricao"] == transacao["description"]
+
+
+def test_mapear_conta_corrente() -> None:
+    conta = {
+        "id": "conta-nubank-corrente",
+        "type": "BANK",
+        "subtype": "CHECKING_ACCOUNT",
+        "name": "Nu Pagamentos S.A.",
+        "marketingName": "Nu Pagamentos S.A. (Conta Pré-paga)",
+        "balance": 480.20,
+        "creditData": None,
+    }
+
+    resultado = pluggy.mapear_conta(conta)
+
+    assert resultado == {
+        "id": "conta-nubank-corrente",
+        "nome": "Nu Pagamentos S.A. (Conta Pré-paga)",
+        "tipo": "BANK",
+        "saldo": 480.20,
+        "limite": None,
+        "disponivel": None,
+    }
+
+
+def test_mapear_conta_cartao_de_credito() -> None:
+    conta = {
+        "id": "conta-nubank-cartao",
+        "type": "CREDIT",
+        "subtype": "CREDIT_CARD",
+        "name": "gold",
+        "marketingName": None,
+        "balance": 340.04,
+        "creditData": {"creditLimit": 350.0, "availableCreditLimit": 9.96},
+    }
+
+    resultado = pluggy.mapear_conta(conta)
+
+    assert resultado == {
+        "id": "conta-nubank-cartao",
+        "nome": "gold",
+        "tipo": "CREDIT",
+        "saldo": 340.04,
+        "limite": 350.0,
+        "disponivel": 9.96,
+    }

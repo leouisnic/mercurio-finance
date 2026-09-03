@@ -1,8 +1,8 @@
 # Mercúrio
 
-Plataforma financeira pessoal com separação entre pessoa física (PF) e a
-empresa (PJ, registrada como MEI). O painel consolidado principal se
-chama Vértice.
+Plataforma financeira pessoal. O painel consolidado principal, Vértice,
+mostra o saldo de cada conta conectada via Open Finance (Pluggy), uma por
+card, com o nome e o valor que o próprio banco relata.
 
 Projeto de portfólio em desenvolvimento. Todo dado usado neste
 repositório, incluindo os exemplos e os testes, é fictício.
@@ -71,13 +71,6 @@ credenciais no `.env` e do worker rodando):
 ```
 curl -X POST http://localhost:8000/sync/pluggy
 curl http://localhost:8000/sync/<job_id devolvido acima>
-```
-
-Marcar o DAS da competência atual como pago (manual: o pagamento sai da
-conta PJ, que não está conectada no Pluggy, sem como detectar sozinho):
-
-```
-curl -X POST http://localhost:8000/das/pagar
 ```
 
 Painel web:

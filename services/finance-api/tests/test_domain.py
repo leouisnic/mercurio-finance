@@ -6,7 +6,6 @@ from finance_api.domain import (
     Movimento,
     Proveniencia,
     TipoMovimento,
-    Titularidade,
     encontrar_duplicidades,
 )
 from pydantic import ValidationError
@@ -14,7 +13,7 @@ from pydantic import ValidationError
 
 def _movimento(**overrides: object) -> Movimento:
     base: dict[str, object] = {
-        "titularidade": Titularidade.PJ,
+        "conta_id": "conta-nubank-corrente",
         "data": date(2026, 8, 10),
         "valor": Decimal("150.00"),
         "descricao": "Pagamento cliente Genux",
