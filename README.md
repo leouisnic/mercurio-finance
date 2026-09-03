@@ -1,8 +1,8 @@
 # Mercúrio
 
-Plataforma financeira pessoal com separação entre pessoa física (PF),
-pessoa jurídica (PJ) e MEI. O painel consolidado principal se chama
-Vértice.
+Plataforma financeira pessoal com separação entre pessoa física (PF) e a
+empresa (PJ, registrada como MEI). O painel consolidado principal se
+chama Vértice.
 
 Projeto de portfólio em desenvolvimento. Todo dado usado neste
 repositório, incluindo os exemplos e os testes, é fictício.

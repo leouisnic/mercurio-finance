@@ -1,5 +1,5 @@
 export type ResumoTitularidade = {
-  id: "pf" | "pj" | "mei";
+  id: "pf" | "pj";
   nome: string;
   saldo: number;
 };
@@ -15,7 +15,7 @@ export type ResumoFinanceiro = {
 };
 
 type RespostaApiTitularidade = {
-  titularidade: "pf" | "pj" | "mei";
+  titularidade: "pf" | "pj";
   nome: string;
   saldo: string;
 };

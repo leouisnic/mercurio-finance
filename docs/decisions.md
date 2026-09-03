@@ -86,13 +86,24 @@ converte para `Decimal` com 2 casas fixas via `Decimal(str(total)).quantize(...)
 não só `round()` (que não garante 2 casas quando o resultado é uma dezena
 redonda, ex: `round(2550.0, 2)` continua `2550.0`, não `2550.00`).
 
+## PJ e MEI são a mesma titularidade
+
+`Titularidade` no `mercurio-domain` tem só `pf` e `pj`, não um terceiro
+valor `mei`. Confirmado com o Leonardo em 2026-09-03: o CNPJ dele é
+registrado como MEI, e a conta Nubank PJ é a conta desse mesmo CNPJ, não
+existe um "saldo do MEI" separado do saldo da PJ. MEI é o regime
+tributário da PJ (o que muda como o DAS é calculado), não uma terceira
+titularidade com dinheiro próprio. Ver
+[domain-rules.md](./domain-rules.md#titularidades).
+
 ## O que ainda não foi decidido
 
 - Modelagem de tabelas no PostgreSQL (ainda não há migração nesta
   entrega; `infra` sobe o banco, mas nenhum serviço lê ou escreve nele).
 - Formato da fila no Redis entre `finance-api` e `ingestion-worker`.
 - Estrutura de autenticação do painel.
-- Como a reserva do DAS será de fato calculada (percentual da receita da
-  PJ no mês, valor fixo configurável, ou outra regra); hoje o valor no
-  painel e na API é fixo e provisório, sem lógica por trás. É decisão de
-  negócio do Leonardo, não só técnica.
+- Implementar de fato a tabela de valores do DAS-MEI (fixo por atividade,
+  reajustado uma vez por ano, não percentual de faturamento) para a
+  reserva do DAS parar de ser um valor fixo fictício. Falta confirmar com
+  o Leonardo o tipo de atividade do MEI dele (comércio/indústria, serviço,
+  ou os dois) para saber qual faixa da tabela usar.

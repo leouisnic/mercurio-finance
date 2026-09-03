@@ -7,8 +7,7 @@ const RESUMO_FICTICIO: ResumoFinanceiro = {
   atualizadoEm: "2026-08-15",
   titularidades: [
     { id: "pf", nome: "Pessoa Física", saldo: 254.5 },
-    { id: "pj", nome: "Pessoa Jurídica", saldo: 2550 },
-    { id: "mei", nome: "MEI", saldo: 348.4 },
+    { id: "pj", nome: "Pessoa Jurídica (MEI)", saldo: 2898.4 },
   ],
   reservaDas: {
     referencia: "competência atual",
@@ -17,15 +16,15 @@ const RESUMO_FICTICIO: ResumoFinanceiro = {
   },
 };
 
-test("mostra as três titularidades com o saldo formatado em reais", () => {
+test("mostra PF e PJ (MEI) com o saldo formatado em reais", () => {
   render(<ResumoPainel resumo={RESUMO_FICTICIO} />);
 
   expect(screen.getByRole("heading", { level: 2, name: "Pessoa Física" })).toBeDefined();
-  expect(screen.getByRole("heading", { level: 2, name: "Pessoa Jurídica" })).toBeDefined();
-  expect(screen.getByRole("heading", { level: 2, name: "MEI" })).toBeDefined();
+  expect(
+    screen.getByRole("heading", { level: 2, name: "Pessoa Jurídica (MEI)" }),
+  ).toBeDefined();
   expect(screen.getByText("R$ 254,50")).toBeDefined();
-  expect(screen.getByText("R$ 2.550,00")).toBeDefined();
-  expect(screen.getByText("R$ 348,40")).toBeDefined();
+  expect(screen.getByText("R$ 2.898,40")).toBeDefined();
 });
 
 test("mostra o valor reservado e o valor previsto do DAS", () => {

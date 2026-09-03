@@ -1,7 +1,7 @@
 {
   "name": "Vértice · Mercúrio",
   "short_name": "Vértice",
-  "description": "Painel consolidado de PF, PJ e MEI do Mercúrio.",
+  "description": "Painel consolidado de pessoa física e PJ (MEI) do Mercúrio.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fafafa",

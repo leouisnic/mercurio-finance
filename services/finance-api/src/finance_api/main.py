@@ -33,8 +33,7 @@ EXTRATO_FICTICIO = Path(__file__).parent / "dados" / "extrato_ficticio.csv"
 
 NOME_POR_TITULARIDADE = {
     Titularidade.PF: "Pessoa Física",
-    Titularidade.PJ: "Pessoa Jurídica",
-    Titularidade.MEI: "MEI",
+    Titularidade.PJ: "Pessoa Jurídica (MEI)",
 }
 
 # Provisório: sem regra real de cálculo ainda. Ver docs/decisions.md.

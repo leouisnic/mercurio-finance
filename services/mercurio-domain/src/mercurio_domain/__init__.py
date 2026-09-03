@@ -19,9 +19,14 @@ from enum import Enum
 
 
 class Titularidade(str, Enum):
+    """PF é a pessoa física. PJ é a empresa: no caso do Leonardo, um único
+    CNPJ registrado como MEI, então PJ e MEI são a mesma conta e o mesmo
+    saldo, não duas titularidades separadas. MEI aqui é o regime
+    tributário da PJ (usado para calcular o DAS pela tabela certa), não
+    um terceiro lugar onde o dinheiro fica."""
+
     PF = "pf"
     PJ = "pj"
-    MEI = "mei"
 
 
 class Proveniencia(str, Enum):

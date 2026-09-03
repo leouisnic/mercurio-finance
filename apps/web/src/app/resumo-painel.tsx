@@ -2,8 +2,7 @@ import type { ResumoFinanceiro } from "./buscar-resumo";
 
 const DESCRICAO_POR_TITULARIDADE: Record<string, string> = {
   pf: "Contas e cartões pessoais",
-  pj: "Recebimentos e despesas do negócio",
-  mei: "Enquadramento e obrigações do MEI",
+  pj: "Recebimentos e despesas do MEI",
 };
 
 const formatoMoeda = new Intl.NumberFormat("pt-BR", {
@@ -16,7 +15,7 @@ export function ResumoPainel({ resumo }: { resumo: ResumoFinanceiro }) {
     <>
       <section
         aria-label="Saldos por titularidade"
-        className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2"
       >
         {resumo.titularidades.map((titularidade) => (
           <article

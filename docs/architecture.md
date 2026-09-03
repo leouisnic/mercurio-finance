@@ -1,7 +1,8 @@
 # Arquitetura
 
-Mercúrio é uma plataforma financeira pessoal com separação entre PF, PJ e
-MEI. O painel consolidado principal é o Vértice.
+Mercúrio é uma plataforma financeira pessoal com separação entre pessoa
+física (PF) e a empresa (PJ, registrada como MEI). O painel consolidado
+principal é o Vértice.
 
 ## Componentes
 

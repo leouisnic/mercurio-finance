@@ -15,8 +15,8 @@ export default async function Home() {
             Vértice
           </h1>
           <p className="max-w-xl text-base text-zinc-600 dark:text-zinc-400">
-            Painel consolidado de PF, PJ e MEI. Os valores abaixo são fictícios,
-            usados apenas para desenvolvimento local.
+            Painel consolidado de pessoa física e PJ (MEI). Os valores abaixo
+            são fictícios, usados apenas para desenvolvimento local.
           </p>
         </header>
 

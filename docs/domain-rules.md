@@ -2,12 +2,22 @@
 
 ## Titularidades
 
-Todo movimento financeiro pertence a exatamente uma titularidade: PF, PJ
-ou MEI. Nunca fica ambíguo entre as três.
+Todo movimento financeiro pertence a exatamente uma titularidade: PF ou
+PJ. Nunca fica ambíguo entre as duas.
+
+MEI não é uma terceira titularidade com saldo próprio. O CNPJ do Leonardo
+é registrado como MEI, e a conta Nubank PJ é a conta desse mesmo CNPJ: PJ
+e MEI são a mesma empresa, a mesma conta, o mesmo saldo. MEI importa como
+**regime tributário** da PJ, não como um lugar separado onde o dinheiro
+fica. Isso muda a forma de calcular o DAS: o MEI paga um valor mensal
+fixo por tabela (varia por tipo de atividade: comércio/indústria, serviço,
+ou os dois), reajustado uma vez por ano, não um percentual do faturamento
+como em outros regimes do Simples Nacional.
 
 ## Nubank PJ e Mercado Pago PF
 
-- Nubank PJ recebe pagamentos de clientes e paga o DAS.
+- Nubank PJ é a conta do CNPJ (MEI) do Leonardo: recebe pagamentos de
+  clientes e paga o DAS.
 - Mercado Pago é conta PF.
 - Transferência de Nubank PJ para Mercado Pago PF é retirada do titular
   na origem (PJ) e aporte do titular no destino (PF): não é despesa da PJ
@@ -28,6 +38,10 @@ continua na conta até o DAS ser pago de fato. Se a reserva fosse
 registrada como despesa E o pagamento do DAS também, o valor sairia do
 saldo duas vezes. `ReservaDas` é um valor calculado à parte, não derivado
 de um movimento do tipo `despesa`.
+
+O valor real da reserva (hoje fixo e fictício) ainda depende de implementar
+a tabela de valores do DAS-MEI por atividade; ver
+[decisions.md](./decisions.md).
 
 ## Conciliação e duplicidade
 

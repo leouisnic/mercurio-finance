@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Vértice",
-  description: "Painel consolidado do Mercúrio: PF, PJ e MEI em um só lugar.",
+  description: "Painel consolidado do Mercúrio: pessoa física e PJ (MEI) em um só lugar.",
   manifest: "/manifest.webmanifest",
 };
 

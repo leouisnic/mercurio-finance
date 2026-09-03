@@ -6,5 +6,5 @@ data,valor,descricao,titularidade,tipo,identificador_externo
 2026-08-08,500.00,Transferencia recebida do Nubank PJ,pf,aporte_titular,TXN2001
 2026-08-09,180.50,Mercado,pf,despesa,TXN2002
 2026-08-10,65.00,Assinatura streaming,pf,despesa,TXN2003
-2026-08-12,420.00,Servico avulso MEI,mei,receita,TXN3001
-2026-08-15,71.60,Taxa DAS emitida,mei,despesa,TXN3002
+2026-08-12,420.00,Servico avulso,pj,receita,TXN3001
+2026-08-15,71.60,Pagamento do DAS,pj,despesa,TXN3002
