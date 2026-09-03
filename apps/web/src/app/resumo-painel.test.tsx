@@ -9,10 +9,10 @@ const RESUMO_FICTICIO: ResumoFinanceiro = {
     { id: "pf", nome: "Pessoa Física", saldo: 254.5 },
     { id: "pj", nome: "Pessoa Jurídica (MEI)", saldo: 2898.4 },
   ],
-  reservaDas: {
-    referencia: "competência atual",
-    valorReservado: 620,
-    valorPrevisto: 650,
+  obrigacaoDas: {
+    competencia: "2026-08",
+    valor: 86.05,
+    paga: false,
   },
 };
 
@@ -27,12 +27,22 @@ test("mostra PF e PJ (MEI) com o saldo formatado em reais", () => {
   expect(screen.getByText("R$ 2.898,40")).toBeDefined();
 });
 
-test("mostra o valor reservado e o valor previsto do DAS", () => {
+test("mostra o valor e o status da obrigação do DAS", () => {
   render(<ResumoPainel resumo={RESUMO_FICTICIO} />);
 
   expect(
-    screen.getByRole("heading", { level: 2, name: /Reserva do DAS/ }),
+    screen.getByRole("heading", { level: 2, name: /DAS \(2026-08\)/ }),
   ).toBeDefined();
-  expect(screen.getByText("R$ 620,00")).toBeDefined();
-  expect(screen.getByText(/R\$ 650,00/)).toBeDefined();
+  expect(screen.getByText("R$ 86,05")).toBeDefined();
+  expect(screen.getByText("Ainda não pago nesta competência.")).toBeDefined();
+});
+
+test("mostra que o DAS já foi pago quando paga é true", () => {
+  render(
+    <ResumoPainel
+      resumo={{ ...RESUMO_FICTICIO, obrigacaoDas: { ...RESUMO_FICTICIO.obrigacaoDas, paga: true } }}
+    />,
+  );
+
+  expect(screen.getByText("Já pago nesta competência.")).toBeDefined();
 });

@@ -36,29 +36,26 @@ export function ResumoPainel({ resumo }: { resumo: ResumoFinanceiro }) {
       </section>
 
       <section
-        aria-label="Reserva do DAS"
+        aria-label="Obrigação do DAS"
         className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950 sm:flex-row sm:items-center sm:justify-between"
       >
         <div>
           <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-            Reserva do DAS ({resumo.reservaDas.referencia})
+            DAS ({resumo.obrigacaoDas.competencia})
           </h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Valor separado a partir do recebimento do mês, antes do vencimento.
+            {resumo.obrigacaoDas.paga
+              ? "Já pago nesta competência."
+              : "Ainda não pago nesta competência."}
           </p>
         </div>
-        <div className="flex flex-col items-start gap-1 sm:items-end">
-          <p className="text-2xl font-semibold text-zinc-950 dark:text-zinc-50">
-            {formatoMoeda.format(resumo.reservaDas.valorReservado)}
-          </p>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            previsto para o mês: {formatoMoeda.format(resumo.reservaDas.valorPrevisto)}
-          </p>
-        </div>
+        <p className="text-2xl font-semibold text-zinc-950 dark:text-zinc-50">
+          {formatoMoeda.format(resumo.obrigacaoDas.valor)}
+        </p>
       </section>
 
       <footer className="text-xs text-zinc-400 dark:text-zinc-600">
-        Atualizado em {resumo.atualizadoEm} · dados fictícios
+        Atualizado em {resumo.atualizadoEm}
       </footer>
     </>
   );

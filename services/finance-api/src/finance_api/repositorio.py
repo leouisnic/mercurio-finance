@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from finance_api.models import MovimentoORM
+from finance_api.models import MovimentoORM, ObrigacaoDasORM
 
 
 def _como_data(valor: object) -> object:
@@ -84,3 +84,21 @@ async def carregar_movimentos(sessao: AsyncSession) -> pd.DataFrame:
             for movimento in movimentos
         ]
     )
+
+
+async def das_esta_pago(sessao: AsyncSession, competencia: str) -> bool:
+    """Existe uma linha em `obrigacoes_das` para essa competência? Marcado
+    à mão via `marcar_das_pago`, não inferido do extrato (ver
+    `finance_api.domain.ObrigacaoDas`)."""
+    resultado = await sessao.execute(
+        select(ObrigacaoDasORM).where(ObrigacaoDasORM.competencia == competencia)
+    )
+    return resultado.scalar_one_or_none() is not None
+
+
+async def marcar_das_pago(sessao: AsyncSession, competencia: str) -> None:
+    """Idempotente: marcar de novo a mesma competência não dá erro."""
+    instrucao = pg_insert(ObrigacaoDasORM).values(competencia=competencia)
+    instrucao = instrucao.on_conflict_do_nothing(index_elements=["competencia"])
+    await sessao.execute(instrucao)
+    await sessao.commit()

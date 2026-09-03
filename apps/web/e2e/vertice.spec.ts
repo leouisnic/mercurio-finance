@@ -14,9 +14,6 @@ test("Vértice mostra o resumo calculado pelo finance-api de verdade", async ({ 
   await expect(page.getByText("R$ 254,50")).toBeVisible();
   await expect(page.getByText("R$ 2.898,40")).toBeVisible();
 
-  await expect(
-    page.getByRole("heading", { level: 2, name: /Reserva do DAS/ }),
-  ).toBeVisible();
-  await expect(page.getByText("R$ 620,00")).toBeVisible();
-  await expect(page.getByText("previsto para o mês: R$ 650,00")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: /DAS \(\d{4}-\d{2}\)/ })).toBeVisible();
+  await expect(page.getByText("R$ 86,05")).toBeVisible();
 });

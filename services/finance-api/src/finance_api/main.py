@@ -6,8 +6,10 @@ regra de agregação do `ingestion-worker`. Popule o banco local com
 `uv run --package finance-api python -m finance_api.seed` (dado
 fictício) antes de rodar em desenvolvimento.
 
-A reserva do DAS ainda é um valor fixo provisório: ver docs/decisions.md.
-Nenhuma credencial, extrato real ou dado pessoal é usado neste módulo.
+A obrigação do DAS é um valor fixo mensal (não derivado de movimento
+importado, ver `finance_api.domain.ObrigacaoDas`); marcar como paga é
+manual, `POST /das/pagar`. Nenhuma credencial, extrato real ou dado
+pessoal é usado neste módulo.
 """
 
 from datetime import date
@@ -19,20 +21,21 @@ from rq.exceptions import NoSuchJobError
 from rq.job import Job
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from finance_api.config import DAS_VALOR
 from finance_api.db import obter_sessao
 from finance_api.domain import (
-    ReservaDas,
+    ObrigacaoDas,
     ResumoFinanceiro,
     ResumoTitularidade,
     Titularidade,
 )
 from finance_api.fila import conexao_redis, fila
 from finance_api.jobs import job_reimportar_seed, job_sincronizar_pluggy
-from finance_api.repositorio import carregar_movimentos
+from finance_api.repositorio import carregar_movimentos, das_esta_pago, marcar_das_pago
 
 app = FastAPI(
     title="Mercúrio · finance-api",
-    description="Resumo financeiro por titularidade e reserva do DAS.",
+    description="Resumo financeiro por titularidade e obrigação do DAS.",
     version="0.1.0",
 )
 
@@ -41,12 +44,9 @@ NOME_POR_TITULARIDADE = {
     Titularidade.PJ: "Pessoa Jurídica (MEI)",
 }
 
-# Provisório: sem regra real de cálculo ainda. Ver docs/decisions.md.
-RESERVA_DAS_FICTICIA = ReservaDas(
-    referencia="competencia_atual",
-    valor_reservado=Decimal("620.00"),
-    valor_previsto=Decimal("650.00"),
-)
+
+def _competencia_atual() -> str:
+    return date.today().strftime("%Y-%m")  # noqa: DTZ011 (competência de calendário, não fuso)
 
 
 def _saldo_em_decimal(total: float) -> Decimal:
@@ -82,11 +82,30 @@ async def resumo(
         for titularidade in Titularidade
     ]
 
+    competencia = _competencia_atual()
+    obrigacao_das = ObrigacaoDas(
+        competencia=competencia,
+        valor=Decimal(DAS_VALOR),
+        paga=await das_esta_pago(sessao, competencia),
+    )
+
     return ResumoFinanceiro(
         atualizado_em=date.today(),  # noqa: DTZ011 (data de exibição, sem sensibilidade a fuso)
         titularidades=titularidades,
-        reserva_das=RESERVA_DAS_FICTICIA,
+        obrigacao_das=obrigacao_das,
     )
+
+
+@app.post("/das/pagar")
+async def marcar_das_pago_da_competencia_atual(
+    sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
+) -> ObrigacaoDas:
+    """Marca a obrigação do DAS da competência atual como paga. Manual: o
+    pagamento sai da conta PJ, que não está conectada no Pluggy, então não
+    tem como detectar isso sozinho a partir do extrato."""
+    competencia = _competencia_atual()
+    await marcar_das_pago(sessao, competencia)
+    return ObrigacaoDas(competencia=competencia, valor=Decimal(DAS_VALOR), paga=True)
 
 
 @app.post("/sync/seed", status_code=202)

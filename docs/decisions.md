@@ -56,13 +56,14 @@ confirmada (some do resumo); fingerprint igual com identificador diferente
 vira duplicidade possível, sinalizada mas não removida automaticamente.
 Ver [domain-rules.md](./domain-rules.md#conciliação-e-duplicidade).
 
-## Reserva do DAS não é uma linha de despesa no extrato
+## DAS não é uma linha de despesa no extrato (superado, ver correção abaixo)
 
-A mesma revisão encontrou que tratar a reserva do DAS como um lançamento
-de despesa faria o valor sair do saldo duas vezes quando o DAS fosse
-realmente pago. A reserva ficou como valor calculado à parte
-(`ReservaDas` na `finance-api`), não como um movimento importado do
-extrato. Ver [domain-rules.md](./domain-rules.md#reserva-do-das).
+A mesma revisão encontrou que tratar o DAS como um lançamento de despesa
+importado faria o valor sair do saldo duas vezes quando fosse realmente
+pago. Naquele momento eu ainda achava que a PJ era uma conta conectada no
+Pluggy; ficou substituído pela correção "Obrigação do DAS é manual, não
+inferida", mais abaixo, quando ficou claro que o DAS nem aparece no
+extrato conectado.
 
 ## apps/web consome finance-api por fetch direto em Server Component
 
@@ -134,12 +135,18 @@ consumidor da fila.
 ponta a ponta (enfileira, processa em processo separado, confere
 resultado) antes de plugar o job real do Pluggy na Fase B.
 
-## Reserva do DAS: valor fixo real, não tabela calculada
+## Obrigação do DAS: valor fixo real, marcada como paga à mão
 
 O Leonardo informou o valor real que paga hoje, R$ 86,05/mês, em vez de
 eu calcular por tabela de atividade do MEI. `ObrigacaoDas` (troca de
-`ReservaDas`, ainda não implementado nesta rodada) usa esse valor fixo,
-configurável por variável de ambiente para quando a tabela do MEI mudar.
+`ReservaDas`) usa esse valor fixo, configurável por `DAS_VALOR`.
+
+`paga` não é inferida do extrato: descobri, olhando o dado real já
+importado, que nenhuma transação com "DAS" na descrição existe no que
+está conectado, porque o pagamento sai da conta PJ (não conectada, ver
+domain-rules.md). Em vez de uma heurística que nunca ia encontrar nada,
+`POST /das/pagar` marca a competência atual como paga (grava uma linha em
+`obrigacoes_das`, idempotente); `paga_em` fica registrado.
 
 ## Pluggy real: v2/transactions, categoria da própria Pluggy para transferência entre titularidades
 
@@ -191,8 +198,8 @@ correção: PF R$ 948,83, PJ R$ 0,00 (nenhuma conta conectada).
 
 - Estrutura de autenticação do painel: senha única simples, via
   `PAINEL_SENHA`, ainda não implementada.
-- Como identificar de fato o pagamento do DAS num movimento vindo do
-  Pluggy (heurística por descrição contendo "DAS" até revisar as
-  descrições reais que já estão no banco de desenvolvimento).
 - Separar compra no cartão de crédito do pagamento da fatura, para não
   contar o mesmo gasto duas vezes.
+- Se um dia a conta PJ for conectada no Pluggy, `CONTAS_PLUGGY` ganha uma
+  terceira entrada e a obrigação do DAS passa a poder ser detectada
+  automaticamente lá, em vez de só marcada à mão.

@@ -40,21 +40,19 @@ titularidade nos dois lados, a Pluggy já identifica esse caso como
 `"Same person transfer"` e o Mercúrio trata do mesmo jeito, não como
 receita nem despesa.
 
-## Reserva do DAS
+## Obrigação do DAS
 
-O valor do DAS é reservado a partir do recebimento do mês, não só no dia
-do vencimento. O painel mostra o valor já reservado e o valor previsto
-para a competência atual.
+Não existe reserva progressiva: o Leonardo recebe o pagamento da nota
+fiscal na conta PJ, paga o DAS como prioridade e transfere o resto para a
+PF no mesmo momento, então não há um valor "sendo reservado" ao longo do
+mês para acompanhar. O DAS-MEI é um valor fixo mensal (R$ 86,05, hoje;
+configurável por `DAS_VALOR`), reajustado uma vez por ano pela tabela do
+MEI, não percentual de faturamento.
 
-A reserva não é lançada como uma linha de despesa no extrato: o dinheiro
-continua na conta até o DAS ser pago de fato. Se a reserva fosse
-registrada como despesa E o pagamento do DAS também, o valor sairia do
-saldo duas vezes. `ReservaDas` é um valor calculado à parte, não derivado
-de um movimento do tipo `despesa`.
-
-O valor real da reserva (hoje fixo e fictício) ainda depende de implementar
-a tabela de valores do DAS-MEI por atividade; ver
-[decisions.md](./decisions.md).
+O pagamento do DAS sai da conta PJ, que não está conectada no Pluggy (ver
+acima), então nenhum movimento importado mostra esse pagamento. Por isso
+`ObrigacaoDas.paga` não é inferida do extrato: é marcada à mão
+(`POST /das/pagar`), uma vez por competência.
 
 ## Conciliação e duplicidade
 

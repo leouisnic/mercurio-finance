@@ -26,8 +26,27 @@ def test_resumo_sem_movimentos_traz_pf_e_pj_zerados() -> None:
     assert titularidades == {"pf", "pj"}
     saldos = {item["titularidade"]: item["saldo"] for item in corpo["titularidades"]}
     assert saldos == {"pf": "0.00", "pj": "0.00"}
-    assert corpo["reserva_das"]["valor_reservado"] == "620.00"
-    assert corpo["reserva_das"]["valor_previsto"] == "650.00"
+    assert corpo["obrigacao_das"]["valor"] == "86.05"
+    assert corpo["obrigacao_das"]["paga"] is False
+
+
+def test_das_pagar_marca_a_competencia_atual_como_paga() -> None:
+    antes = client.get("/resumo").json()
+    assert antes["obrigacao_das"]["paga"] is False
+
+    resposta = client.post("/das/pagar")
+    assert resposta.status_code == 200
+    assert resposta.json()["paga"] is True
+
+    depois = client.get("/resumo").json()
+    assert depois["obrigacao_das"]["paga"] is True
+
+
+def test_das_pagar_e_idempotente() -> None:
+    assert client.post("/das/pagar").status_code == 200
+    assert client.post("/das/pagar").status_code == 200
+
+    assert client.get("/resumo").json()["obrigacao_das"]["paga"] is True
 
 
 def test_resumo_calcula_o_saldo_a_partir_dos_movimentos_gravados(semear_movimentos) -> None:

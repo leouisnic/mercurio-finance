@@ -7,10 +7,10 @@ export type ResumoTitularidade = {
 export type ResumoFinanceiro = {
   atualizadoEm: string;
   titularidades: ResumoTitularidade[];
-  reservaDas: {
-    referencia: string;
-    valorReservado: number;
-    valorPrevisto: number;
+  obrigacaoDas: {
+    competencia: string;
+    valor: number;
+    paga: boolean;
   };
 };
 
@@ -23,10 +23,10 @@ type RespostaApiTitularidade = {
 type RespostaApi = {
   atualizado_em: string;
   titularidades: RespostaApiTitularidade[];
-  reserva_das: {
-    referencia: string;
-    valor_reservado: string;
-    valor_previsto: string;
+  obrigacao_das: {
+    competencia: string;
+    valor: string;
+    paga: boolean;
   };
 };
 
@@ -60,10 +60,10 @@ export async function buscarResumo(): Promise<ResumoFinanceiro | null> {
         nome: item.nome,
         saldo: Number(item.saldo),
       })),
-      reservaDas: {
-        referencia: corpo.reserva_das.referencia,
-        valorReservado: Number(corpo.reserva_das.valor_reservado),
-        valorPrevisto: Number(corpo.reserva_das.valor_previsto),
+      obrigacaoDas: {
+        competencia: corpo.obrigacao_das.competencia,
+        valor: Number(corpo.obrigacao_das.valor),
+        paga: corpo.obrigacao_das.paga,
       },
     };
   } catch {

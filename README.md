@@ -73,6 +73,13 @@ curl -X POST http://localhost:8000/sync/pluggy
 curl http://localhost:8000/sync/<job_id devolvido acima>
 ```
 
+Marcar o DAS da competência atual como pago (manual: o pagamento sai da
+conta PJ, que não está conectada no Pluggy, sem como detectar sozinho):
+
+```
+curl -X POST http://localhost:8000/das/pagar
+```
+
 Painel web:
 
 ```

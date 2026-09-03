@@ -12,10 +12,10 @@ test("converte a resposta do finance-api (snake_case, valores em string) para o 
       { titularidade: "pf", nome: "Pessoa Física", saldo: "254.50" },
       { titularidade: "pj", nome: "Pessoa Jurídica", saldo: "2550.00" },
     ],
-    reserva_das: {
-      referencia: "competencia_atual",
-      valor_reservado: "620.00",
-      valor_previsto: "650.00",
+    obrigacao_das: {
+      competencia: "2026-08",
+      valor: "86.05",
+      paga: false,
     },
   };
 
@@ -35,10 +35,10 @@ test("converte a resposta do finance-api (snake_case, valores em string) para o 
       { id: "pf", nome: "Pessoa Física", saldo: 254.5 },
       { id: "pj", nome: "Pessoa Jurídica", saldo: 2550 },
     ],
-    reservaDas: {
-      referencia: "competencia_atual",
-      valorReservado: 620,
-      valorPrevisto: 650,
+    obrigacaoDas: {
+      competencia: "2026-08",
+      valor: 86.05,
+      paga: false,
     },
   });
 });

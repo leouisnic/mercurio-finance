@@ -23,8 +23,8 @@ from pydantic import BaseModel, Field, field_validator
 
 __all__ = [
     "Movimento",
+    "ObrigacaoDas",
     "Proveniencia",
-    "ReservaDas",
     "ResumoFinanceiro",
     "ResumoTitularidade",
     "TipoMovimento",
@@ -90,13 +90,21 @@ class ResumoTitularidade(BaseModel):
     saldo: Decimal
 
 
-class ReservaDas(BaseModel):
-    referencia: str
-    valor_reservado: Decimal
-    valor_previsto: Decimal
+class ObrigacaoDas(BaseModel):
+    """O DAS-MEI é um valor fixo mensal (não percentual de faturamento).
+
+    Não é derivado de movimento importado: nada no extrato conectado hoje
+    mostra o pagamento do DAS, porque ele sai da conta PJ, que não está
+    conectada no Pluggy (ver docs/domain-rules.md). `paga` é marcada à
+    mão via POST /das/pagar, não inferida automaticamente.
+    """
+
+    competencia: str  # "AAAA-MM"
+    valor: Decimal
+    paga: bool
 
 
 class ResumoFinanceiro(BaseModel):
     atualizado_em: date
     titularidades: list[ResumoTitularidade]
-    reserva_das: ReservaDas
+    obrigacao_das: ObrigacaoDas

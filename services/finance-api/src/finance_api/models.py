@@ -34,3 +34,11 @@ class MovimentoORM(Base):
     fingerprint: Mapped[str] = mapped_column(String(16), index=True)
     duplicado_possivel: Mapped[bool] = mapped_column(Boolean, default=False)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ObrigacaoDasORM(Base):
+    __tablename__ = "obrigacoes_das"
+
+    # "AAAA-MM": uma linha por competência, criada só quando marcada como paga.
+    competencia: Mapped[str] = mapped_column(String(7), primary_key=True)
+    paga_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
