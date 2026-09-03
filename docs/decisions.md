@@ -96,14 +96,55 @@ tributário da PJ (o que muda como o DAS é calculado), não uma terceira
 titularidade com dinheiro próprio. Ver
 [domain-rules.md](./domain-rules.md#titularidades).
 
+## Persistência: uma tabela, constraint única, banco de teste separado
+
+`finance-api` ganhou SQLAlchemy 2.0 assíncrono (`asyncpg`) e Alembic. Uma
+tabela só, `movimentos`, com constraint única em
+`(fingerprint, identificador_externo)`: reimportar a mesma origem não
+duplica saldo, sem precisar de lógica extra no código (`ON CONFLICT DO
+NOTHING`). `finance_api/seed.py` popula o banco de desenvolvimento com o
+extrato fictício.
+
+Banco de teste (`mercurio_test`) é separado do de desenvolvimento
+(`mercurio`), criado por `infra/postgres-init/001-create-test-db.sql`
+(só roda num volume novo: se precisar recriar depois de já ter dado real,
+recrie o volume manualmente ou rode o SQL à mão). Os testes truncam
+`mercurio_test` a cada execução; `mercurio` é o único que recebe dado real
+do Pluggy, e nenhum teste aponta para ele.
+
+## localhost custava ~2s por conexão no Windows
+
+Resolver `localhost` tentava IPv6 antes de cair para IPv4 nesta máquina,
+adicionando ~2s a cada conexão nova do Postgres (a suíte de teste foi de
+1,3s para 60s só com isso). `DATABASE_URL`, `TEST_DATABASE_URL` e
+`REDIS_URL` usam `127.0.0.1` explícito por causa disso.
+
+## Fila do Redis: SimpleWorker, não `rq worker`
+
+RQ workers padrão precisam de `fork()`, que o Windows não tem
+(documentação oficial da lib: "workers cannot run natively on Windows").
+`finance_api/worker.py` sempre usa `SimpleWorker` (roda o job no mesmo
+processo, sem fork), com `TimerDeathPenalty` no lugar do mecanismo padrão
+baseado em sinal. Os jobs (`finance_api/jobs.py`) vivem na `finance-api`,
+não no `ingestion-worker`: ela já depende do `ingestion-worker` para o
+parser e já é dona da persistência, então é o lugar natural para o
+consumidor da fila.
+
+`POST /sync/seed` e `GET /sync/{job_id}` existem para provar a fila de
+ponta a ponta (enfileira, processa em processo separado, confere
+resultado) antes de plugar o job real do Pluggy na Fase B.
+
+## Reserva do DAS: valor fixo real, não tabela calculada
+
+O Leonardo informou o valor real que paga hoje, R$ 86,05/mês, em vez de
+eu calcular por tabela de atividade do MEI. `ObrigacaoDas` (troca de
+`ReservaDas`, ainda não implementado nesta rodada) usa esse valor fixo,
+configurável por variável de ambiente para quando a tabela do MEI mudar.
+
 ## O que ainda não foi decidido
 
-- Modelagem de tabelas no PostgreSQL (ainda não há migração nesta
-  entrega; `infra` sobe o banco, mas nenhum serviço lê ou escreve nele).
-- Formato da fila no Redis entre `finance-api` e `ingestion-worker`.
-- Estrutura de autenticação do painel.
-- Implementar de fato a tabela de valores do DAS-MEI (fixo por atividade,
-  reajustado uma vez por ano, não percentual de faturamento) para a
-  reserva do DAS parar de ser um valor fixo fictício. Falta confirmar com
-  o Leonardo o tipo de atividade do MEI dele (comércio/indústria, serviço,
-  ou os dois) para saber qual faixa da tabela usar.
+- Estrutura de autenticação do painel: senha única simples, via
+  `PAINEL_SENHA`, ainda não implementada.
+- Como identificar de fato o pagamento do DAS num movimento vindo do
+  Pluggy (heurística por descrição contendo "DAS" até vermos o formato
+  real da Pluggy).

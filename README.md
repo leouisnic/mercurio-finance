@@ -42,11 +42,24 @@ docker compose up -d
 ```
 
 API financeira (o painel busca nela; sem ela no ar, a página mostra uma
-mensagem de erro em vez do resumo):
+mensagem de erro em vez do resumo). Primeira vez, aplique a migração e
+popule o banco de desenvolvimento com dado fictício:
 
 ```
 uv sync --all-packages
+cp .env.example .env   # preencha com suas credenciais locais
+cd services/finance-api
+uv run alembic upgrade head
+uv run python -m finance_api.seed
+cd ../..
 uv run --package finance-api uvicorn finance_api.main:app --reload
+```
+
+Worker da fila (processa `/sync/*`; sem ele, os jobs ficam enfileirados
+sem rodar):
+
+```
+uv run --package finance-api python -m finance_api.worker
 ```
 
 Painel web:

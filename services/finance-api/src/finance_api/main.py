@@ -1,35 +1,40 @@
 """API financeira do Mercúrio.
 
-Nesta etapa, `/resumo` calcula o saldo por titularidade a partir de um
-extrato fictício versionado (`dados/extrato_ficticio.csv`), usando o
-mesmo importador e a mesma regra de agregação do `ingestion-worker`. A
-reserva do DAS continua um valor fixo provisório: a regra real de
-cálculo ainda depende de uma decisão de negócio do Leonardo (percentual
-da receita, valor fixo configurável, etc), não é só um detalhe técnico.
-Nenhuma credencial, extrato real ou dado pessoal é usado aqui.
+`/resumo` calcula o saldo por titularidade a partir dos movimentos
+gravados no Postgres (ver `finance_api.repositorio`), reusando a mesma
+regra de agregação do `ingestion-worker`. Popule o banco local com
+`uv run --package finance-api python -m finance_api.seed` (dado
+fictício) antes de rodar em desenvolvimento.
+
+A reserva do DAS ainda é um valor fixo provisório: ver docs/decisions.md.
+Nenhuma credencial, extrato real ou dado pessoal é usado neste módulo.
 """
 
 from datetime import date
 from decimal import Decimal
-from pathlib import Path
 
-from fastapi import FastAPI
-from ingestion_worker.extrato import carregar_extrato, resumir_por_titularidade
+from fastapi import Depends, FastAPI, HTTPException
+from ingestion_worker.extrato import resumir_por_titularidade
+from rq.exceptions import NoSuchJobError
+from rq.job import Job
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from finance_api.db import obter_sessao
 from finance_api.domain import (
     ReservaDas,
     ResumoFinanceiro,
     ResumoTitularidade,
     Titularidade,
 )
+from finance_api.fila import conexao_redis, fila
+from finance_api.jobs import job_reimportar_seed
+from finance_api.repositorio import carregar_movimentos
 
 app = FastAPI(
     title="Mercúrio · finance-api",
     description="Resumo financeiro por titularidade e reserva do DAS.",
     version="0.1.0",
 )
-
-EXTRATO_FICTICIO = Path(__file__).parent / "dados" / "extrato_ficticio.csv"
 
 NOME_POR_TITULARIDADE = {
     Titularidade.PF: "Pessoa Física",
@@ -57,9 +62,16 @@ def health() -> dict[str, str]:
 
 
 @app.get("/resumo", response_model=ResumoFinanceiro)
-def resumo() -> ResumoFinanceiro:
-    extrato = carregar_extrato(EXTRATO_FICTICIO)
-    totais = resumir_por_titularidade(extrato).set_index("titularidade")["total"]
+async def resumo(
+    sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
+) -> ResumoFinanceiro:
+    movimentos = await carregar_movimentos(sessao)
+
+    totais = (
+        resumir_por_titularidade(movimentos).set_index("titularidade")["total"]
+        if not movimentos.empty
+        else {}
+    )
 
     titularidades = [
         ResumoTitularidade(
@@ -71,7 +83,33 @@ def resumo() -> ResumoFinanceiro:
     ]
 
     return ResumoFinanceiro(
-        atualizado_em=date(2026, 8, 15),
+        atualizado_em=date.today(),  # noqa: DTZ011 (data de exibição, sem sensibilidade a fuso)
         titularidades=titularidades,
         reserva_das=RESERVA_DAS_FICTICIA,
     )
+
+
+@app.post("/sync/seed", status_code=202)
+def sincronizar_seed() -> dict[str, str]:
+    """Enfileira a reimportação do extrato fictício, sem travar a resposta.
+
+    Existe para provar a fila do Redis de ponta a ponta antes do job real
+    do Pluggy (Fase B); é seguro rodar mais de uma vez, a importação é
+    idempotente. Consulte o resultado em GET /sync/{job_id}.
+    """
+    job = fila.enqueue(job_reimportar_seed)
+    return {"job_id": job.id, "status": job.get_status()}
+
+
+@app.get("/sync/{job_id}")
+def status_sincronizacao(job_id: str) -> dict[str, object]:
+    try:
+        job = Job.fetch(job_id, connection=conexao_redis)
+    except NoSuchJobError as erro:
+        raise HTTPException(status_code=404, detail="job não encontrado") from erro
+
+    return {
+        "job_id": job.id,
+        "status": job.get_status(),
+        "resultado": job.return_value(),
+    }

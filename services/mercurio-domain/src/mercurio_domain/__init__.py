@@ -33,6 +33,7 @@ class Proveniencia(str, Enum):
     EXTRATO_BANCARIO = "extrato_bancario"
     NFSE_XML = "nfse_xml"
     IMPORTACAO_MANUAL = "importacao_manual"
+    PLUGGY = "pluggy"
 
 
 class TipoMovimento(str, Enum):
