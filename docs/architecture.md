@@ -95,19 +95,22 @@ nesta máquina, e isso sozinho já custava ~2s por conexão nova.
 
 - `apps/web`: painel Vértice buscando o resumo real do `finance-api` a
   cada carregamento (Server Component assíncrono).
-- `services/finance-api`: `/health` e `/resumo` (calculado a partir dos
-  movimentos no Postgres), modelo de domínio com fingerprint de
-  conciliação e validação de valor positivo.
-- `services/ingestion-worker`: importador de extrato CSV, com validação
-  explícita (titularidade, tipo, valor, data) e duas camadas de
-  duplicidade (confirmada e possível), usado tanto pelos próprios testes
-  quanto pelo `finance-api`. Ver
-  [domain-rules.md](./domain-rules.md#conciliação-e-duplicidade).
+- `services/finance-api`: `/health`, `/resumo` (calculado a partir dos
+  movimentos no Postgres), `/sync/seed` e `/sync/pluggy` (enfileiram
+  importação e sincronização real, `/sync/{job_id}` confere o resultado),
+  modelo de domínio com fingerprint de conciliação e validação de valor
+  positivo.
+- `services/ingestion-worker`: importador de extrato CSV e cliente da
+  Pluggy (`pluggy.py`, só leitura), com validação explícita (titularidade,
+  tipo, valor, data) e duas camadas de duplicidade (confirmada e
+  possível), usado tanto pelos próprios testes quanto pelo `finance-api`.
+  Ver [domain-rules.md](./domain-rules.md#conciliação-e-duplicidade).
 - `services/mercurio-domain`: fingerprint e tipos compartilhados.
 - `infra`: PostgreSQL (com banco de teste separado) e Redis com healthcheck
-  e bind só em `127.0.0.1`.
+  e bind só em `127.0.0.1`, usados de verdade agora (persistência e fila).
 
-Ainda não wireados: fila no Redis entre `finance-api` e `ingestion-worker`,
-Pluggy, Telegram, autenticação, GitHub Actions e dados reais. Ver
-[decisions.md](./decisions.md) para o que foi decidido e o que falta
+Pluggy está sincronizando dado real (Nubank = PJ, Mercado Pago = PF) no
+banco de desenvolvimento local; esse dado nunca entra no Git. Ainda não
+wireados: Telegram, autenticação do painel, regra real de cálculo do DAS.
+Ver [decisions.md](./decisions.md) para o que foi decidido e o que falta
 decidir.

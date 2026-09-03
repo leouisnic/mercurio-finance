@@ -508,6 +508,7 @@ name = "ingestion-worker"
 version = "0.1.0"
 source = { editable = "services/ingestion-worker" }
 dependencies = [
+    { name = "httpx" },
     { name = "mercurio-domain" },
     { name = "pandas" },
 ]
@@ -519,6 +520,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "mercurio-domain", editable = "services/mercurio-domain" },
     { name = "pandas", specifier = ">=3.0.5" },
 ]

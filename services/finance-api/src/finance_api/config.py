@@ -25,3 +25,8 @@ TEST_DATABASE_URL = os.environ.get(
 )
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
+
+PLUGGY_CLIENT_ID = os.environ.get("PLUGGY_CLIENT_ID")
+PLUGGY_CLIENT_SECRET = os.environ.get("PLUGGY_CLIENT_SECRET")
+PLUGGY_ITEM_ID_PJ = os.environ.get("PLUGGY_ITEM_ID_PJ")
+PLUGGY_ITEM_ID_PF = os.environ.get("PLUGGY_ITEM_ID_PF")

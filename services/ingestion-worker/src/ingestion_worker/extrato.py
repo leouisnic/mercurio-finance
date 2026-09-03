@@ -1,4 +1,4 @@
-"""Importador de extrato bancário em CSV.
+"""Importador de extrato bancário (CSV, e outras origens como a Pluggy).
 
 Usa o fingerprint compartilhado de `mercurio_domain` (mesma regra da
 finance-api). O identificador externo (coluna `identificador_externo`) já
@@ -37,7 +37,7 @@ COLUNAS_ESPERADAS = [
 SINAL_POR_TIPO_STR = {tipo.value: sinal for tipo, sinal in SINAL_POR_TIPO.items()}
 
 
-def _parse_data(valor: str) -> date:
+def _parse_data(valor: object) -> date:
     try:
         # Data de extrato bancário não carrega fuso horário; date() descarta
         # o componente de hora que o strptime exige.
@@ -58,9 +58,9 @@ def _fingerprint_linha(linha: pd.Series) -> str:
     )
 
 
-def carregar_extrato(caminho: Path) -> pd.DataFrame:
-    """Lê um CSV de extrato e devolve os lançamentos com fingerprint e
-    marcação de duplicidade.
+def processar_movimentos(movimentos: pd.DataFrame) -> pd.DataFrame:
+    """Valida, calcula fingerprint e marca duplicidade de um DataFrame de
+    movimentos, venha de onde vier (CSV, Pluggy, XML de NFS-e).
 
     Rejeita a importação (levanta `ValueError`) se alguma linha tiver
     titularidade ou tipo fora do esperado, valor ausente ou não positivo,
@@ -68,14 +68,14 @@ def carregar_extrato(caminho: Path) -> pd.DataFrame:
     esses casos eram descartados em silêncio pelo pandas em vez de barrar
     a importação.
     """
-    extrato = pd.read_csv(caminho, dtype=str)
+    extrato = movimentos.copy()
 
     colunas_faltando = set(COLUNAS_ESPERADAS) - set(extrato.columns)
     if colunas_faltando:
         raise ValueError(f"Colunas faltando no extrato: {sorted(colunas_faltando)}")
 
-    extrato["titularidade"] = extrato["titularidade"].str.strip().str.lower()
-    extrato["tipo"] = extrato["tipo"].str.strip().str.lower()
+    extrato["titularidade"] = extrato["titularidade"].astype(str).str.strip().str.lower()
+    extrato["tipo"] = extrato["tipo"].astype(str).str.strip().str.lower()
 
     titularidade_invalida = ~extrato["titularidade"].isin(TITULARIDADES_VALIDAS)
     tipo_invalido = ~extrato["tipo"].isin(TIPOS_VALIDOS)
@@ -87,12 +87,13 @@ def carregar_extrato(caminho: Path) -> pd.DataFrame:
             f"Titularidade ou tipo inválido no extrato, linhas (1 = cabeçalho): {linhas}"
         )
 
-    valor_ausente = extrato["valor"].isna() | (extrato["valor"].str.strip() == "")
+    valor_numerico = pd.to_numeric(extrato["valor"], errors="coerce")
+    valor_ausente = valor_numerico.isna()
     if valor_ausente.any():
         linhas = sorted((extrato.index[valor_ausente] + 2).tolist())
         raise ValueError(f"Valor ausente no extrato, linhas (1 = cabeçalho): {linhas}")
 
-    extrato["valor"] = extrato["valor"].astype(float)
+    extrato["valor"] = valor_numerico
     valor_nao_positivo = extrato["valor"] <= 0
     if valor_nao_positivo.any():
         linhas = sorted((extrato.index[valor_nao_positivo] + 2).tolist())
@@ -113,6 +114,12 @@ def carregar_extrato(caminho: Path) -> pd.DataFrame:
     extrato["duplicado_possivel"] = duplicado_mesmo_fingerprint & ~duplicado_confirmado
 
     return extrato
+
+
+def carregar_extrato(caminho: Path) -> pd.DataFrame:
+    """Lê um CSV de extrato e devolve os lançamentos processados
+    (fingerprint e duplicidade). Ver `processar_movimentos`."""
+    return processar_movimentos(pd.read_csv(caminho, dtype=str))
 
 
 def resumir_por_titularidade(extrato: pd.DataFrame) -> pd.DataFrame:

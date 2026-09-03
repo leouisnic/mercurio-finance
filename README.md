@@ -11,8 +11,9 @@ repositório, incluindo os exemplos e os testes, é fictício.
 
 ```
 apps/web                  Next.js, React, TypeScript. Painel Vértice.
-services/finance-api       FastAPI. Regras de domínio e resumo financeiro.
-services/ingestion-worker  Importadores e ETL com Pandas.
+services/finance-api       FastAPI. Resumo financeiro, persistência no
+                           Postgres e fila de sincronização no Redis.
+services/ingestion-worker  Importadores (CSV, Pluggy) e ETL com Pandas.
 services/mercurio-domain   Tipos e fingerprint compartilhados entre os dois.
 integrations/hermes-plugin Contrato de ferramentas MCP com o Hermes Agent.
 infra                      Docker Compose (PostgreSQL, Redis).
@@ -23,11 +24,13 @@ Detalhes em [docs/architecture.md](./docs/architecture.md).
 
 ## Stack
 
-Next.js, React, TypeScript, Tailwind CSS · Python, FastAPI, Pandas, uv ·
-PostgreSQL · Redis · Docker Compose · Pytest, Vitest, Playwright.
+Next.js, React, TypeScript, Tailwind CSS · Python, FastAPI, SQLAlchemy,
+Alembic, RQ, Pandas, uv · PostgreSQL · Redis · Docker Compose ·
+Pluggy/Open Finance (leitura) · Pytest, Vitest, Playwright · GitHub
+Actions.
 
-Planejado para etapas seguintes: Pluggy/Open Finance (leitura), Telegram
-Bot, PWA completa, Hermes Agent via MCP, GitHub Actions.
+Planejado para etapas seguintes: Telegram Bot, autenticação do painel, PWA
+completa, Hermes Agent via MCP.
 
 ## Rodando localmente
 
@@ -60,6 +63,14 @@ sem rodar):
 
 ```
 uv run --package finance-api python -m finance_api.worker
+```
+
+Sincronizar com o Pluggy de verdade (leitura, Open Finance; precisa das
+credenciais no `.env` e do worker rodando):
+
+```
+curl -X POST http://localhost:8000/sync/pluggy
+curl http://localhost:8000/sync/<job_id devolvido acima>
 ```
 
 Painel web:

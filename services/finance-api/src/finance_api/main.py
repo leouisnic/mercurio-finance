@@ -27,7 +27,7 @@ from finance_api.domain import (
     Titularidade,
 )
 from finance_api.fila import conexao_redis, fila
-from finance_api.jobs import job_reimportar_seed
+from finance_api.jobs import job_reimportar_seed, job_sincronizar_pluggy
 from finance_api.repositorio import carregar_movimentos
 
 app = FastAPI(
@@ -98,6 +98,16 @@ def sincronizar_seed() -> dict[str, str]:
     idempotente. Consulte o resultado em GET /sync/{job_id}.
     """
     job = fila.enqueue(job_reimportar_seed)
+    return {"job_id": job.id, "status": job.get_status()}
+
+
+@app.post("/sync/pluggy", status_code=202)
+def sincronizar_pluggy() -> dict[str, str]:
+    """Enfileira a sincronização real com o Pluggy (Nubank e Mercado
+    Pago), sem travar a resposta. Só leitura na Pluggy; escrita no Postgres
+    é idempotente. Consulte o resultado em GET /sync/{job_id}.
+    """
+    job = fila.enqueue(job_sincronizar_pluggy, job_timeout=300)
     return {"job_id": job.id, "status": job.get_status()}
 
 

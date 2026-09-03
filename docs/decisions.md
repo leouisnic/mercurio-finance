@@ -141,10 +141,41 @@ eu calcular por tabela de atividade do MEI. `ObrigacaoDas` (troca de
 `ReservaDas`, ainda não implementado nesta rodada) usa esse valor fixo,
 configurável por variável de ambiente para quando a tabela do MEI mudar.
 
+## Pluggy real: v2/transactions, categoria da própria Pluggy para transferência entre titularidades
+
+`GET /transactions` (paginação por página) está descontinuado pelo Pluggy
+(HTTP 410, "use GET /v2/transactions"); `services/ingestion_worker/pluggy.py`
+usa a v2, paginação por cursor (`next` na resposta).
+
+Achado validando com dado real: a Pluggy já categoriza transferência entre
+contas do mesmo titular como `"Same person transfer"`. Usamos essa
+categoria para mapear para `aporte_titular`/`retirada_titular` (sinal do
+valor decide qual), em vez de tentar adivinhar pela descrição do
+lançamento. `ingestion_worker.extrato.carregar_extrato` virou uma casca
+fina sobre `processar_movimentos`, para o mesmo validador/fingerprint
+servir tanto o CSV quanto os dados vindos da Pluggy.
+
+Cada item (conexão bancária) tem mais de uma conta: Nubank e Mercado Pago
+devolveram conta corrente/pré-paga E cartão de crédito, quatro contas ao
+todo. Confirmado com o Leonardo: importar as duas por titularidade agora,
+aceitando o risco de dupla contagem entre a compra no cartão e o
+pagamento da fatura (a fatura paga também vira uma despesa na conta
+corrente). Ajustar essa regra é trabalho futuro, não travou a Fase B.
+
+`job_sincronizar_pluggy` (`services/finance-api/src/finance_api/jobs.py`)
+roda a sincronização completa: autentica, lista contas dos dois `itemId`
+(PJ = Nubank, PF = Mercado Pago), busca transações de cada conta, mapeia
+e grava no Postgres pelo mesmo caminho idempotente do seed. Testado com o
+cliente da Pluggy mockado (nunca a API real nos testes) e validado uma
+vez contra a API e o banco de desenvolvimento de verdade, com o resultado
+conferido manualmente antes de seguir.
+
 ## O que ainda não foi decidido
 
 - Estrutura de autenticação do painel: senha única simples, via
   `PAINEL_SENHA`, ainda não implementada.
 - Como identificar de fato o pagamento do DAS num movimento vindo do
-  Pluggy (heurística por descrição contendo "DAS" até vermos o formato
-  real da Pluggy).
+  Pluggy (heurística por descrição contendo "DAS" até revisar as
+  descrições reais que já estão no banco de desenvolvimento).
+- Separar compra no cartão de crédito do pagamento da fatura, para não
+  contar o mesmo gasto duas vezes.
