@@ -1,0 +1,14 @@
+[project]
+name = "mercurio-domain"
+version = "0.1.0"
+description = "Tipos e regras de conciliação compartilhados entre finance-api e ingestion-worker."
+readme = "README.md"
+authors = [
+    { name = "Leonardo Colacio Nicolau", email = "colacionicolau@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.12.7,<0.13.0"]
+build-backend = "uv_build"

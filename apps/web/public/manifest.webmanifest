@@ -1,0 +1,10 @@
+{
+  "name": "Vértice · Mercúrio",
+  "short_name": "Vértice",
+  "description": "Painel consolidado de PF, PJ e MEI do Mercúrio.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#0a0a0a",
+  "lang": "pt-BR"
+}
