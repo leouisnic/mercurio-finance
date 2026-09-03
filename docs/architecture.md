@@ -9,8 +9,10 @@ MEI. O painel consolidado principal é o Vértice.
 apps/web                  Next.js + React + TypeScript. PWA responsiva.
                            Painel Vértice e telas por titularidade.
 
-services/finance-api       FastAPI. Regras de domínio, resumo financeiro,
-                           reserva do DAS, conciliação por fingerprint.
+services/finance-api       FastAPI. Regras de domínio, resumo financeiro
+                           calculado a partir de movimentos, conciliação
+                           por fingerprint. Usa o importador do
+                           ingestion-worker para carregar o extrato.
 
 services/ingestion-worker  ETL com Pandas. Importa extrato bancário,
                            planilha e XML de NFS-e. Roda como worker
@@ -50,23 +52,40 @@ de manter as duas em sincronia manualmente, os tipos de domínio
 vivem só ali; `finance-api` e `ingestion-worker` importam, não
 reimplementam.
 
+## Fluxo de dado (com dados fictícios)
+
+```
+services/finance-api/src/finance_api/dados/extrato_ficticio.csv
+  -> carregar_extrato() e resumir_por_titularidade() (ingestion-worker)
+  -> GET /resumo (finance-api), saldo por titularidade em Decimal
+  -> fetch em Server Component, cache: "no-store" (apps/web)
+  -> painel Vértice
+```
+
+`apps/web` busca `finance-api` de verdade a cada carregamento da página
+(`src/app/buscar-resumo.ts`); não há mais número fixo no componente. Se o
+`finance-api` não estiver no ar, a página mostra uma mensagem em vez de
+quebrar. A reserva do DAS ainda é um valor fixo dentro do `finance-api`: a
+regra real de cálculo é decisão de negócio do Leonardo, ainda pendente.
+
 ## Estado desta entrega
 
-Base inicial funcional, com dados fictícios:
-
-- `apps/web`: página inicial do Vértice mostrando saldo fictício por
-  titularidade e a reserva do DAS (valor reservado e valor previsto).
-- `services/finance-api`: endpoints `/health` e `/resumo`, modelo de
-  domínio com fingerprint de conciliação e validação de valor positivo.
-- `services/ingestion-worker`: importador de extrato CSV fictício, com
-  validação explícita (titularidade, tipo, valor, data) e duas camadas de
-  duplicidade (confirmada e possível). Ver
+- `apps/web`: painel Vértice buscando o resumo real do `finance-api` a
+  cada carregamento (Server Component assíncrono).
+- `services/finance-api`: `/health` e `/resumo` (calculado a partir de um
+  extrato fictício, não mais hardcoded), modelo de domínio com fingerprint
+  de conciliação e validação de valor positivo.
+- `services/ingestion-worker`: importador de extrato CSV, com validação
+  explícita (titularidade, tipo, valor, data) e duas camadas de
+  duplicidade (confirmada e possível), usado tanto pelos próprios testes
+  quanto pelo `finance-api`. Ver
   [domain-rules.md](./domain-rules.md#conciliação-e-duplicidade).
 - `services/mercurio-domain`: fingerprint e tipos compartilhados.
 - `infra`: PostgreSQL e Redis com healthcheck e bind só em `127.0.0.1`,
-  validados subindo os containers.
+  validados subindo os containers. Ainda sem uso real (nenhum serviço lê
+  ou escreve neles nesta entrega).
 
-Ainda não wireados nesta entrega: comunicação entre `apps/web` e
-`finance-api`, persistência em PostgreSQL, fila no Redis, Pluggy, Telegram,
-autenticação, GitHub Actions e dados reais. Ver [decisions.md](./decisions.md)
-para o que foi decidido e o que falta decidir.
+Ainda não wireados: persistência em PostgreSQL, fila no Redis entre
+`finance-api` e `ingestion-worker`, Pluggy, Telegram, autenticação, GitHub
+Actions e dados reais. Ver [decisions.md](./decisions.md) para o que foi
+decidido e o que falta decidir.

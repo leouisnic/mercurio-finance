@@ -1,0 +1,10 @@
+data,valor,descricao,titularidade,tipo,identificador_externo
+2026-08-05,2500.00,Pagamento cliente Genux,pj,receita,TXN1001
+2026-08-06,850.00,Pagamento cliente Tragial,pj,receita,TXN1002
+2026-08-07,300.00,Ferramenta de trabalho,pj,despesa,TXN1003
+2026-08-08,500.00,Transferencia para Mercado Pago,pj,retirada_titular,TXN1004
+2026-08-08,500.00,Transferencia recebida do Nubank PJ,pf,aporte_titular,TXN2001
+2026-08-09,180.50,Mercado,pf,despesa,TXN2002
+2026-08-10,65.00,Assinatura streaming,pf,despesa,TXN2003
+2026-08-12,420.00,Servico avulso MEI,mei,receita,TXN3001
+2026-08-15,71.60,Taxa DAS emitida,mei,despesa,TXN3002

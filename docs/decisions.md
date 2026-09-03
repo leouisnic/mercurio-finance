@@ -64,17 +64,35 @@ realmente pago. A reserva ficou como valor calculado à parte
 (`ReservaDas` na `finance-api`), não como um movimento importado do
 extrato. Ver [domain-rules.md](./domain-rules.md#reserva-do-das).
 
+## apps/web consome finance-api por fetch direto em Server Component
+
+`src/app/page.tsx` é um Server Component assíncrono que busca
+`GET /resumo` (`cache: "no-store"`, sempre um dado atual, nunca cacheado
+entre requisições) e passa o resultado para `ResumoPainel`, um componente
+síncrono só de apresentação. Essa separação existe porque o Next.js não
+suporta testar Server Component assíncrono direto no Vitest (confirmado na
+documentação oficial); `ResumoPainel` e a função `buscarResumo` (que faz o
+fetch e converte string para number) são testados separadamente no Vitest,
+e o fluxo completo (os dois serviços conversando de verdade) é validado
+pelo Playwright, que sobe `finance-api` e `apps/web` juntos.
+
+Se o `finance-api` estiver fora do ar, a página mostra uma mensagem em vez
+de quebrar (sem página de erro dedicada nesta etapa).
+
+## Total do worker convertido para Decimal na borda da finance-api
+
+O `ingestion-worker` soma em `float` (natureza do pandas). O `finance-api`
+converte para `Decimal` com 2 casas fixas via `Decimal(str(total)).quantize(...)`,
+não só `round()` (que não garante 2 casas quando o resultado é uma dezena
+redonda, ex: `round(2550.0, 2)` continua `2550.0`, não `2550.00`).
+
 ## O que ainda não foi decidido
 
-- Como `apps/web` vai consumir `finance-api` (fetch direto, camada de
-  API route do Next.js, ou outra forma).
 - Modelagem de tabelas no PostgreSQL (ainda não há migração nesta
-  entrega).
+  entrega; `infra` sobe o banco, mas nenhum serviço lê ou escreve nele).
 - Formato da fila no Redis entre `finance-api` e `ingestion-worker`.
 - Estrutura de autenticação do painel.
-- Como o total calculado pelo `ingestion-worker` (hoje `float`, arredondado
-  em 2 casas na saída) vai virar `Decimal` ao entrar na `finance-api`, e
-  como a reserva do DAS será efetivamente calculada a partir da receita.
 - Como a reserva do DAS será de fato calculada (percentual da receita da
   PJ no mês, valor fixo configurável, ou outra regra); hoje o valor no
-  painel e na API é só fictício, sem lógica por trás ainda.
+  painel e na API é fixo e provisório, sem lógica por trás. É decisão de
+  negócio do Leonardo, não só técnica.

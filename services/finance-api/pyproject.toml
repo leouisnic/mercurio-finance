@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.13"
 dependencies = [
     "fastapi[standard]>=0.141.1",
+    "ingestion-worker",
     "mercurio-domain",
 ]
 
@@ -24,3 +25,4 @@ dev = [
 
 [tool.uv.sources]
 mercurio-domain = { workspace = true }
+ingestion-worker = { workspace = true }

@@ -33,12 +33,20 @@ Bot, PWA completa, Hermes Agent via MCP, GitHub Actions.
 
 Pré-requisitos: Node 20+, Python 3.13+, `uv`, Docker Desktop.
 
-Infraestrutura (PostgreSQL e Redis):
+Infraestrutura (PostgreSQL e Redis, ainda sem uso real por nenhum serviço):
 
 ```
 cd infra
 cp .env.example .env
 docker compose up -d
+```
+
+API financeira (o painel busca nela; sem ela no ar, a página mostra uma
+mensagem de erro em vez do resumo):
+
+```
+uv sync --all-packages
+uv run --package finance-api uvicorn finance_api.main:app --reload
 ```
 
 Painel web:
@@ -49,20 +57,20 @@ npm install
 npm run dev
 ```
 
-API financeira:
-
-```
-uv sync --all-packages
-uv run --package finance-api uvicorn finance_api.main:app --reload
-```
+Por padrão o painel busca a API em `http://localhost:8000`. Para apontar
+para outro endereço, defina `FINANCE_API_URL` antes de rodar `npm run dev`.
 
 ## Testes
 
 ```
-cd apps/web && npm run lint && npm run build && npm run test && npm run test:e2e
 uv run ruff check .
 uv run pytest
+cd apps/web && npm run lint && npm run build && npm run test && npm run test:e2e
 ```
+
+`npm run test:e2e` sobe o `finance-api` de verdade sozinho (via `uv run`), então
+precisa do workspace Python sincronizado (`uv sync --all-packages` na raiz)
+antes de rodar.
 
 ## Dados
 

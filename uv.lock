@@ -280,6 +280,7 @@ version = "0.1.0"
 source = { editable = "services/finance-api" }
 dependencies = [
     { name = "fastapi", extra = ["standard"] },
+    { name = "ingestion-worker" },
     { name = "mercurio-domain" },
 ]
 
@@ -292,6 +293,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.141.1" },
+    { name = "ingestion-worker", editable = "services/ingestion-worker" },
     { name = "mercurio-domain", editable = "services/mercurio-domain" },
 ]
 
