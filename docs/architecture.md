@@ -109,8 +109,10 @@ nesta máquina, e isso sozinho já custava ~2s por conexão nova.
 - `infra`: PostgreSQL (com banco de teste separado) e Redis com healthcheck
   e bind só em `127.0.0.1`, usados de verdade agora (persistência e fila).
 
-Pluggy está sincronizando dado real (Nubank = PJ, Mercado Pago = PF) no
-banco de desenvolvimento local; esse dado nunca entra no Git. Ainda não
+Pluggy está sincronizando dado real (Nubank e Mercado Pago, as duas PF; a
+conta PJ existe mas não está conectada, ver
+[domain-rules.md](./domain-rules.md#contas-reais-e-o-que-está-conectado-no-pluggy))
+no banco de desenvolvimento local; esse dado nunca entra no Git. Ainda não
 wireados: Telegram, autenticação do painel, regra real de cálculo do DAS.
 Ver [decisions.md](./decisions.md) para o que foi decidido e o que falta
 decidir.

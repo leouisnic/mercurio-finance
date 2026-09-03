@@ -8,8 +8,9 @@ from ingestion_worker import pluggy
 
 pytestmark = pytest.mark.usefixtures("banco_de_teste_limpo")
 
-CONTA_CORRENTE_PJ = {"id": "conta-pj-corrente", "type": "BANK"}
-TRANSACOES_PJ = [
+# As duas contas conectadas no Pluggy hoje são PF (Nubank e Mercado Pago).
+CONTA_NUBANK = {"id": "conta-nubank", "type": "BANK"}
+TRANSACOES_NUBANK = [
     {
         "id": "txn-1",
         "date": "2026-08-05T10:00:00.000Z",
@@ -25,12 +26,12 @@ TRANSACOES_PJ = [
         "category": "Same person transfer",
     },
 ]
-CONTA_CORRENTE_PF = {"id": "conta-pf-corrente", "type": "BANK"}
-TRANSACOES_PF = [
+CONTA_MERCADOPAGO = {"id": "conta-mercadopago", "type": "BANK"}
+TRANSACOES_MERCADOPAGO = [
     {
         "id": "txn-3",
         "date": "2026-08-08T10:00:00.000Z",
-        "description": "Transferencia recebida do Nubank PJ",
+        "description": "Transferencia recebida do Nubank",
         "amount": 500.0,
         "category": "Same person transfer",
     },
@@ -41,16 +42,17 @@ def _configurar_mocks(monkeypatch: pytest.MonkeyPatch, sessao_de_teste_factory) 
     monkeypatch.setattr(jobs, "async_session", sessao_de_teste_factory)
     monkeypatch.setattr(jobs, "PLUGGY_CLIENT_ID", "id-de-teste")
     monkeypatch.setattr(jobs, "PLUGGY_CLIENT_SECRET", "segredo-de-teste")
-    monkeypatch.setattr(jobs, "PLUGGY_ITEM_ID_PJ", "item-pj")
-    monkeypatch.setattr(jobs, "PLUGGY_ITEM_ID_PF", "item-pf")
+    monkeypatch.setattr(
+        jobs, "CONTAS_PLUGGY", [("item-nubank", "pf"), ("item-mercadopago", "pf")]
+    )
 
     monkeypatch.setattr(pluggy, "autenticar", lambda client_id, client_secret: "chave-falsa")
 
     def _listar_contas_falso(api_key, item_id):
-        return [CONTA_CORRENTE_PJ] if item_id == "item-pj" else [CONTA_CORRENTE_PF]
+        return [CONTA_NUBANK] if item_id == "item-nubank" else [CONTA_MERCADOPAGO]
 
     def _listar_transacoes_falso(api_key, account_id):
-        return TRANSACOES_PJ if account_id == CONTA_CORRENTE_PJ["id"] else TRANSACOES_PF
+        return TRANSACOES_NUBANK if account_id == CONTA_NUBANK["id"] else TRANSACOES_MERCADOPAGO
 
     monkeypatch.setattr(pluggy, "listar_contas", _listar_contas_falso)
     monkeypatch.setattr(pluggy, "listar_transacoes", _listar_transacoes_falso)

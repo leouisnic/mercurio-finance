@@ -163,12 +163,29 @@ pagamento da fatura (a fatura paga também vira uma despesa na conta
 corrente). Ajustar essa regra é trabalho futuro, não travou a Fase B.
 
 `job_sincronizar_pluggy` (`services/finance-api/src/finance_api/jobs.py`)
-roda a sincronização completa: autentica, lista contas dos dois `itemId`
-(PJ = Nubank, PF = Mercado Pago), busca transações de cada conta, mapeia
-e grava no Postgres pelo mesmo caminho idempotente do seed. Testado com o
-cliente da Pluggy mockado (nunca a API real nos testes) e validado uma
-vez contra a API e o banco de desenvolvimento de verdade, com o resultado
-conferido manualmente antes de seguir.
+roda a sincronização completa: autentica, lista contas de cada `itemId`
+em `CONTAS_PLUGGY`, busca transações de cada conta, mapeia e grava no
+Postgres pelo mesmo caminho idempotente do seed. Testado com o cliente da
+Pluggy mockado (nunca a API real nos testes) e validado contra a API e o
+banco de desenvolvimento de verdade, com o resultado conferido
+manualmente antes de seguir.
+
+## Correção: as duas contas conectadas no Pluggy são PF, não PJ
+
+Mapeei errado na Fase B: tratei o item do Nubank como PJ. O Leonardo
+corrigiu (2026-09-03): a conta Nubank conectada no Pluggy é PF. A conta PJ
+dele existe de verdade, mas é outra conta, não conectada no Pluggy, e
+funciona só como intermediária para receber pagamento de nota fiscal
+(saldo sempre perto de zero, por instrução do contador). Ver
+[domain-rules.md](./domain-rules.md#contas-reais-e-o-que-está-conectado-no-pluggy).
+
+Corrigido: variáveis de ambiente renomeadas por banco, não por titularidade
+presumida (`PLUGGY_ITEM_ID_NUBANK`, `PLUGGY_ITEM_ID_MERCADOPAGO`, no lugar
+de `..._PJ`/`..._PF`); `CONTAS_PLUGGY` em `finance_api/jobs.py` mapeia as
+duas para `"pf"` hoje. Os 724 movimentos já importados foram apagados do
+banco de desenvolvimento e reimportados com o mapeamento certo (mesmo
+caminho idempotente, sem risco de duplicar). `/resumo` real depois da
+correção: PF R$ 948,83, PJ R$ 0,00 (nenhuma conta conectada).
 
 ## O que ainda não foi decidido
 

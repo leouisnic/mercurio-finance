@@ -14,18 +14,31 @@ fixo por tabela (varia por tipo de atividade: comércio/indústria, serviço,
 ou os dois), reajustado uma vez por ano, não um percentual do faturamento
 como em outros regimes do Simples Nacional.
 
-## Nubank PJ e Mercado Pago PF
+## Contas reais e o que está conectado no Pluggy
 
-- Nubank PJ é a conta do CNPJ (MEI) do Leonardo: recebe pagamentos de
-  clientes e paga o DAS.
-- Mercado Pago é conta PF.
-- Transferência de Nubank PJ para Mercado Pago PF é retirada do titular
-  na origem (PJ) e aporte do titular no destino (PF): não é despesa da PJ
-  nem receita da PF. Ainda assim reduz o saldo da PJ e aumenta o saldo da
-  PF, porque o dinheiro realmente muda de conta. Cada perna da
-  transferência é um movimento próprio (`retirada_titular` na origem,
-  `aporte_titular` no destino); nenhum dos dois entra em receita ou
-  despesa.
+O Leonardo tem três contas na prática, só duas conectadas no Pluggy hoje:
+
+- **Nubank PF** (conectada): conta pessoal, uso do dia a dia.
+- **Mercado Pago PF** (conectada): outra conta pessoal.
+- **Nubank PJ** (não conectada): a conta do CNPJ (MEI). Por instrução do
+  contador, ela é só intermediária: recebe o pagamento da nota fiscal do
+  cliente e o dinheiro sai de lá logo em seguida (paga o DAS, transfere o
+  resto para a PF). O saldo dela fica sempre perto de zero por causa
+  disso, então não há um "saldo da PJ" relevante para acompanhar hoje.
+  `Titularidade.PJ` continua existindo no código porque a conta é real;
+  ela só não tem movimento importado até (e se) for conectada no Pluggy.
+
+Transferência entre titularidades (por exemplo, da PJ para a PF, quando o
+Leonardo retira o que sobrou depois do DAS) é retirada do titular na
+origem e aporte do titular no destino: não é despesa de quem manda nem
+receita de quem recebe, mas ainda reduz o saldo de origem e aumenta o de
+destino, porque o dinheiro muda de conta de verdade. Cada perna é um
+movimento próprio (`retirada_titular` na origem, `aporte_titular` no
+destino). O mesmo vale para transferência entre as duas contas PF
+conectadas (Nubank PF ↔ Mercado Pago PF): mesmo sendo a mesma
+titularidade nos dois lados, a Pluggy já identifica esse caso como
+`"Same person transfer"` e o Mercúrio trata do mesmo jeito, não como
+receita nem despesa.
 
 ## Reserva do DAS
 
