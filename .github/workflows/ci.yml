@@ -97,11 +97,11 @@ jobs:
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
 
       - name: Instalar workspace Python
-        working-directory: ../..
+        working-directory: ${{ github.workspace }}
         run: uv sync --locked --all-packages
 
       - name: Aplicar migrações em banco vazio
-        working-directory: ../../services/finance-api
+        working-directory: ${{ github.workspace }}/services/finance-api
         env:
           DATABASE_URL: postgresql+asyncpg://mercurio:mercurio@localhost:5432/mercurio_test
         run: uv run alembic upgrade head
