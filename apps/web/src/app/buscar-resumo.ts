@@ -1,3 +1,5 @@
+import { buscarJson, paraNumero, paraNumeroOuNull } from "./api";
+
 export type Conta = {
   id: string;
   nome: string;
@@ -5,10 +7,15 @@ export type Conta = {
   saldo: number;
   limite: number | null;
   disponivel: number | null;
+  bandeira: string | null;
+  final: string | null;
+  /** Datas da fatura em aberto. Nulas para conta corrente. */
+  fechamento: string | null;
+  vencimento: string | null;
 };
 
 export type ResumoFinanceiro = {
-  atualizadoEm: string;
+  atualizadoEm: string | null;
   contas: Conta[];
 };
 
@@ -19,52 +26,37 @@ type RespostaApiConta = {
   saldo: string;
   limite: string | null;
   disponivel: string | null;
+  bandeira: string | null;
+  final: string | null;
+  fechamento: string | null;
+  vencimento: string | null;
 };
 
 type RespostaApi = {
-  atualizado_em: string;
+  atualizado_em: string | null;
   contas: RespostaApiConta[];
 };
 
-const FINANCE_API_URL = process.env.FINANCE_API_URL ?? "http://localhost:8000";
-
-function paraNumeroOuNull(valor: string | null): number | null {
-  return valor === null ? null : Number(valor);
-}
-
-/**
- * Busca o resumo financeiro no finance-api. Os valores chegam como string no
- * JSON porque o Pydantic serializa Decimal assim; aqui já convertem para
- * number, formato que o resto do painel espera.
- *
- * Devolve null em qualquer falha (rede, API fora do ar, resposta inválida)
- * em vez de lançar: em desenvolvimento o finance-api pode não estar rodando,
- * e a página trata esse caso mostrando uma mensagem em vez de quebrar.
- */
+/** Contas conectadas e seus saldos, como a Pluggy relata. */
 export async function buscarResumo(): Promise<ResumoFinanceiro | null> {
-  try {
-    const resposta = await fetch(`${FINANCE_API_URL}/resumo`, {
-      cache: "no-store",
-    });
-
-    if (!resposta.ok) {
-      return null;
-    }
-
-    const corpo = (await resposta.json()) as RespostaApi;
-
-    return {
-      atualizadoEm: corpo.atualizado_em,
-      contas: corpo.contas.map((conta) => ({
-        id: conta.id,
-        nome: conta.nome,
-        tipo: conta.tipo,
-        saldo: Number(conta.saldo),
-        limite: paraNumeroOuNull(conta.limite),
-        disponivel: paraNumeroOuNull(conta.disponivel),
-      })),
-    };
-  } catch {
+  const corpo = await buscarJson<RespostaApi>("/resumo");
+  if (corpo === null) {
     return null;
   }
+
+  return {
+    atualizadoEm: corpo.atualizado_em,
+    contas: corpo.contas.map((conta) => ({
+      id: conta.id,
+      nome: conta.nome,
+      tipo: conta.tipo,
+      saldo: paraNumero(conta.saldo),
+      limite: paraNumeroOuNull(conta.limite),
+      disponivel: paraNumeroOuNull(conta.disponivel),
+      bandeira: conta.bandeira,
+      final: conta.final,
+      fechamento: conta.fechamento,
+      vencimento: conta.vencimento,
+    })),
+  };
 }

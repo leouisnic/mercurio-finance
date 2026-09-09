@@ -1,36 +1,64 @@
+import { sincronizar } from "./acoes";
+import { buscarCiclos, buscarFluxoPorConta } from "./buscar-movimentos";
 import { buscarResumo } from "./buscar-resumo";
+import { porExtenso, tempoDesde } from "./formato";
 import { ResumoPainel } from "./resumo-painel";
 
-export default async function Home() {
-  const resumo = await buscarResumo();
+/** Verde até 15 min, laranja até 4 h, vermelho acima: o quanto o dado da
+ *  tela ainda merece confiança. */
+function tomDaSincronizacao(atualizadoEm: string, agora: Date) {
+  const minutos = (agora.getTime() - new Date(atualizadoEm).getTime()) / 60000;
+  if (minutos <= 15) {
+    return "bg-positivo-fundo text-positivo";
+  }
+  return minutos <= 240 ? "bg-gasto-fundo text-gasto" : "bg-alerta-fundo text-alerta";
+}
+
+export default async function VisaoGeral() {
+  const agora = new Date();
+  const [resumo, ciclos] = await Promise.all([buscarResumo(), buscarCiclos()]);
+  const fluxos = ciclos ? await buscarFluxoPorConta(ciclos.atual.inicio, ciclos.atual.fim) : null;
 
   return (
-    <div className="flex flex-1 flex-col items-center px-4 py-10 sm:px-8">
-      <main className="flex w-full max-w-5xl flex-col gap-8">
-        <header className="flex flex-col gap-2">
-          <span className="text-sm font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-            Mercúrio
+    <>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-[3px]">
+          <h1 className="text-[23px] font-bold tracking-[-0.2px]">Visão geral</h1>
+          <span className="text-tinta-3 text-[13px] first-letter:uppercase">
+            {porExtenso(agora)}
           </span>
-          <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-            Vértice
-          </h1>
-          <p className="max-w-xl text-base text-zinc-600 dark:text-zinc-400">
-            Saldo das suas contas conectadas, em um só lugar.
-          </p>
-        </header>
+        </div>
 
-        {resumo ? (
-          <ResumoPainel resumo={resumo} />
-        ) : (
-          <p
-            role="alert"
-            className="rounded-lg border border-zinc-200 bg-white p-5 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400"
-          >
-            Não foi possível carregar o resumo financeiro agora. Confira se o
-            finance-api está rodando.
-          </p>
-        )}
-      </main>
-    </div>
+        <div className="flex items-center gap-2.5">
+          {resumo?.atualizadoEm && (
+            <span
+              className={`${tomDaSincronizacao(resumo.atualizadoEm, agora)} rounded-[10px] px-3.5 py-2 text-[12.5px] font-semibold`}
+            >
+              Sincronizado {tempoDesde(resumo.atualizadoEm, agora)}
+            </span>
+          )}
+          <form action={sincronizar}>
+            <button
+              type="submit"
+              className="bg-superficie border-borda text-tinta-2 hover:bg-superficie-2 cursor-pointer rounded-[10px] border px-4 py-2.5 text-[12.5px] font-semibold"
+            >
+              Sincronizar
+            </button>
+          </form>
+        </div>
+      </header>
+
+      {resumo ? (
+        <ResumoPainel contas={resumo.contas} fluxos={fluxos ?? []} hoje={agora} />
+      ) : (
+        <p
+          role="alert"
+          className="bg-superficie border-borda text-tinta-2 rounded-[14px] border p-5 text-sm"
+        >
+          Não foi possível carregar o resumo financeiro agora. Confira se o finance-api está
+          rodando.
+        </p>
+      )}
+    </>
   );
 }

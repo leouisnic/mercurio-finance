@@ -1,7 +1,11 @@
 # Contexto de agentes, só local (backup privado em agent-workflow)
 /AGENTS.md
 /CLAUDE.md
-/.memoria-tecnica/
+/.workflow/
+/.claude/
+
+# Capturas temporárias de revisão, fora do projeto
+/prints/
 
 # Node / Next.js (apps/web também tem seu próprio .gitignore)
 node_modules/
@@ -16,12 +20,21 @@ out/
 __pycache__/
 *.pyc
 .pytest_cache/
+.test-tmp/
+.test-cache/
 .ruff_cache/
+.uv-cache/
 
 # Ambiente e segredos
 .env
 .env.*
 !.env.example
+*.p12
+*.pfx
+*.pem
+*.key
+*.crt
+*.cer
 
 # Sistema
 .DS_Store

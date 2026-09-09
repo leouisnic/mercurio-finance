@@ -9,7 +9,18 @@ test("converte a resposta do finance-api (snake_case, valores em string) para o 
   const corpoDaApi = {
     atualizado_em: "2026-08-15",
     contas: [
-      { id: "c1", nome: "Banco X", tipo: "BANK", saldo: "254.50", limite: null, disponivel: null },
+      {
+        id: "c1",
+        nome: "Banco X",
+        tipo: "BANK",
+        saldo: "254.50",
+        limite: null,
+        disponivel: null,
+        bandeira: null,
+        final: null,
+        fechamento: null,
+        vencimento: null,
+      },
       {
         id: "c2",
         nome: "Cartão gold",
@@ -17,6 +28,10 @@ test("converte a resposta do finance-api (snake_case, valores em string) para o 
         saldo: "340.04",
         limite: "350.00",
         disponivel: "9.96",
+        bandeira: "MASTERCARD",
+        final: "4073",
+        fechamento: "2026-09-08",
+        vencimento: "2026-09-15",
       },
     ],
   };
@@ -34,8 +49,30 @@ test("converte a resposta do finance-api (snake_case, valores em string) para o 
   expect(resumo).toEqual({
     atualizadoEm: "2026-08-15",
     contas: [
-      { id: "c1", nome: "Banco X", tipo: "BANK", saldo: 254.5, limite: null, disponivel: null },
-      { id: "c2", nome: "Cartão gold", tipo: "CREDIT", saldo: 340.04, limite: 350, disponivel: 9.96 },
+      {
+        id: "c1",
+        nome: "Banco X",
+        tipo: "BANK",
+        saldo: 254.5,
+        limite: null,
+        disponivel: null,
+        bandeira: null,
+        final: null,
+        fechamento: null,
+        vencimento: null,
+      },
+      {
+        id: "c2",
+        nome: "Cartão gold",
+        tipo: "CREDIT",
+        saldo: 340.04,
+        limite: 350,
+        disponivel: 9.96,
+        bandeira: "MASTERCARD",
+        final: "4073",
+        fechamento: "2026-09-08",
+        vencimento: "2026-09-15",
+      },
     ],
   });
 });

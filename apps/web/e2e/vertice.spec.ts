@@ -1,14 +1,64 @@
 import { test, expect } from "@playwright/test";
 
-test("Vértice mostra o resumo calculado pelo finance-api de verdade", async ({ page }) => {
+test("Visão geral mostra o resumo calculado pelo finance-api de verdade", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { level: 1, name: "Vértice" })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: "Conta A (fictícia)" })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: "Conta B (fictícia)" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Visão geral" })).toBeVisible();
+
+  const contas = page.getByRole("region", { name: "Contas conectadas" });
+  await expect(contas.getByText("Conta A (fictícia)")).toBeVisible();
+  await expect(contas.getByText("Conta B (fictícia)")).toBeVisible();
 
   // Valores batendo com o que finance_api.seed grava nas contas, não mais
   // hardcoded no componente: prova de que apps/web busca o dado de verdade.
-  await expect(page.getByText("R$ 2.898,40")).toBeVisible();
-  await expect(page.getByText("R$ 254,50")).toBeVisible();
+  await expect(contas.getByText("R$ 2.898,40")).toBeVisible();
+  await expect(contas.getByText("R$ 254,50")).toBeVisible();
+
+  // Indicador somando as duas contas correntes fictícias.
+  const indicadores = page.getByRole("region", { name: "Indicadores" });
+  await expect(indicadores.getByText("R$ 3.152,90")).toBeVisible();
+  await expect(indicadores.getByText("2 contas correntes")).toBeVisible();
+});
+
+test("Movimentos filtra por ciclo com as datas que o finance-api calcula", async ({ page }) => {
+  await page.goto("/movimentos");
+
+  await expect(page.getByRole("heading", { level: 1, name: "Movimentos" })).toBeVisible();
+
+  // O filtro de ciclo vem de GET /ciclos, não de data escrita na tela: os
+  // três ciclos têm intervalo de verdade, calculado com dia útil.
+  const filtroDeCiclo = page.getByRole("navigation", { name: "Ciclo" });
+  await expect(filtroDeCiclo.getByRole("link")).toHaveCount(3);
+  // Formato "Ciclo N · DD/MM a DD/MM".
+  for (const rotulo of await filtroDeCiclo.getByRole("link").allInnerTexts()) {
+    expect(rotulo).toMatch(/^Ciclo [12] · \d{2}\/\d{2} a \d{2}\/\d{2}$/);
+  }
+
+  await expect(page.getByRole("region", { name: "Gasto por dia" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Movimentos" })).toBeVisible();
+});
+
+test("escolher outro ciclo troca o recorte pela URL", async ({ page }) => {
+  await page.goto("/movimentos");
+
+  const seguinte = page.getByRole("navigation", { name: "Ciclo" }).getByRole("link").last();
+  const rotulo = await seguinte.innerText();
+  await seguinte.click();
+
+  await expect(page).toHaveURL(/ciclo=seguinte/);
+  await expect(seguinte).toHaveAttribute("aria-current", "true");
+
+  // O cabeçalho passa a descrever o mesmo intervalo do filtro escolhido.
+  const [, inicio, fim] = rotulo.match(/(\d{2}\/\d{2}) a (\d{2}\/\d{2})/) ?? [];
+  await expect(page.getByText(`de ${inicio} a ${fim}`, { exact: false })).toBeVisible();
+});
+
+test("a navegação leva de uma tela para a outra", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("navigation", { name: "Navegação principal" }).getByText("Movimentos").click();
+  await expect(page.getByRole("heading", { level: 1, name: "Movimentos" })).toBeVisible();
+
+  await page.getByRole("navigation", { name: "Navegação principal" }).getByText("Visão geral").click();
+  await expect(page.getByRole("heading", { level: 1, name: "Visão geral" })).toBeVisible();
 });

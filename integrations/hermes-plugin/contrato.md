@@ -10,7 +10,7 @@ ferramenta futura deve seguir o formato abaixo antes de ganhar código.
   nota) devolve uma proposta de ação, não executa direto. A execução exige
   confirmação humana explícita em um passo separado.
 - Nenhuma ferramenta devolve extrato bruto completo. O agente recebe
-  agregados ou os itens que o Leonardo apontou.
+  agregados ou os itens selecionados para a tarefa.
 
 ## Ferramentas de leitura (planejadas)
 

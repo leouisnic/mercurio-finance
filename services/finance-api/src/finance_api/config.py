@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+from sqlalchemy.engine import make_url
 
 RAIZ_DO_REPOSITORIO = Path(__file__).resolve().parents[4]
 load_dotenv(RAIZ_DO_REPOSITORIO / ".env")
@@ -36,3 +37,23 @@ PLUGGY_CLIENT_SECRET = os.environ.get("PLUGGY_CLIENT_SECRET")
 PLUGGY_ITEM_IDS = [
     item.strip() for item in os.environ.get("PLUGGY_ITEM_IDS", "").split(",") if item.strip()
 ]
+
+
+def validar_url_local_de_teste(test_database_url: str) -> None:
+    """Recusa uma URL que não seja de um banco local identificado como teste."""
+    teste = make_url(test_database_url)
+    if teste.host not in {"127.0.0.1", "localhost"}:
+        raise RuntimeError("TEST_DATABASE_URL precisa apontar para o computador local")
+    if not teste.database or not teste.database.endswith("_test"):
+        raise RuntimeError("o nome do banco de teste precisa terminar em _test")
+
+
+def validar_banco_de_teste(test_database_url: str, database_url: str) -> None:
+    """Recusa uma URL capaz de apontar a suíte para dados de desenvolvimento."""
+    teste = make_url(test_database_url)
+    desenvolvimento = make_url(database_url)
+    if teste.render_as_string(hide_password=False) == desenvolvimento.render_as_string(
+        hide_password=False
+    ):
+        raise RuntimeError("TEST_DATABASE_URL não pode ser igual a DATABASE_URL")
+    validar_url_local_de_teste(test_database_url)

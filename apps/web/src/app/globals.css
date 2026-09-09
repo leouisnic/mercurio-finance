@@ -1,26 +1,57 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Paleta do Vértice, em oklch, igual aos mockups aprovados em
+   design/vertice. Tema só claro por decisão: não existe mockup escuro, e
+   inventar uma paleta escura sem aprovação daria uma tela que ninguém viu.
+   Os tokens ficam aqui para o dia em que houver um. */
+@theme {
+  --font-sans: var(--font-sora), system-ui, sans-serif;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-fundo: oklch(97.3% 0.004 250);
+  --color-superficie: oklch(100% 0 0);
+  --color-superficie-2: oklch(98.5% 0.004 250);
+  --color-superficie-3: oklch(98% 0.006 265);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-borda: oklch(90% 0.01 250);
+  --color-borda-sutil: oklch(93.5% 0.006 250);
+
+  --color-tinta: oklch(22% 0.02 260);
+  --color-tinta-2: oklch(45% 0.02 260);
+  --color-tinta-3: oklch(55% 0.02 260);
+  --color-tinta-4: oklch(64% 0.015 260);
+
+  /* Roxo da marca. */
+  --color-marca: oklch(48% 0.16 265);
+  --color-marca-escura: oklch(38% 0.14 265);
+  --color-marca-clara: oklch(93% 0.03 265);
+
+  /* Verde: saldo, entrada, pago, sincronização recente. */
+  --color-positivo: oklch(38% 0.11 155);
+  --color-positivo-forte: oklch(58% 0.13 160);
+  --color-positivo-fundo: oklch(93% 0.05 155);
+
+  /* Laranja: fatura, saída, gasto. */
+  --color-gasto: oklch(50% 0.15 55);
+  --color-gasto-forte: oklch(58% 0.15 55);
+  --color-gasto-fundo: oklch(94% 0.06 55);
+  --color-gasto-fundo-fraco: oklch(93% 0.05 55);
+
+  /* Vermelho: atraso, limite estourando. */
+  --color-alerta: oklch(45% 0.19 27);
+  --color-alerta-forte: oklch(55% 0.19 27);
+  --color-alerta-fundo: oklch(93% 0.06 25);
+
+  /* Cor de cada banco, usada no quadradinho com a inicial. */
+  --color-nubank: oklch(42% 0.19 322);
+  --color-mercadopago: oklch(62% 0.14 230);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-fundo);
+  color: var(--color-tinta);
+}
+
+/* Coluna de número alinha quando todos os dígitos têm a mesma largura. */
+.num {
+  font-variant-numeric: tabular-nums;
 }

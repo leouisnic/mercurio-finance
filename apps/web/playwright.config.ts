@@ -16,21 +16,22 @@ export default defineConfig({
       // Aponta pro banco de TESTE (semeado com o extrato fictício), nunca
       // pro banco de desenvolvimento, que guarda dado real do Pluggy.
       command:
-        "uv run --package finance-api python -m finance_api.seed && uv run --package finance-api uvicorn finance_api.main:app --port 8100",
+        "uv run --package finance-api python -m finance_api.seed --reset-test && uv run --package finance-api uvicorn finance_api.main:app --port 8100",
       cwd: "../..",
       env: {
         ...process.env,
         DATABASE_URL: "postgresql+asyncpg://mercurio:mercurio@127.0.0.1:5432/mercurio_test",
       },
       url: `${FINANCE_API_URL}/health`,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 60_000,
     },
     {
-      command: "npm run dev -- --port 3100",
+      command:
+        "node node_modules/next/dist/bin/next build && node node_modules/next/dist/bin/next start --port 3100",
       url: "http://localhost:3100",
-      env: { FINANCE_API_URL },
-      reuseExistingServer: !process.env.CI,
+      env: { FINANCE_API_URL, NEXT_DIST_DIR: ".next-e2e" },
+      reuseExistingServer: false,
       timeout: 60_000,
     },
   ],

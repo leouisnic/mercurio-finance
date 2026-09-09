@@ -36,7 +36,7 @@ completa, Hermes Agent via MCP.
 
 Pré-requisitos: Node 20+, Python 3.13+, `uv`, Docker Desktop.
 
-Infraestrutura (PostgreSQL e Redis, ainda sem uso real por nenhum serviço):
+Infraestrutura local:
 
 ```
 cd infra
@@ -44,18 +44,15 @@ cp .env.example .env
 docker compose up -d
 ```
 
-API financeira (o painel busca nela; sem ela no ar, a página mostra uma
-mensagem de erro em vez do resumo). Primeira vez, aplique a migração e
-popule o banco de desenvolvimento com dado fictício:
+API financeira. Para demonstração, use o banco de teste e nunca o banco local
+que recebe sincronizações reais:
 
 ```
 uv sync --all-packages
-cp .env.example .env   # preencha com suas credenciais locais
-cd services/finance-api
-uv run alembic upgrade head
-uv run python -m finance_api.seed
-cd ../..
-uv run --package finance-api uvicorn finance_api.main:app --reload
+$env:DATABASE_URL = "postgresql+asyncpg://mercurio:mercurio@127.0.0.1:5432/mercurio_test"
+uv run --package finance-api alembic -c services/finance-api/alembic.ini upgrade head
+uv run --package finance-api python -m finance_api.seed
+uv run --package finance-api uvicorn finance_api.main:app --port 8100
 ```
 
 Worker da fila (processa `/sync/*`; sem ele, os jobs ficam enfileirados
@@ -78,23 +75,25 @@ Painel web:
 ```
 cd apps/web
 npm install
-npm run dev
+$env:FINANCE_API_URL = "http://localhost:8100"
+npm run dev -- --port 3100
 ```
 
-Por padrão o painel busca a API em `http://localhost:8000`. Para apontar
-para outro endereço, defina `FINANCE_API_URL` antes de rodar `npm run dev`.
+Abra `http://localhost:3100` ou `http://localhost:3100/movimentos`. Não rode
+Pytest ou Playwright enquanto estiver usando essa demonstração, pois essas
+suítes limpam o banco `mercurio_test`.
 
 ## Testes
 
 ```
-uv run ruff check .
-uv run pytest
-cd apps/web && npm run lint && npm run build && npm run test && npm run test:e2e
+uv run python scripts/validar.py
+uv run python scripts/validar.py --e2e
 ```
 
 `npm run test:e2e` sobe o `finance-api` de verdade sozinho (via `uv run`), então
 precisa do workspace Python sincronizado (`uv sync --all-packages` na raiz)
-antes de rodar.
+antes de rodar. A suíte recusa banco remoto ou sem o sufixo `_test`, limpa esse
+banco local e o semeia novamente com o extrato fictício.
 
 ## Dados
 

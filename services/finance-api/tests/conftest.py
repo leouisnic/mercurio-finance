@@ -7,14 +7,23 @@ from collections.abc import Callable
 
 import pandas as pd
 import pytest
-from finance_api.config import TEST_DATABASE_URL
+from finance_api.config import DATABASE_URL, TEST_DATABASE_URL, validar_banco_de_teste
 from finance_api.db import obter_sessao
 from finance_api.main import app
-from finance_api.models import ContaORM, MovimentoORM
-from finance_api.repositorio import inserir_movimentos, upsert_contas
+from finance_api.models import CompromissoORM, ContaORM, MovimentoORM, RecorrenciaORM
+from finance_api.recorrencias import detectar_recorrencias
+from finance_api.repositorio import (
+    inserir_movimentos,
+    lancamentos_para_deteccao,
+    marcar_pagamentos_de_fatura,
+    salvar_recorrencias_detectadas,
+    upsert_contas,
+)
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
+
+validar_banco_de_teste(TEST_DATABASE_URL, DATABASE_URL)
 
 # NullPool: cada teste (e o TestClient) roda em um asyncio.run() próprio, ou
 # seja, um event loop novo a cada vez. Uma conexão asyncpg pooled fica presa
@@ -35,8 +44,11 @@ app.dependency_overrides[obter_sessao] = _obter_sessao_teste
 
 async def _limpar_movimentos() -> None:
     async with _sessao_teste() as sessao:
-        # movimentos primeiro: tem chave estrangeira para contas.
+        # Tudo que aponta para contas primeiro: as três tabelas têm chave
+        # estrangeira para `contas`.
         await sessao.execute(delete(MovimentoORM))
+        await sessao.execute(delete(RecorrenciaORM))
+        await sessao.execute(delete(CompromissoORM))
         await sessao.execute(delete(ContaORM))
         await sessao.commit()
 
@@ -73,6 +85,38 @@ def semear_contas() -> Callable[[list[dict]], None]:
         asyncio.run(gravar())
 
     return _semear
+
+
+@pytest.fixture
+def rodar_casamento_de_fatura() -> Callable[[], int]:
+    """Roda o casamento das duas pernas do pagamento de fatura, como
+    `job_sincronizar_pluggy` faz depois de gravar os movimentos."""
+
+    def _rodar() -> int:
+        async def executar() -> int:
+            async with _sessao_teste() as sessao:
+                return await marcar_pagamentos_de_fatura(sessao)
+
+        return asyncio.run(executar())
+
+    return _rodar
+
+
+@pytest.fixture
+def rodar_deteccao_de_recorrencia() -> Callable[[], int]:
+    """Roda a mesma dupla (detectar + gravar) que `job_sincronizar_pluggy`
+    faz no fim de cada sincronização, para o teste poder exercitar o
+    fluxo real sem depender do Pluggy."""
+
+    def _rodar() -> int:
+        async def executar() -> int:
+            async with _sessao_teste() as sessao:
+                candidatas = detectar_recorrencias(await lancamentos_para_deteccao(sessao))
+                return await salvar_recorrencias_detectadas(sessao, candidatas)
+
+        return asyncio.run(executar())
+
+    return _rodar
 
 
 @pytest.fixture

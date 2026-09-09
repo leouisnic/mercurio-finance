@@ -75,7 +75,7 @@ def fingerprint(
     Dois movimentos com o mesmo fingerprint têm conta, data, valor,
     descrição e tipo iguais: são o mesmo evento financeiro, independente
     do identificador dado pelo banco ou pela fonte, que já foi observado
-    reaproveitado em lançamentos diferentes nos dados reais do Leonardo.
+    reaproveitado em lançamentos bancários diferentes.
     """
     valor_normalizado = normalizar_valor(valor)
     base = "|".join(

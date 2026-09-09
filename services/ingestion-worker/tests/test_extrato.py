@@ -51,7 +51,7 @@ def test_resumir_por_conta_ignora_so_duplicidade_confirmada() -> None:
     extrato = carregar_extrato(FIXTURE)
     resumo = resumir_por_conta(extrato).set_index("conta_id")["total"]
 
-    # conta-a: 150 (Genux, uma vez só) + 80 (Tragial) - 200 (retirada)
+    # conta-a: 150 (Alfa, uma vez só) + 80 (Beta) - 200 (retirada)
     assert resumo["conta-a"] == pytest.approx(150.00 + 80.00 - 200.00)
     # conta-b: 200 (aporte vindo da conta-a, espelha a retirada) - 45.90 (despesa)
     assert resumo["conta-b"] == pytest.approx(200.00 - 45.90)

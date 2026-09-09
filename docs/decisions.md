@@ -1,162 +1,81 @@
 # Decisões técnicas
 
-Registro curto de decisões já tomadas e por que. Decisões de negócio estão
-em [domain-rules.md](./domain-rules.md).
+Registro das decisões atuais. Regras financeiras ficam em
+[domain-rules.md](./domain-rules.md).
 
-## Repositório próprio, fora de hermes-agent e agent-workflow
+## Repositórios separados
 
-O código do Mercúrio fica só em `mercurio-finance`. `hermes-agent` é um
-projeto separado e não deve ser tocado por este. `agent-workflow` é
-privado do Leonardo e guarda só backup de instruções e memória técnica,
-nunca código.
+O código do Mercúrio vive apenas em `mercurio-finance`. `hermes-agent` é
+outro produto. `agent-workflow` guarda somente instruções, memória e backup
+privados.
 
-## Workspace uv para os serviços Python
+## Workspace Python
 
-`finance-api`, `ingestion-worker` e `mercurio-domain` compartilham
-lockfile único via workspace do uv, em vez de ambientes virtuais
-independentes. Reduz divergência de versão entre os três sem forçar todos
-a serem o mesmo pacote.
+`finance-api`, `ingestion-worker` e `mercurio-domain` compartilham um lockfile
+via workspace do uv. O pacote `mercurio-domain` centraliza tipos e fingerprint
+para impedir divergência entre ingestão e persistência.
 
-## Tailwind no apps/web
+## Contas dinâmicas
 
-`create-next-app` inclui Tailwind por padrão nesta versão. Mantido porque
-ajuda a entregar a página inicial responsiva rapidamente; pode ser
-removido depois se não fizer sentido para o restante do painel.
+Cada conta informada pela Pluggy é persistida com o identificador externo,
+nome e natureza `BANK` ou `CREDIT`. O saldo do card vem da própria instituição,
+não da soma local do histórico.
 
-## Fingerprint em vez de identificador externo
+## Conciliação em duas camadas
 
-Ver [domain-rules.md](./domain-rules.md#conciliação-e-duplicidade). Motivado
-por casos reais observados nos dados do Leonardo, não é uma escolha
-teórica.
+Fingerprint e identificador externo iguais formam duplicidade confirmada e não
+são inseridos novamente. Fingerprint igual com identificador diferente forma
+possível duplicidade. O valor continua nos totais e aparece como valor em
+revisão até existir decisão humana.
 
-## mercurio-domain como pacote separado
+## Banco e fila locais
 
-Revisão de casos de domínio (2026-09-03) encontrou que `finance-api` e
-`ingestion-worker` calculavam fingerprint com formatação de valor e data
-diferentes: o mesmo movimento vindo de fontes diferentes podia não ser
-reconhecido como igual. Em vez de alinhar as duas implementações à mão (o
-que pode divergir de novo na próxima mudança), a regra virou um terceiro
-membro do workspace uv, `services/mercurio-domain`, importado pelos dois.
-A chave do fingerprint é `conta_id` (não mais titularidade, ver "Contas
-dinâmicas" abaixo).
+Postgres e Redis publicam portas somente em `127.0.0.1`. A API usa SQLAlchemy
+assíncrono e Alembic. O worker usa `SimpleWorker`, compatível com Windows, e
+descarta o pool assíncrono ao terminar cada job.
 
-## Portas do Postgres/Redis só em localhost
+## Pluggy somente leitura
 
-Revisão de infraestrutura (2026-09-02) apontou que `infra/docker-compose.yml`
-publicava as portas em `0.0.0.0`/IPv6 com credenciais previsíveis de
-desenvolvimento. Corrigido para bind só em `127.0.0.1`. Ver
-[security.md](./security.md#portas-do-postgres-e-do-redis-só-em-localhost).
+O cliente usa `/v2/transactions`, segue paginação por cursor e classifica o
+sentido pelo campo `type`. `DEBIT` representa saída e `CREDIT` representa
+entrada, independentemente do sinal de `amount`. Resposta sem tipo válido ou
+paginação incompleta faz a sincronização falhar sem persistir lote parcial.
 
-## Duas camadas de duplicidade (confirmada e possível)
+## Pagamento de fatura
 
-Mesma revisão de 2026-09-03 encontrou que confiar só no fingerprint de
-conteúdo para descartar duplicidade automaticamente tinha o problema
-oposto ao que motivou o fingerprint: duas compras legítimas e iguais no
-mesmo dia (mesmo valor, mesma descrição) eram fundidas em uma só. A
-correção usa fingerprint E identificador externo iguais para duplicidade
-confirmada (some do resumo); fingerprint igual com identificador diferente
-vira duplicidade possível, sinalizada mas não removida automaticamente.
-Ver [domain-rules.md](./domain-rules.md#conciliação-e-duplicidade).
+A baixa informada no cartão é ligada a uma saída bancária apenas quando existe
+um casamento único por valor exato, janela de três dias, categoria de
+transferência e natureza das contas. Ambiguidade não é resolvida
+automaticamente. A marcação pode ser confirmada ou descartada por uma pessoa.
 
-## apps/web consome finance-api por fetch direto em Server Component
+## Recorrências e compromissos
 
-`src/app/page.tsx` é um Server Component assíncrono que busca
-`GET /resumo` (`cache: "no-store"`, sempre um dado atual, nunca cacheado
-entre requisições) e passa o resultado para `ResumoPainel`, um componente
-síncrono só de apresentação. Essa separação existe porque o Next.js não
-suporta testar Server Component assíncrono direto no Vitest (confirmado na
-documentação oficial); `ResumoPainel` e a função `buscarResumo` (que faz o
-fetch e converte string para number) são testados separadamente no Vitest,
-e o fluxo completo (os dois serviços conversando de verdade) é validado
-pelo Playwright, que sobe `finance-api` e `apps/web` juntos.
+Recorrência é inferida de três despesas encadeadas, com intervalo de 28 a 35
+dias e variação de valor de até 15%. A candidata nasce pendente. Compromisso é
+cadastrado manualmente com começo e fim e não é conciliado automaticamente.
 
-Se o `finance-api` estiver fora do ar, a página mostra uma mensagem em vez
-de quebrar (sem página de erro dedicada nesta etapa).
+## Ciclos de pagamento
 
-## Persistência: contas e movimentos, banco de teste separado
+O Ciclo 1 começa no dia bancário útil anterior ou igual ao dia 5 e termina na
+véspera do primeiro dia bancário útil posterior ou igual ao dia 15. O Ciclo 2
+ocupa o intervalo restante até a véspera do primeiro ciclo do mês seguinte.
+O cálculo fica apenas na API.
 
-`finance-api` usa SQLAlchemy 2.0 assíncrono (`asyncpg`) e Alembic. Duas
-tabelas: `contas` (saldo/limite atualizados a cada sincronização, é o que
-`/resumo` devolve direto) e `movimentos` (histórico, ligado a uma conta
-por `conta_id`, constraint única em `(fingerprint, identificador_externo)`
-torna a importação idempotente, `ON CONFLICT DO NOTHING`). `finance_api/seed.py`
-popula o banco de desenvolvimento com contas e extrato fictícios.
+O calendário inicial usa fins de semana, feriados nacionais de data fixa,
+segunda e terça de Carnaval, Sexta-feira da Paixão e Corpus Christi. Carnaval e
+Corpus Christi são dias sem expediente do mercado financeiro, embora não sejam
+feriados nacionais por lei. A Sexta-feira da Paixão é definida localmente. Por
+isso o código chama o conjunto de datas não úteis, e não de feriados nacionais.
+Feriados estaduais e municipais ainda não são modelados.
 
-Banco de teste (`mercurio_test`) é separado do de desenvolvimento
-(`mercurio`), criado por `infra/postgres-init/001-create-test-db.sql`
-(só roda num volume novo: se precisar recriar depois de já ter dado real,
-recrie o volume manualmente ou rode o SQL à mão). Os testes truncam
-`mercurio_test` a cada execução; `mercurio` é o único que recebe dado real
-do Pluggy, e nenhum teste aponta para ele.
+## Interface web
 
-## localhost custava ~2s por conexão no Windows
+O Next.js busca a API em Server Components com `cache: "no-store"`. Filtros e
+paginação ficam na URL. A base visual usa Sora, Tailwind CSS 4, tema claro e
+componentes próprios para os gráficos atuais.
 
-Resolver `localhost` tentava IPv6 antes de cair para IPv4 nesta máquina,
-adicionando ~2s a cada conexão nova do Postgres (a suíte de teste foi de
-1,3s para 60s só com isso). `DATABASE_URL`, `TEST_DATABASE_URL` e
-`REDIS_URL` usam `127.0.0.1` explícito por causa disso.
+## Migrações e testes
 
-## Fila do Redis: SimpleWorker, não `rq worker`
-
-RQ workers padrão precisam de `fork()`, que o Windows não tem
-(documentação oficial da lib: "workers cannot run natively on Windows").
-`finance_api/worker.py` sempre usa `SimpleWorker` (roda o job no mesmo
-processo, sem fork), com `TimerDeathPenalty` no lugar do mecanismo padrão
-baseado em sinal. Os jobs (`finance_api/jobs.py`) vivem na `finance-api`,
-não no `ingestion-worker`: ela já depende do `ingestion-worker` para o
-parser e já é dona da persistência, então é o lugar natural para o
-consumidor da fila.
-
-`POST /sync/seed` e `GET /sync/{job_id}` existem para provar a fila de
-ponta a ponta (enfileira, processa em processo separado, confere
-resultado) antes de plugar o job real do Pluggy.
-
-## Pluggy real: v2/transactions, categoria própria para transferência entre contas
-
-`GET /transactions` (paginação por página) está descontinuado pelo Pluggy
-(HTTP 410, "use GET /v2/transactions"); `services/ingestion_worker/pluggy.py`
-usa a v2, paginação por cursor (`next` na resposta).
-
-Achado validando com dado real: a Pluggy já categoriza transferência entre
-contas do mesmo dono como `"Same person transfer"`. Usamos essa categoria
-para mapear para `aporte_titular`/`retirada_titular` (sinal do valor
-decide qual), em vez de tentar adivinhar pela descrição do lançamento.
-`ingestion_worker.extrato.carregar_extrato` virou uma casca fina sobre
-`processar_movimentos`, para o mesmo validador/fingerprint servir tanto o
-CSV quanto os dados vindos da Pluggy.
-
-## Contas dinâmicas substituem PF/PJ e a obrigação do DAS
-
-Depois de ver o painel rodando, o Leonardo pediu para tirar PF/PJ e a
-obrigação do DAS: ele só tem contas pessoais rastreadas de verdade
-(Nubank e Mercado Pago), a distinção PF/PJ que eu tinha desenhado não
-correspondia a nada que ele quisesse acompanhar, e mostrar um valor fixo
-de DAS que não pode ser detectado automaticamente não agregava. O
-caminho até aqui (registrado só para contexto, já revertido):
-`Titularidade` (pf/pj) → tentei mapear o item do Nubank no Pluggy como PJ,
-errado, era PF → `ObrigacaoDas` com valor fixo e `paga` marcada à mão →
-tudo isso saiu.
-
-O que ficou (2026-09-03), ver [domain-rules.md](./domain-rules.md#contas-não-titularidade):
-
-- `Titularidade` saiu do `mercurio-domain`; `movimentos.conta_id` (o
-  próprio `accountId` que a transação da Pluggy já traz) substitui
-  `titularidade` em tudo, inclusive no fingerprint.
-- Nova tabela `contas` (id da Pluggy, nome, tipo, saldo, limite,
-  disponível), atualizada a cada `job_sincronizar_pluggy`. `/resumo`
-  devolve essa tabela direto, uma conta por card no painel.
-- Cada banco tem 2 contas na Pluggy (corrente e cartão de crédito), 4
-  cards ao todo hoje. Puxei o objeto real de um cartão antes de desenhar
-  a tela: `balance` do cartão já é o valor usado da fatura, `creditData`
-  traz `creditLimit`/`availableCreditLimit`. Conta corrente mostra
-  "Saldo" (verde); cartão mostra "Fatura atual" com o limite como
-  contexto (laranja, é dívida, não saldo disponível).
-- `PLUGGY_ITEM_IDS` (lista separada por vírgula) substitui as variáveis
-  antigas por banco: adicionar/trocar um banco é só mexer nessa lista,
-  sem tocar em código. A API do Pluggy nesse plano não lista contas
-  conectadas sozinha (`GET /items` sem filtro devolve 401, só busca por
-  id que já se tem), então "dinâmico" aqui quer dizer nome/saldo/limite
-  sempre vindos da Pluggy, não a descoberta automática de bancos novos.
-- Continua em aberto (não travou esta entrega): separar compra no cartão
-  de crédito do pagamento da fatura no histórico de movimentos, para não
-  contar o mesmo gasto duas vezes ali.
+O schema é criado exclusivamente por Alembic. Testes usam banco local separado
+com nome terminado em `_test`. O CI executa Ruff, Pytest, ESLint, Vitest, build,
+migrações desde banco vazio e Playwright.

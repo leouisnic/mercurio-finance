@@ -33,6 +33,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
+      DATABASE_URL: postgresql+asyncpg://mercurio:mercurio@localhost:5432/mercurio_ci_unused
       TEST_DATABASE_URL: postgresql+asyncpg://mercurio:mercurio@localhost:5432/mercurio_test
       REDIS_URL: redis://localhost:6379/0
     steps:
@@ -44,24 +45,11 @@ jobs:
       - name: Instalar dependências
         run: uv sync --locked --all-packages
 
-      - name: Criar schema do banco de teste
+      - name: Aplicar migrações em banco vazio
         working-directory: services/finance-api
-        run: |
-          uv run python -c "
-          import asyncio
-          from sqlalchemy.ext.asyncio import create_async_engine
-          from finance_api.config import TEST_DATABASE_URL
-          from finance_api.db import Base
-          from finance_api import models  # noqa: F401
-
-          async def criar():
-              engine = create_async_engine(TEST_DATABASE_URL)
-              async with engine.begin() as conn:
-                  await conn.run_sync(Base.metadata.create_all)
-              await engine.dispose()
-
-          asyncio.run(criar())
-          "
+        env:
+          DATABASE_URL: postgresql+asyncpg://mercurio:mercurio@localhost:5432/mercurio_test
+        run: uv run alembic upgrade head
 
       - name: Ruff
         run: uv run ruff check .
@@ -72,6 +60,23 @@ jobs:
   web:
     name: web
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: mercurio
+          POSTGRES_PASSWORD: mercurio
+          POSTGRES_DB: mercurio_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mercurio -d mercurio_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://mercurio:mercurio@localhost:5432/mercurio_ci_unused
+      TEST_DATABASE_URL: postgresql+asyncpg://mercurio:mercurio@localhost:5432/mercurio_test
     defaults:
       run:
         working-directory: apps/web
@@ -88,6 +93,19 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      - name: Instalar workspace Python
+        working-directory: ../..
+        run: uv sync --locked --all-packages
+
+      - name: Aplicar migrações em banco vazio
+        working-directory: ../../services/finance-api
+        env:
+          DATABASE_URL: postgresql+asyncpg://mercurio:mercurio@localhost:5432/mercurio_test
+        run: uv run alembic upgrade head
+
       - name: Lint
         run: npm run lint
 
@@ -96,3 +114,9 @@ jobs:
 
       - name: Vitest
         run: npm run test
+
+      - name: Instalar Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Playwright
+        run: npm run test:e2e

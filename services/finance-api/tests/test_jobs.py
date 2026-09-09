@@ -3,8 +3,10 @@ API real) e gravando no banco de teste (nunca o de desenvolvimento)."""
 
 import pytest
 from finance_api import jobs
+from finance_api.config import TEST_DATABASE_URL
 from finance_api.jobs import job_sincronizar_pluggy
 from ingestion_worker import pluggy
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 pytestmark = pytest.mark.usefixtures("banco_de_teste_limpo")
 
@@ -21,8 +23,9 @@ TRANSACOES_NUBANK = [
         "id": "txn-1",
         "accountId": "conta-nubank",
         "date": "2026-08-05T10:00:00.000Z",
-        "description": "Pagamento cliente Genux",
+        "description": "Pagamento cliente fictício",
         "amount": 2500.0,
+        "type": "CREDIT",
         "category": "Business income",
     },
     {
@@ -31,6 +34,7 @@ TRANSACOES_NUBANK = [
         "date": "2026-08-08T10:00:00.000Z",
         "description": "Transferencia para Mercado Pago",
         "amount": -500.0,
+        "type": "DEBIT",
         "category": "Same person transfer",
     },
 ]
@@ -49,6 +53,7 @@ TRANSACOES_MERCADOPAGO = [
         "date": "2026-08-08T10:00:00.000Z",
         "description": "Transferencia recebida do Nubank",
         "amount": 500.0,
+        "type": "CREDIT",
         "category": "Same person transfer",
     },
 ]
@@ -79,7 +84,16 @@ def test_job_sincronizar_pluggy_grava_contas_e_movimentos(
 
     resultado = job_sincronizar_pluggy()
 
-    assert resultado == {"contas": 2, "transacoes_encontradas": 3, "inseridos": 3}
+    assert resultado == {
+        "contas": 2,
+        "transacoes_encontradas": 3,
+        "inseridos": 3,
+        # Nenhuma conta de cartão nas fixtures, nada para casar.
+        "pagamentos_de_fatura_detectados": 0,
+        # Três transações espalhadas, nenhuma repetida mês a mês: a
+        # detecção roda mas não tem o que sugerir.
+        "recorrencias_detectadas": 0,
+    }
 
 
 def test_job_sincronizar_pluggy_e_idempotente(
@@ -101,3 +115,24 @@ def test_job_sincronizar_pluggy_sem_credenciais_leva_erro_claro(
 
     with pytest.raises(RuntimeError, match="Credenciais do Pluggy"):
         job_sincronizar_pluggy()
+
+
+def test_dois_jobs_seguidos_no_mesmo_processo(
+    monkeypatch: pytest.MonkeyPatch, sessao_de_teste_factory
+) -> None:
+    """O worker é um processo longo que roda vários jobs em sequência.
+
+    Este teste usa um engine COM pool de propósito: as outras fixtures usam
+    NullPool, que já contorna o problema e esconderia a regressão. Cada job
+    abre um event loop próprio (`asyncio.run`), e a conexão asyncpg fica
+    presa ao loop em que nasceu, então o segundo job pegaria uma conexão
+    morta se `jobs.rodar` não descartasse o pool no fim de cada um.
+    """
+    _configurar_mocks(monkeypatch, sessao_de_teste_factory)
+
+    engine_com_pool = create_async_engine(TEST_DATABASE_URL)
+    monkeypatch.setattr(jobs, "engine", engine_com_pool)
+    monkeypatch.setattr(jobs, "async_session", async_sessionmaker(engine_com_pool))
+
+    assert job_sincronizar_pluggy()["contas"] == 2
+    assert job_sincronizar_pluggy()["contas"] == 2

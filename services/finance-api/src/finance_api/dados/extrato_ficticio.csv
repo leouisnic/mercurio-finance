@@ -1,6 +1,6 @@
 data,valor,descricao,conta_id,tipo,identificador_externo
-2026-08-05,2500.00,Pagamento cliente Genux,conta-a,receita,TXN1001
-2026-08-06,850.00,Pagamento cliente Tragial,conta-a,receita,TXN1002
+2026-08-05,2500.00,Pagamento cliente Alfa,conta-a,receita,TXN1001
+2026-08-06,850.00,Pagamento cliente Beta,conta-a,receita,TXN1002
 2026-08-07,300.00,Ferramenta de trabalho,conta-a,despesa,TXN1003
 2026-08-08,500.00,Transferencia para conta B,conta-a,retirada_titular,TXN1004
 2026-08-08,500.00,Transferencia recebida da conta A,conta-b,aporte_titular,TXN2001

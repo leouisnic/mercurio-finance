@@ -16,7 +16,7 @@ def _movimento(**overrides: object) -> Movimento:
         "conta_id": "conta-nubank-corrente",
         "data": date(2026, 8, 10),
         "valor": Decimal("150.00"),
-        "descricao": "Pagamento cliente Genux",
+        "descricao": "Pagamento cliente Alfa",
         "tipo": TipoMovimento.RECEITA,
         "proveniencia": Proveniencia.EXTRATO_BANCARIO,
         "identificador_externo": "TXN123",
@@ -42,7 +42,7 @@ def test_movimentos_diferentes_tem_fingerprints_diferentes() -> None:
 def test_encontrar_duplicidades_agrupa_fingerprint_e_identificador_iguais() -> None:
     duplicado_a = _movimento(identificador_externo="TXN123")
     duplicado_b = _movimento(identificador_externo="TXN123")  # mesma linha importada 2x
-    unico = _movimento(descricao="Pagamento cliente Tragial", identificador_externo="TXN777")
+    unico = _movimento(descricao="Pagamento cliente Beta", identificador_externo="TXN777")
 
     grupos = encontrar_duplicidades([duplicado_a, duplicado_b, unico])
 

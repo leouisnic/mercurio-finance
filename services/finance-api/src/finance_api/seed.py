@@ -4,12 +4,15 @@ desenvolvimento e para os testes automatizados (e2e do apps/web).
 Uso: uv run --package finance-api python -m finance_api.seed
 """
 
+import argparse
 import asyncio
 from pathlib import Path
 
 from ingestion_worker.extrato import carregar_extrato
 from mercurio_domain import Proveniencia
+from sqlalchemy import text
 
+from finance_api.config import DATABASE_URL, validar_url_local_de_teste
 from finance_api.db import async_session
 from finance_api.repositorio import inserir_movimentos, upsert_contas
 
@@ -25,9 +28,19 @@ def seed_contas_ficticias() -> list[dict]:
     ]
 
 
-async def semear() -> None:
+async def semear(*, limpar_teste: bool = False) -> None:
+    if limpar_teste:
+        validar_url_local_de_teste(DATABASE_URL)
     extrato = carregar_extrato(EXTRATO_FICTICIO)
     async with async_session() as sessao:
+        if limpar_teste:
+            await sessao.execute(
+                text(
+                    "TRUNCATE TABLE movimentos, contas, recorrencias, compromissos "
+                    "RESTART IDENTITY CASCADE"
+                )
+            )
+            await sessao.commit()
         await upsert_contas(sessao, seed_contas_ficticias())
         inseridos = await inserir_movimentos(
             sessao, extrato, proveniencia=Proveniencia.IMPORTACAO_MANUAL.value
@@ -36,4 +49,7 @@ async def semear() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(semear())
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--reset-test", action="store_true")
+    argumentos = parser.parse_args()
+    asyncio.run(semear(limpar_teste=argumentos.reset_test))

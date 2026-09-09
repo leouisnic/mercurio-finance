@@ -7,7 +7,7 @@ ao Hermes Agent.
 ## Limites de acesso
 
 - O agente recebe agregados (resumos por titularidade, totais por período)
-  ou transações específicas que o Leonardo escolher enviar. Nunca tem
+  ou transações específicas selecionadas para a tarefa. Nunca tem
   acesso irrestrito ao banco de dados financeiro.
 - O agente pode ler e sugerir. Pagamento, transferência, emissão ou
   cancelamento de nota fiscal sempre passam por confirmação humana antes de

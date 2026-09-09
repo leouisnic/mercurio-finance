@@ -62,6 +62,7 @@ def test_listar_transacoes_segue_a_paginacao_por_cursor(monkeypatch: pytest.Monk
                 "date": "2026-08-29T13:13:45.216Z",
                 "description": "Compra no débito|SESC BAURU",
                 "amount": -12,
+                "type": "DEBIT",
                 "category": "Shopping",
             },
             "despesa",
@@ -72,8 +73,9 @@ def test_listar_transacoes_segue_a_paginacao_por_cursor(monkeypatch: pytest.Monk
                 "id": "c1",
                 "accountId": "conta-nubank-corrente",
                 "date": "2026-08-28T21:11:50.804Z",
-                "description": "Pagamento recebido|Cliente Genux",
+                "description": "Pagamento recebido|Cliente Alfa",
                 "amount": 850.0,
+                "type": "CREDIT",
                 "category": "Business income",
             },
             "receita",
@@ -84,8 +86,9 @@ def test_listar_transacoes_segue_a_paginacao_por_cursor(monkeypatch: pytest.Monk
                 "id": "s1",
                 "accountId": "conta-mercadopago-corrente",
                 "date": "2026-08-28T21:11:50.804Z",
-                "description": "Transferência Recebida|Leonardo Colacio Nicolau",
+                "description": "Transferência recebida|Titular",
                 "amount": 23.9,
+                "type": "CREDIT",
                 "category": "Same person transfer",
             },
             "aporte_titular",
@@ -96,8 +99,9 @@ def test_listar_transacoes_segue_a_paginacao_por_cursor(monkeypatch: pytest.Monk
                 "id": "s2",
                 "accountId": "conta-nubank-corrente",
                 "date": "2026-08-28T21:11:50.804Z",
-                "description": "Transferência enviada|Leonardo Colacio Nicolau",
+                "description": "Transferência enviada|Titular",
                 "amount": -200.0,
+                "type": "DEBIT",
                 "category": "Same person transfer",
             },
             "retirada_titular",
@@ -116,11 +120,107 @@ def test_mapear_para_movimento(transacao: dict, tipo_esperado: str, valor_espera
     assert movimento["descricao"] == transacao["description"]
 
 
+def test_compra_no_cartao_e_despesa_apesar_do_valor_positivo() -> None:
+    """No cartão a Pluggy inverte o sinal: compra vem positiva com
+    `type=DEBIT`. Decidir pelo sinal classificava compra como receita, que
+    era o bug que escondia todo o gasto do cartão."""
+    movimento = pluggy.mapear_para_movimento(
+        {
+            "id": "c1",
+            "accountId": "conta-nubank-cartao",
+            "date": "2026-08-20T10:00:00.000Z",
+            "description": "Drogasil1633",
+            "amount": 35.08,
+            "type": "DEBIT",
+            "category": "Pharmacy",
+            "categoryId": "13010000",
+        }
+    )
+
+    assert movimento["tipo"] == "despesa"
+    assert movimento["valor"] == 35.08
+    assert movimento["categoria"] == "Pharmacy"
+    assert movimento["categoria_id"] == "13010000"
+
+
+def test_pagamento_de_fatura_no_cartao_e_aporte_nao_despesa() -> None:
+    """Visto pelo cartão, o pagamento da fatura entra e abate a dívida.
+    Vinha com valor negativo e era gravado como despesa, contando o mesmo
+    gasto de novo (a compra já foi lançada)."""
+    movimento = pluggy.mapear_para_movimento(
+        {
+            "id": "f1",
+            "accountId": "conta-nubank-cartao",
+            "date": "2026-08-05T10:00:00.000Z",
+            "description": "Pagamento recebido",
+            "amount": -335.80,
+            "type": "CREDIT",
+            "category": "Credit card payment",
+            "categoryId": "05100000",
+        }
+    )
+
+    assert movimento["tipo"] == "aporte_titular"
+    assert movimento["valor"] == 335.80
+
+
+def test_transferencia_propria_casa_por_id_de_categoria() -> None:
+    """O id é mais estável que o nome; o nome fica de reserva."""
+    movimento = pluggy.mapear_para_movimento(
+        {
+            "id": "s1",
+            "accountId": "conta-nubank-corrente",
+            "date": "2026-08-28T10:00:00.000Z",
+            "description": "Transferência enviada",
+            "amount": -200.0,
+            "type": "DEBIT",
+            "category": None,
+            "categoryId": "04000000",
+        }
+    )
+
+    assert movimento["tipo"] == "retirada_titular"
+
+
+def test_sem_type_e_rejeitado() -> None:
+    with pytest.raises(pluggy.RespostaPluggyInvalida, match="DEBIT ou CREDIT"):
+        pluggy.mapear_para_movimento(
+            {
+                "id": "x1",
+                "accountId": "conta-ficticia",
+                "date": "2026-08-28T10:00:00.000Z",
+                "description": "Compra fictícia",
+                "amount": -50.0,
+            }
+        )
+
+
+def test_listar_transacoes_falha_ao_exceder_limite(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _get_falso(url, params, headers, timeout):
+        return _resposta({"results": [{"id": "t1"}], "next": "?after=seguinte"})
+
+    monkeypatch.setattr(pluggy.httpx, "get", _get_falso)
+
+    with pytest.raises(pluggy.PaginacaoPluggyIncompleta, match="limite de 1"):
+        pluggy.listar_transacoes("chave", "conta-1", limite_paginas=1)
+
+
+def test_listar_transacoes_falha_com_cursor_repetido(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _get_falso(url, params, headers, timeout):
+        return _resposta({"results": [{"id": "t1"}], "next": "?after=repetido"})
+
+    monkeypatch.setattr(pluggy.httpx, "get", _get_falso)
+
+    with pytest.raises(pluggy.PaginacaoPluggyIncompleta, match="repetiu"):
+        pluggy.listar_transacoes("chave", "conta-1", limite_paginas=3)
+
+
 def test_mapear_conta_corrente() -> None:
     conta = {
         "id": "conta-nubank-corrente",
         "type": "BANK",
         "subtype": "CHECKING_ACCOUNT",
+        "number": "0001/12345-0",
         "name": "Nu Pagamentos S.A.",
         "marketingName": "Nu Pagamentos S.A. (Conta Pré-paga)",
         "balance": 480.20,
@@ -136,6 +236,10 @@ def test_mapear_conta_corrente() -> None:
         "saldo": 480.20,
         "limite": None,
         "disponivel": None,
+        "bandeira": None,
+        "final": None,
+        "fechamento": None,
+        "vencimento": None,
     }
 
 
@@ -146,8 +250,15 @@ def test_mapear_conta_cartao_de_credito() -> None:
         "subtype": "CREDIT_CARD",
         "name": "gold",
         "marketingName": None,
+        "number": "1234",
         "balance": 340.04,
-        "creditData": {"creditLimit": 350.0, "availableCreditLimit": 9.96},
+        "creditData": {
+            "creditLimit": 350.0,
+            "availableCreditLimit": 9.96,
+            "brand": "MASTERCARD",
+            "balanceCloseDate": "2026-09-08",
+            "balanceDueDate": "2026-09-15",
+        },
     }
 
     resultado = pluggy.mapear_conta(conta)
@@ -159,4 +270,29 @@ def test_mapear_conta_cartao_de_credito() -> None:
         "saldo": 340.04,
         "limite": 350.0,
         "disponivel": 9.96,
+        "bandeira": "MASTERCARD",
+        "final": "1234",
+        "fechamento": "2026-09-08",
+        "vencimento": "2026-09-15",
     }
+
+
+def test_mapear_conta_cartao_sem_bandeira_informada() -> None:
+    """A Pluggy nem sempre manda `brand`; o mapeamento não pode quebrar
+    quando falta, só devolver `bandeira: None`."""
+    conta = {
+        "id": "conta-mercadopago-cartao",
+        "type": "CREDIT",
+        "subtype": "CREDIT_CARD",
+        "name": "MP Card",
+        "marketingName": None,
+        "balance": 795.96,
+        "creditData": {"creditLimit": 820.0, "availableCreditLimit": 24.04},
+    }
+
+    resultado = pluggy.mapear_conta(conta)
+
+    assert resultado["bandeira"] is None
+    assert resultado["final"] is None
+    assert resultado["fechamento"] is None
+    assert resultado["vencimento"] is None

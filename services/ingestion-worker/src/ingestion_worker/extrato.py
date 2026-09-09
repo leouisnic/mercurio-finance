@@ -3,7 +3,7 @@
 Usa o fingerprint compartilhado de `mercurio_domain` (mesma regra da
 finance-api). O identificador externo (coluna `identificador_externo`) já
 foi observado reaproveitado em lançamentos diferentes em dados reais do
-Leonardo, por isso não é chave única sozinho: uma duplicidade só é
+fontes bancárias, por isso não é chave única sozinho: uma duplicidade só é
 considerada confirmada quando fingerprint E identificador externo batem
 os dois. Fingerprint igual com identificador diferente é ambíguo (pode
 ser duplicidade real ou dois eventos legítimos iguais) e fica marcado
@@ -127,7 +127,7 @@ def resumir_por_conta(extrato: pd.DataFrame) -> pd.DataFrame:
 
     Receita e aporte do titular somam; despesa e retirada do titular
     subtraem. Retirada e aporte do titular não são despesa nem receita
-    (são transferência entre contas do próprio Leonardo), mas ainda mudam
+    (são transferência entre contas do mesmo titular), mas ainda mudam
     o saldo de cada conta.
 
     Lançamentos marcados como `duplicado_possivel` (mesmo fingerprint,
