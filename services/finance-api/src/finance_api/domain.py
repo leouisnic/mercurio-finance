@@ -26,6 +26,7 @@ __all__ = [
     "CompromissoOut",
     "CompromissoUpdate",
     "Conta",
+    "ContaUpdate",
     "DecisaoPagamentoFatura",
     "EstadoPagamentoFatura",
     "FluxoDaConta",
@@ -103,6 +104,10 @@ class Conta(BaseModel):
 
     id: str
     nome: str
+    apelido: str | None = Field(
+        default=None,
+        description="Nome escolhido na revisão, no lugar do que a Pluggy devolve.",
+    )
     tipo: str  # "BANK" ou "CREDIT"
     saldo: Decimal
     limite: Decimal | None = None
@@ -115,6 +120,12 @@ class Conta(BaseModel):
     vencimento: date | None = Field(
         default=None, description="Dia em que a fatura em aberto vence. Só para CREDIT."
     )
+
+
+class ContaUpdate(BaseModel):
+    """Renomeia uma conta. `apelido` nulo volta a mostrar o nome da Pluggy."""
+
+    apelido: str | None = Field(default=None, min_length=1, max_length=100)
 
 
 class ResumoFinanceiro(BaseModel):
@@ -188,6 +199,7 @@ class FluxoDaConta(BaseModel):
 
     conta_id: str
     nome: str
+    apelido: str | None = None
     tipo: str
     entradas: Decimal
     saidas: Decimal

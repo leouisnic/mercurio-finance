@@ -3,6 +3,7 @@ import { buscarJson, paraNumero, paraNumeroOuNull } from "./api";
 export type Conta = {
   id: string;
   nome: string;
+  apelido: string | null;
   tipo: "BANK" | "CREDIT";
   saldo: number;
   limite: number | null;
@@ -22,6 +23,7 @@ export type ResumoFinanceiro = {
 type RespostaApiConta = {
   id: string;
   nome: string;
+  apelido: string | null;
   tipo: "BANK" | "CREDIT";
   saldo: string;
   limite: string | null;
@@ -49,6 +51,7 @@ export async function buscarResumo(): Promise<ResumoFinanceiro | null> {
     contas: corpo.contas.map((conta) => ({
       id: conta.id,
       nome: conta.nome,
+      apelido: conta.apelido,
       tipo: conta.tipo,
       saldo: paraNumero(conta.saldo),
       limite: paraNumeroOuNull(conta.limite),

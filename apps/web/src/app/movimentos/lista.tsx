@@ -68,10 +68,10 @@ export function Lista({ movimentos, contas }: { movimentos: Movimento[]; contas:
               </span>
 
               <span className="flex min-w-0 items-center gap-2">
-                {conta && <SeloDoBanco nome={conta.nome} tamanho={22} />}
+                {conta && <SeloDoBanco conta={conta} tamanho={22} />}
                 <span className="text-tinta-2 truncate text-[12.5px]">
                   {conta
-                    ? `${nomeDaConta(conta.nome)} · ${conta.tipo === "CREDIT" ? "Cartão" : "Conta"}`
+                    ? `${nomeDaConta(conta)} · ${conta.tipo === "CREDIT" ? "Cartão" : "Conta"}`
                     : movimento.contaId}
                 </span>
               </span>

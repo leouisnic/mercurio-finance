@@ -85,8 +85,8 @@ export function Filtros({
             href={url(cicloEscolhido, conta.id, referencia)}
             ativo={contaEscolhida === conta.id}
           >
-            <SeloDoBanco nome={conta.nome} tamanho={16} />
-            {nomeDaConta(conta.nome)} · {conta.tipo === "CREDIT" ? "Cartão" : "Conta"}
+            <SeloDoBanco conta={conta} tamanho={16} />
+            {nomeDaConta(conta)} · {conta.tipo === "CREDIT" ? "Cartão" : "Conta"}
           </Pilula>
         ))}
       </nav>

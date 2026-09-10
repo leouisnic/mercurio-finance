@@ -34,6 +34,10 @@ class ContaORM(Base):
 
     id: Mapped[str] = mapped_column(String(100), primary_key=True)
     nome: Mapped[str] = mapped_column(String(200))
+    # Nome escolhido pelo Leonardo. A Pluggy nem sempre diz o banco: o cartão do
+    # Nubank chega como "gold". Nunca entra no `set_` do upsert, senão a
+    # sincronização seguinte apaga a escolha dele.
+    apelido: Mapped[str | None] = mapped_column(String(100), nullable=True)
     tipo: Mapped[str] = mapped_column(String(20))  # "BANK" ou "CREDIT"
     saldo: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     limite: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)

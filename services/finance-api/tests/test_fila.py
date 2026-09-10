@@ -46,7 +46,7 @@ def test_sync_seed_enfileira_e_processa(fila_de_teste) -> None:
     assert status.status_code == 200
     corpo = status.json()
     assert corpo["status"] == "finished"
-    assert corpo["resultado"] == 9  # linhas do extrato fictício
+    assert corpo["resultado"] == 11  # linhas do extrato fictício
 
 
 def test_status_de_job_inexistente_devolve_404() -> None:
@@ -60,5 +60,5 @@ def test_job_reimportar_seed_e_idempotente(monkeypatch, sessao_de_teste_factory)
     primeira = job_reimportar_seed()
     segunda = job_reimportar_seed()
 
-    assert primeira == 9
+    assert primeira == 11
     assert segunda == 0

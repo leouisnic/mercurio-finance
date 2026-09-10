@@ -35,7 +35,8 @@ movimentos não reconstrói esse saldo, pois pode possuir períodos incompletos.
 O `finance-api` usa SQLAlchemy assíncrono, asyncpg e Alembic. As tabelas atuais
 são:
 
-- `contas`: estado mais recente de cada conta conectada;
+- `contas`: estado mais recente de cada conta conectada, mais o apelido que o
+  dono escolheu, que a sincronização não sobrescreve;
 - `movimentos`: histórico e dados de conciliação;
 - `recorrencias`: padrões sugeridos e decisão humana;
 - `compromissos`: obrigações futuras cadastradas manualmente.
@@ -49,9 +50,13 @@ separado e protegido contra configuração acidental para desenvolvimento.
 ciclo e página ficam na URL. A interface não replica regras de ciclo ou
 agregação financeira.
 
+As telas são Visão geral, Movimentos e Recorrências. As mutações usam server
+action, sem cliente HTTP no navegador: a página recarrega com
+`revalidatePath` depois da chamada.
+
 Os principais grupos de endpoints são:
 
-- resumo das contas;
+- resumo das contas, e o apelido editável de cada uma;
 - movimentos, gastos diários e fluxo por conta;
 - ciclos de pagamento;
 - recorrências e compromissos;

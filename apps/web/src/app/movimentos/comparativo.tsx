@@ -78,9 +78,9 @@ export function GastoPorConta({ fluxos }: { fluxos: FluxoDaConta[] }) {
         <div className="flex flex-col gap-3">
           {comGasto.map((fluxo) => (
             <div key={fluxo.contaId} className="flex items-center gap-3">
-              <SeloDoBanco nome={fluxo.nome} tamanho={22} />
+              <SeloDoBanco conta={fluxo} tamanho={22} />
               <span className="w-[150px] shrink-0 truncate text-[12.5px]" title={fluxo.nome}>
-                {nomeDaConta(fluxo.nome)} · {fluxo.tipo === "CREDIT" ? "Cartão" : "Conta"}
+                {nomeDaConta(fluxo)} · {fluxo.tipo === "CREDIT" ? "Cartão" : "Conta"}
               </span>
               <div className="bg-borda-sutil h-2 grow overflow-hidden rounded-full">
                 <div

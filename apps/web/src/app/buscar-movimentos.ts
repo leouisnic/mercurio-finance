@@ -21,6 +21,7 @@ export type GastoDiario = {
 export type FluxoDaConta = {
   contaId: string;
   nome: string;
+  apelido: string | null;
   tipo: "BANK" | "CREDIT";
   entradas: number;
   saidas: number;
@@ -72,6 +73,7 @@ export async function buscarFluxoPorConta(
   type Linha = {
     conta_id: string;
     nome: string;
+    apelido: string | null;
     tipo: "BANK" | "CREDIT";
     entradas: string;
     saidas: string;
@@ -85,6 +87,7 @@ export async function buscarFluxoPorConta(
     corpo?.map((linha) => ({
       contaId: linha.conta_id,
       nome: linha.nome,
+      apelido: linha.apelido,
       tipo: linha.tipo,
       entradas: paraNumero(linha.entradas),
       saidas: paraNumero(linha.saidas),

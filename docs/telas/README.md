@@ -13,3 +13,7 @@ Remove-Item Env:GERAR_CAPTURAS
 ```
 
 Confira visualmente as imagens antes de versioná-las.
+
+A base fictícia inclui uma assinatura cobrada em três meses seguidos, de
+propósito: sem ela a detecção não sugere nada e a captura de Recorrências
+mostraria só a fila vazia.

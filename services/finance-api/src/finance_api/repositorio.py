@@ -113,6 +113,9 @@ async def upsert_contas(sessao: AsyncSession, contas: list[dict]) -> None:
             # cru. Sem isto `atualizado_em` congela na primeira gravação e o
             # painel mostra uma idade de dado errada.
             "atualizado_em": func.now(),
+            # `apelido` fica de fora de propósito: é escolha do Leonardo, não
+            # dado da Pluggy, e listá-lo aqui faria cada sincronização apagar o
+            # nome que ele deu.
         },
     )
     await sessao.execute(instrucao)
@@ -199,6 +202,18 @@ async def listar_movimentos(
     return list(resultado.scalars().all())
 
 
+async def atualizar_conta(sessao: AsyncSession, conta_id: str, apelido: str | None) -> ContaORM | None:
+    """Define ou limpa o apelido de uma conta. Devolve `None` se a conta não
+    existe."""
+    conta = await sessao.get(ContaORM, conta_id)
+    if conta is None:
+        return None
+    conta.apelido = apelido
+    await sessao.commit()
+    await sessao.refresh(conta)
+    return conta
+
+
 async def agregar_despesas_por_dia(
     sessao: AsyncSession,
     *,
@@ -238,9 +253,9 @@ async def agregar_fluxo_por_conta(
     *,
     data_inicio: date,
     data_fim: date,
-) -> list[tuple[str, str, str, Decimal, Decimal, Decimal]]:
+) -> list[tuple[str, str, str | None, str, Decimal, Decimal, Decimal]]:
     """Entradas e saídas de cada conta no intervalo (inclusive nas duas
-    pontas), como `(conta_id, nome, tipo, entradas, saidas)`.
+    pontas), como `(conta_id, nome, apelido, tipo, entradas, saidas, em_revisao)`.
 
     Entrada é `receita`, saída é `despesa`; transferência entre contas próprias
     (`aporte_titular`/`retirada_titular`) fica fora dos dois, porque não é
@@ -267,6 +282,7 @@ async def agregar_fluxo_por_conta(
         select(
             ContaORM.id,
             ContaORM.nome,
+            ContaORM.apelido,
             ContaORM.tipo,
             soma_de("receita"),
             soma_de("despesa"),
@@ -299,15 +315,12 @@ async def agregar_fluxo_por_conta(
                 _nao_e_pagamento_de_fatura(),
             ),
         )
-        .group_by(ContaORM.id, ContaORM.nome, ContaORM.tipo)
+        .group_by(ContaORM.id, ContaORM.nome, ContaORM.apelido, ContaORM.tipo)
         .order_by(ContaORM.nome)
     )
 
     resultado = await sessao.execute(consulta)
-    return [
-        (linha[0], linha[1], linha[2], linha[3], linha[4], linha[5])
-        for linha in resultado.all()
-    ]
+    return [tuple(linha) for linha in resultado.all()]
 
 
 async def lancamentos_para_deteccao(sessao: AsyncSession) -> list[LancamentoObservado]:

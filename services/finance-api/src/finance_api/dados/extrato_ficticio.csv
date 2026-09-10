@@ -1,4 +1,6 @@
 data,valor,descricao,conta_id,tipo,identificador_externo
+2026-06-10,65.00,Assinatura streaming,conta-b,despesa,TXN0901
+2026-07-10,65.00,Assinatura streaming,conta-b,despesa,TXN0902
 2026-08-05,2500.00,Pagamento cliente Alfa,conta-a,receita,TXN1001
 2026-08-06,850.00,Pagamento cliente Beta,conta-a,receita,TXN1002
 2026-08-07,300.00,Ferramenta de trabalho,conta-a,despesa,TXN1003

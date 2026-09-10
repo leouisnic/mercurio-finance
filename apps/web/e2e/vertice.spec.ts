@@ -62,3 +62,25 @@ test("a navegação leva de uma tela para a outra", async ({ page }) => {
   await page.getByRole("navigation", { name: "Navegação principal" }).getByText("Visão geral").click();
   await expect(page.getByRole("heading", { level: 1, name: "Visão geral" })).toBeVisible();
 });
+
+test("Recorrências mostra a fila de decisão vinda do finance-api", async ({ page }) => {
+  await page.goto("/recorrencias");
+
+  await expect(page.getByRole("heading", { level: 1, name: "Recorrências" })).toBeVisible();
+
+  // A base fictícia tem uma assinatura cobrada em tres meses seguidos, entao a
+  // deteccao rodada pelo seed sugere exatamente uma candidata.
+  const fila = page.getByRole("region", { name: "Esperando decisão" });
+  await expect(fila.getByText("Assinatura streaming")).toBeVisible();
+  await expect(fila.getByText("R$ 65,00")).toBeVisible();
+  await expect(fila.getByText("3 cobranças", { exact: false })).toBeVisible();
+  await expect(fila.getByRole("button", { name: "Aprovar" })).toBeVisible();
+  await expect(fila.getByRole("button", { name: "Rejeitar" })).toBeVisible();
+  await expect(fila.getByLabel("Categoria")).toHaveValue("");
+});
+
+// A decisao em si (aprovar, rejeitar, classificar) nao e' exercitada aqui de
+// proposito: so' existe uma candidata na base ficticia, e o Playwright roda os
+// arquivos em paralelo, entao um teste que a consumisse deixaria os outros
+// instaveis. A mutacao esta coberta onde e' deterministica: nos endpoints, em
+// test_main.py, e na fiacao do formulario, em cartao.test.tsx.

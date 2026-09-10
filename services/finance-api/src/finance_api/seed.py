@@ -14,7 +14,13 @@ from sqlalchemy import text
 
 from finance_api.config import DATABASE_URL, validar_url_local_de_teste
 from finance_api.db import async_session
-from finance_api.repositorio import inserir_movimentos, upsert_contas
+from finance_api.recorrencias import detectar_recorrencias
+from finance_api.repositorio import (
+    inserir_movimentos,
+    lancamentos_para_deteccao,
+    salvar_recorrencias_detectadas,
+    upsert_contas,
+)
 
 EXTRATO_FICTICIO = Path(__file__).parent / "dados" / "extrato_ficticio.csv"
 
@@ -45,7 +51,16 @@ async def semear(*, limpar_teste: bool = False) -> None:
         inseridos = await inserir_movimentos(
             sessao, extrato, proveniencia=Proveniencia.IMPORTACAO_MANUAL.value
         )
-    print(f"{inseridos} movimentos inseridos (fictícios, de {EXTRATO_FICTICIO.name}).")
+        # A detecção roda aqui pelo mesmo motivo que roda no fim da
+        # sincronização: é onde chegou movimento novo. Sem isto o extrato
+        # fictício teria a assinatura repetida mas nenhuma candidata, e a tela
+        # de Recorrências ficaria sem o que demonstrar.
+        candidatas = detectar_recorrencias(await lancamentos_para_deteccao(sessao))
+        recorrencias = await salvar_recorrencias_detectadas(sessao, candidatas)
+    print(
+        f"{inseridos} movimentos inseridos e {recorrencias} recorrências detectadas "
+        f"(fictícios, de {EXTRATO_FICTICIO.name})."
+    )
 
 
 if __name__ == "__main__":

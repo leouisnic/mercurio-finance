@@ -79,3 +79,47 @@ componentes próprios para os gráficos atuais.
 O schema é criado exclusivamente por Alembic. Testes usam banco local separado
 com nome terminado em `_test`. O CI executa Ruff, Pytest, ESLint, Vitest, build,
 migrações desde banco vazio e Playwright.
+
+## Tela de Recorrências e apelido por conta
+
+Entrega de 2026-09-10. O backend de recorrência existia inteiro desde a entrega
+anterior, mas sem tela: as candidatas ficavam paradas e só dava para decidir por
+chamada direta de API. Um recurso que exige aprovação humana e não oferece onde
+aprovar não serve para nada, então a tela veio antes da matriz de contas fixas.
+
+- **A fila de decisão vem primeiro na página**, porque é o que exige ação. O que
+  já foi decidido fica embaixo, e continua reversível.
+- **Aprovar e classificar são a mesma ação.** O `PATCH /recorrencias/{id}` aceita
+  `apelido`, `categoria` e `status` juntos, então os dois botões são `submit` do
+  mesmo formulário, com `name="status"` e valores diferentes. Uma requisição, e
+  nada de estado intermediário na tela.
+- **Rejeitar avisa antes** que a detecção não devolve a candidata para a fila.
+  A trava está no `ON CONFLICT DO UPDATE ... WHERE status <> 'rejeitada'`, e a
+  tela precisa dizer isso porque o efeito não é óbvio.
+- **Mutação por server action**, no mesmo padrão do botão Sincronizar: sem
+  cliente HTTP no navegador e sem estado duplicado.
+
+**Apelido por conta.** A Pluggy nem sempre diz o banco: o cartão do Nubank chega
+como "gold". O `connector.name` do item também não resolve. Em vez de chutar,
+`contas` ganhou `apelido` e `PATCH /contas/{id}`, no mesmo modelo que
+`recorrencias` já usava.
+
+O detalhe que exige cuidado: `upsert_contas` roda a cada sincronização com
+`ON CONFLICT DO UPDATE`, e `apelido` fica **fora** do `set_`. Listá-lo ali faria
+cada sincronização apagar o nome escolhido. Isso é teste, não comentário.
+
+O apelido também alimenta a cor do selo do banco: quem chama a conta de "Cartão
+Nubank" espera o roxo, não o cinza de conta não identificada. E ele atravessa
+`GET /movimentos/por-conta`, senão a mesma conta apareceria com dois nomes
+diferentes na mesma tela.
+
+**A base fictícia passou a exercitar a detecção.** Ganhou a mesma assinatura
+cobrada em três meses seguidos, e o `seed` passou a rodar a detecção depois de
+inserir, como a sincronização já fazia. Sem isso o e2e e a captura pública da
+tela de Recorrências só teriam a fila vazia para mostrar.
+
+**O que o e2e não cobre, de propósito:** a decisão em si. Só existe uma candidata
+na base fictícia e o Playwright roda os arquivos em paralelo, então um teste que
+a consumisse deixaria os outros instáveis. A mutação está coberta onde é
+determinística: nos endpoints, em `test_main.py`, e na fiação do formulário, em
+`cartao.test.tsx`.

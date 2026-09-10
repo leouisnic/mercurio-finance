@@ -8,6 +8,7 @@ const CONTAS: Conta[] = [
   {
     id: "c1",
     nome: "Nu Pagamentos S.A. - Instituição de Pagamento (Conta Pré-paga)",
+    apelido: null,
     tipo: "BANK",
     saldo: 6.09,
     limite: null,

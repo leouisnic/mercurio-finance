@@ -89,7 +89,7 @@ def test_movimentos_do_seed_ficticio_sao_gravados_ligados_as_contas(
     extrato = carregar_extrato(EXTRATO_FICTICIO)
     inseridos = semear_movimentos(extrato, Proveniencia.IMPORTACAO_MANUAL.value)
 
-    assert inseridos == 9
+    assert inseridos == 11
 
 
 def test_lista_movimentos_com_filtro_por_conta_e_por_data(semear_contas, semear_movimentos) -> None:
@@ -98,7 +98,7 @@ def test_lista_movimentos_com_filtro_por_conta_e_por_data(semear_contas, semear_
 
     resposta_geral = client.get("/movimentos")
     assert resposta_geral.status_code == 200
-    assert len(resposta_geral.json()) == 9
+    assert len(resposta_geral.json()) == 11
 
     resposta_conta_b = client.get("/movimentos", params={"conta_id": "conta-b"})
     contas_no_resultado = {m["conta_id"] for m in resposta_conta_b.json()}
@@ -949,3 +949,48 @@ def test_resumo_traz_fechamento_e_vencimento_da_fatura(semear_contas) -> None:
 
     assert cartao["fechamento"] == "2026-09-08"
     assert cartao["vencimento"] == "2026-09-15"
+
+
+def test_apelido_da_conta_substitui_o_nome_da_pluggy(semear_contas) -> None:
+    semear_contas([{"id": "conta-cartao", "nome": "gold", "tipo": "CREDIT", "saldo": 143.12}])
+
+    renomeada = client.patch("/contas/conta-cartao", json={"apelido": "Cartão Nubank"}).json()
+
+    assert renomeada["apelido"] == "Cartão Nubank"
+    # O nome da Pluggy continua guardado, só deixa de ser o que a tela mostra.
+    assert renomeada["nome"] == "gold"
+    (conta,) = client.get("/resumo").json()["contas"]
+    assert conta["apelido"] == "Cartão Nubank"
+
+
+def test_apelido_sobrevive_a_uma_nova_sincronizacao(semear_contas) -> None:
+    """A Pluggy reescreve nome, saldo e limite a cada sincronização. O apelido
+    é escolha do Leonardo e não pode ser apagado junto."""
+    semear_contas([{"id": "conta-cartao", "nome": "gold", "tipo": "CREDIT", "saldo": 143.12}])
+    client.patch("/contas/conta-cartao", json={"apelido": "Cartão Nubank"})
+
+    # Mesma conta chegando de novo da Pluggy, com saldo novo.
+    semear_contas([{"id": "conta-cartao", "nome": "gold", "tipo": "CREDIT", "saldo": 999.00}])
+
+    (conta,) = client.get("/resumo").json()["contas"]
+    assert conta["apelido"] == "Cartão Nubank"
+    assert conta["saldo"] == "999.00"
+
+
+def test_apelido_nulo_volta_a_mostrar_o_nome_da_pluggy(semear_contas) -> None:
+    semear_contas([{"id": "conta-cartao", "nome": "gold", "tipo": "CREDIT", "saldo": 143.12}])
+    client.patch("/contas/conta-cartao", json={"apelido": "Cartão Nubank"})
+
+    limpa = client.patch("/contas/conta-cartao", json={"apelido": None}).json()
+
+    assert limpa["apelido"] is None
+
+
+def test_apelido_vazio_e_rejeitado(semear_contas) -> None:
+    semear_contas([{"id": "conta-cartao", "nome": "gold", "tipo": "CREDIT", "saldo": 143.12}])
+
+    assert client.patch("/contas/conta-cartao", json={"apelido": ""}).status_code == 422
+
+
+def test_renomear_conta_que_nao_existe_da_404() -> None:
+    assert client.patch("/contas/nao-existe", json={"apelido": "X"}).status_code == 404

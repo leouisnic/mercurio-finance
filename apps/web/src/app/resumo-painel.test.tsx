@@ -9,6 +9,7 @@ const HOJE = new Date(2026, 8, 4); // 04/09/2026
 const CORRENTE: Conta = {
   id: "c1",
   nome: "Banco X",
+  apelido: null,
   tipo: "BANK",
   saldo: 480.2,
   limite: null,
@@ -22,6 +23,7 @@ const CORRENTE: Conta = {
 const CARTAO: Conta = {
   id: "c2",
   nome: "Cartão gold",
+  apelido: null,
   tipo: "CREDIT",
   saldo: 340.04,
   limite: 350,
@@ -36,6 +38,7 @@ const FLUXOS: FluxoDaConta[] = [
   {
     contaId: "c1",
     nome: "Banco X",
+    apelido: null,
     tipo: "BANK",
     entradas: 2400,
     saidas: 420,
@@ -141,4 +144,15 @@ test("conta que a Pluggy não identifica mantém o nome dela", () => {
   montar([{ ...CARTAO, nome: "gold" }], []);
 
   expect(em("Contas conectadas").getByText("gold")).toBeDefined();
+});
+
+test("apelido substitui o nome e traz a cor do banco junto", () => {
+  // O cartao do Nubank chega da Pluggy como "gold", sem nada que diga o banco.
+  montar([{ ...CARTAO, nome: "gold", apelido: "Cartão Nubank" }], []);
+
+  const contas = em("Contas conectadas");
+  expect(contas.getByText("Cartão Nubank")).toBeDefined();
+  expect(contas.queryByText("gold")).toBeNull();
+  // O nome cru continua acessivel no title.
+  expect(contas.getByTitle("gold")).toBeDefined();
 });

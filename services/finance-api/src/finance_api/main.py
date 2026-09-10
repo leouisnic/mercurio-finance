@@ -37,6 +37,7 @@ from finance_api.domain import (
     CompromissoOut,
     CompromissoUpdate,
     Conta,
+    ContaUpdate,
     EstadoPagamentoFatura,
     FluxoDaConta,
     GastoDiario,
@@ -50,12 +51,13 @@ from finance_api.domain import (
 )
 from finance_api.fila import conexao_redis, fila
 from finance_api.jobs import job_reimportar_seed, job_sincronizar_pluggy
-from finance_api.models import CompromissoORM, MovimentoORM, RecorrenciaORM
+from finance_api.models import CompromissoORM, ContaORM, MovimentoORM, RecorrenciaORM
 from finance_api.repositorio import (
     PagamentoFaturaInvalido,
     agregar_despesas_por_dia,
     agregar_fluxo_por_conta,
     atualizar_compromisso,
+    atualizar_conta,
     atualizar_recorrencia,
     criar_compromisso,
     definir_pagamento_de_fatura,
@@ -146,6 +148,7 @@ async def resumo(
             Conta(
                 id=conta.id,
                 nome=conta.nome,
+                apelido=conta.apelido,
                 tipo=conta.tipo,
                 saldo=conta.saldo,
                 limite=conta.limite,
@@ -158,6 +161,39 @@ async def resumo(
             for conta in contas
         ],
     )
+
+
+def _conta_out(conta: ContaORM) -> Conta:
+    return Conta(
+        id=conta.id,
+        nome=conta.nome,
+        apelido=conta.apelido,
+        tipo=conta.tipo,
+        saldo=conta.saldo,
+        limite=conta.limite,
+        disponivel=conta.disponivel,
+        bandeira=conta.bandeira,
+        final=conta.final,
+        fechamento=conta.fechamento,
+        vencimento=conta.vencimento,
+    )
+
+
+@app.patch("/contas/{conta_id}", response_model=Conta)
+async def renomear_conta(
+    conta_id: str,
+    alteracoes: ContaUpdate,
+    sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
+) -> Conta:
+    """Define o apelido da conta, ou o limpa mandando `null`.
+
+    O apelido sobrevive à sincronização: `upsert_contas` não o inclui no
+    `ON CONFLICT DO UPDATE`, então a Pluggy nunca sobrescreve a escolha.
+    """
+    conta = await atualizar_conta(sessao, conta_id, alteracoes.apelido)
+    if conta is None:
+        raise HTTPException(status_code=404, detail="conta não encontrada")
+    return _conta_out(conta)
 
 
 @app.get("/movimentos", response_model=list[MovimentoOut])
@@ -247,12 +283,13 @@ async def fluxo_por_conta(
         FluxoDaConta(
             conta_id=conta_id,
             nome=nome,
+            apelido=apelido,
             tipo=tipo,
             entradas=entradas,
             saidas=saidas,
             em_revisao=em_revisao,
         )
-        for conta_id, nome, tipo, entradas, saidas, em_revisao in linhas
+        for conta_id, nome, apelido, tipo, entradas, saidas, em_revisao in linhas
     ]
 
 

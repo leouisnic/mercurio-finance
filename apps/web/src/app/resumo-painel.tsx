@@ -56,13 +56,13 @@ function Cabecalho({ conta, tom }: { conta: Conta; tom: "saldo" | "fatura" }) {
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="flex min-w-0 items-center gap-[11px]">
-        <SeloDoBanco nome={conta.nome} />
+        <SeloDoBanco conta={conta} />
         <span className="flex min-w-0 flex-col leading-tight">
           {/* Nome longo trunca em vez de quebrar o card em duas linhas: a
               Pluggy devolve coisas como "Nu Pagamentos S.A. - Instituição
               de Pagamento (Conta Pré-paga)". */}
           <span className="truncate text-[14.5px] font-semibold" title={conta.nome}>
-            {nomeDaConta(conta.nome)}
+            {nomeDaConta(conta)}
           </span>
           <span className="text-tinta-3 text-xs">
             {tom === "saldo" ? "Conta corrente" : "Cartão de crédito"}
