@@ -4,6 +4,11 @@
 /.workflow/
 /.claude/
 
+# Mockup e conceito visual. Fora do Git porque este repositorio e' publico e os valores nos
+# mockups vieram de tela com dado real (saldo, instituicao). Backup em projetos.psd1 do
+# agent-workflow. Captura publica de tela e' gerada com o banco ficticio, em docs/telas.
+/docs/design/
+
 # Capturas temporárias de revisão, fora do projeto
 /prints/
 
@@ -39,3 +44,4 @@ __pycache__/
 # Sistema
 .DS_Store
 Thumbs.db
+/local/
