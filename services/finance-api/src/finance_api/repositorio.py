@@ -204,13 +204,19 @@ async def listar_movimentos(
 
 async def atualizar_conta(sessao: AsyncSession, conta_id: str, apelido: str | None) -> ContaORM | None:
     """Define ou limpa o apelido de uma conta. Devolve `None` se a conta não
-    existe."""
-    conta = await sessao.get(ContaORM, conta_id)
-    if conta is None:
-        return None
-    conta.apelido = apelido
+    existe.
+
+    `atualizado_em` vai no SET com o próprio valor porque o `onupdate` só
+    dispara para coluna ausente do SET, e ela marca a última sincronização
+    com a Pluggy: renomear não pode fazer saldo antigo parecer recém-buscado.
+    """
+    conta = await sessao.scalar(
+        update(ContaORM)
+        .where(ContaORM.id == conta_id)
+        .values(apelido=apelido, atualizado_em=ContaORM.atualizado_em)
+        .returning(ContaORM)
+    )
     await sessao.commit()
-    await sessao.refresh(conta)
     return conta
 
 
@@ -366,11 +372,31 @@ async def marcar_pagamentos_de_fatura(sessao: AsyncSession) -> int:
 
     Só mexe em movimento sem estado: nunca sobrescreve `confirmado` nem
     `descartado`.
+
+    Uma baixa paga uma saída só, também entre sincronizações. A marcação não
+    guarda qual baixa usou, então a baixa que casa com alguma saída já
+    `detectado` ou `confirmado` conta como usada. Na ambiguidade a saída nova
+    fica sem marca e continua somando como gasto, o erro que aparece na tela.
     """
     banco = aliased(MovimentoORM)
     conta_do_banco = aliased(ContaORM)
     cartao = aliased(MovimentoORM)
     conta_do_cartao = aliased(ContaORM)
+    ja_marcado = aliased(MovimentoORM)
+    conta_do_marcado = aliased(ContaORM)
+
+    baixa_ja_usada = (
+        select(ja_marcado.id)
+        .join(conta_do_marcado, conta_do_marcado.id == ja_marcado.conta_id)
+        .where(
+            conta_do_marcado.tipo == "BANK",
+            ja_marcado.tipo == "despesa",
+            ja_marcado.pagamento_de_fatura.in_(("detectado", "confirmado")),
+            ja_marcado.valor == cartao.valor,
+            func.abs(cartao.data - ja_marcado.data) <= JANELA_PAGAMENTO_DE_FATURA_DIAS,
+        )
+        .exists()
+    )
 
     consulta = (
         select(banco.id, cartao.id)
@@ -393,6 +419,7 @@ async def marcar_pagamentos_de_fatura(sessao: AsyncSession) -> int:
             conta_do_cartao.tipo == "CREDIT",
             cartao.duplicado_possivel.is_(False),
             cartao.categoria_id == CATEGORIA_ID_PAGAMENTO_DE_FATURA,
+            ~baixa_ja_usada,
         )
     )
     pares = [(linha[0], linha[1]) for linha in (await sessao.execute(consulta)).all()]

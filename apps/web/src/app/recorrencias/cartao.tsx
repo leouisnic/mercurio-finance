@@ -1,3 +1,6 @@
+"use client";
+
+import { type FormEvent, useState, useTransition } from "react";
 import { SeloDoBanco, nomeDaConta } from "../banco";
 import type { Conta } from "../buscar-resumo";
 import { CATEGORIAS, ROTULO_DA_CATEGORIA, type Recorrencia } from "../buscar-recorrencias";
@@ -21,6 +24,39 @@ function Identificacao({ recorrencia, conta }: { recorrencia: Recorrencia; conta
   );
 }
 
+/**
+ * Envia a decisão e guarda o erro no próprio cartão: decisão não pode
+ * falhar calada.
+ *
+ * `onSubmit` em vez do `action` do formulário de propósito: ao fim de toda
+ * ação o React chama `form.reset()`, e o `<select>` volta à primeira opção
+ * mesmo controlado. Depois de uma falha, a categoria escolhida sumiria da
+ * tela e o reenvio iria sem ela. O botão clicado vai no `FormData` como
+ * `submitter`, que é o que diz se é aprovar ou rejeitar.
+ */
+function useDecisao() {
+  const [erro, setErro] = useState<string | null>(null);
+  const [enviando, iniciar] = useTransition();
+
+  function enviar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    const submitter = (evento.nativeEvent as SubmitEvent).submitter;
+    const dados = new FormData(evento.currentTarget, submitter);
+    iniciar(async () => {
+      setErro((await decidirRecorrencia(dados)).erro);
+    });
+  }
+  return { erro, enviando, enviar };
+}
+
+function ErroDaDecisao({ erro }: { erro: string | null }) {
+  return erro ? (
+    <p role="alert" className="bg-alerta-fundo text-alerta rounded-[9px] px-3 py-2 text-[12.5px]">
+      {erro}
+    </p>
+  ) : null;
+}
+
 function Historico({ recorrencia }: { recorrencia: Recorrencia }) {
   return (
     <span className="text-tinta-3 text-[11.5px]">
@@ -39,10 +75,11 @@ export function CartaoPendente({
   conta?: Conta;
 }) {
   const campo = `recorrencia-${recorrencia.id}`;
+  const { erro, enviando, enviar } = useDecisao();
 
   return (
     <form
-      action={decidirRecorrencia}
+      onSubmit={enviar}
       className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border p-5"
     >
       <input type="hidden" name="id" value={recorrencia.id} />
@@ -84,9 +121,9 @@ export function CartaoPendente({
             className="border-borda bg-superficie focus:border-marca rounded-[9px] border px-3 py-2 text-[13px] outline-none"
           >
             <option value="">Sem categoria</option>
-            {CATEGORIAS.map((categoria) => (
-              <option key={categoria} value={categoria}>
-                {ROTULO_DA_CATEGORIA[categoria]}
+            {CATEGORIAS.map((opcao) => (
+              <option key={opcao} value={opcao}>
+                {ROTULO_DA_CATEGORIA[opcao]}
               </option>
             ))}
           </select>
@@ -95,23 +132,26 @@ export function CartaoPendente({
         <div className="flex gap-2">
           <button
             type="submit"
+            disabled={enviando}
             name="status"
             value="aprovada"
-            className="bg-positivo-forte cursor-pointer rounded-[9px] px-4 py-2 text-[13px] font-semibold text-white"
+            className="bg-positivo cursor-pointer rounded-[9px] disabled:cursor-wait disabled:opacity-60 px-4 py-2 text-[13px] font-semibold text-white"
           >
             Aprovar
           </button>
           <button
             type="submit"
+            disabled={enviando}
             name="status"
             value="rejeitada"
             title="A detecção não devolve esta recorrência para a fila depois de rejeitada"
-            className="border-borda text-tinta-2 hover:bg-superficie-2 cursor-pointer rounded-[9px] border px-4 py-2 text-[13px] font-semibold"
+            className="border-borda text-tinta-2 hover:bg-superficie-2 cursor-pointer rounded-[9px] disabled:cursor-wait disabled:opacity-60 border px-4 py-2 text-[13px] font-semibold"
           >
             Rejeitar
           </button>
         </div>
       </div>
+      <ErroDaDecisao erro={erro} />
     </form>
   );
 }
@@ -125,10 +165,11 @@ export function LinhaDecidida({
   conta?: Conta;
 }) {
   const aprovada = recorrencia.status === "aprovada";
+  const { erro, enviando, enviar } = useDecisao();
 
   return (
     <form
-      action={decidirRecorrencia}
+      onSubmit={enviar}
       className="border-borda-sutil flex flex-wrap items-center justify-between gap-3 border-b px-[22px] py-3 last:border-b-0"
     >
       <input type="hidden" name="id" value={recorrencia.id} />
@@ -145,13 +186,19 @@ export function LinhaDecidida({
         </span>
         <button
           type="submit"
+          disabled={enviando}
           name="status"
           value={aprovada ? "rejeitada" : "aprovada"}
-          className="border-borda text-tinta-2 hover:bg-superficie-2 cursor-pointer rounded-[9px] border px-3 py-1.5 text-[12px]"
+          className="border-borda text-tinta-2 hover:bg-superficie-2 cursor-pointer rounded-[9px] disabled:cursor-wait disabled:opacity-60 border px-3 py-1.5 text-[12px]"
         >
           {aprovada ? "Rejeitar" : "Aprovar"}
         </button>
       </div>
+      {erro && (
+        <div className="basis-full">
+          <ErroDaDecisao erro={erro} />
+        </div>
+      )}
     </form>
   );
 }

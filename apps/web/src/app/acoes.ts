@@ -1,5 +1,24 @@
+"use server";
+
 import { revalidatePath } from "next/cache";
 import { FINANCE_API_URL } from "./api";
+
+/** O que a tela precisa saber de uma ação: `erro` nulo é sucesso. */
+export type ResultadoDaAcao = { erro: string | null };
+
+/**
+ * Chama a API e traduz a falha em motivo legível. Resposta fora de 2xx é
+ * falha também: um 503 que termina como sucesso faria a tela recarregar
+ * como se a decisão tivesse sido gravada.
+ */
+async function enviar(caminho: string, init: RequestInit): Promise<string | null> {
+  try {
+    const resposta = await fetch(`${FINANCE_API_URL}${caminho}`, { ...init, cache: "no-store" });
+    return resposta.ok ? null : `a API respondeu com erro ${resposta.status}`;
+  } catch {
+    return "a API não respondeu";
+  }
+}
 
 /**
  * Enfileira uma sincronização com a Pluggy (`POST /sync/pluggy`, só
@@ -9,15 +28,13 @@ import { FINANCE_API_URL } from "./api";
  * recarregamento mostra o que já estava gravado, e o selo de "atualizado
  * há X" revela quando o dado novo chega.
  */
-export async function sincronizar(): Promise<void> {
-  "use server";
-  try {
-    await fetch(`${FINANCE_API_URL}/sync/pluggy`, { method: "POST", cache: "no-store" });
-  } catch {
-    // Falha de sincronização não derruba a tela: o selo continua mostrando
-    // a idade do dado que já está lá.
+export async function sincronizar(): Promise<ResultadoDaAcao> {
+  const motivo = await enviar("/sync/pluggy", { method: "POST" });
+  if (motivo) {
+    return { erro: `Não foi possível pedir a sincronização: ${motivo}.` };
   }
   revalidatePath("/");
+  return { erro: null };
 }
 
 /**
@@ -28,8 +45,7 @@ export async function sincronizar(): Promise<void> {
  * Rejeitar é definitivo em relação à detecção: a sincronização seguinte
  * reencontra o mesmo padrão e não devolve a recorrência para a fila.
  */
-export async function decidirRecorrencia(dados: FormData): Promise<void> {
-  "use server";
+export async function decidirRecorrencia(dados: FormData): Promise<ResultadoDaAcao> {
   const id = String(dados.get("id"));
   const apelido = String(dados.get("apelido") ?? "").trim();
   const categoria = String(dados.get("categoria") ?? "");
@@ -46,36 +62,35 @@ export async function decidirRecorrencia(dados: FormData): Promise<void> {
     alteracoes.status = status;
   }
 
-  try {
-    await fetch(`${FINANCE_API_URL}/recorrencias/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(alteracoes),
-      cache: "no-store",
-    });
-  } catch {
-    // Falha de rede não derruba a tela: o recarregamento mostra que a
-    // recorrência continua onde estava.
+  const motivo = await enviar(`/recorrencias/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(alteracoes),
+  });
+  if (motivo) {
+    return { erro: `Não foi possível registrar a decisão: ${motivo}. O que você preencheu foi mantido.` };
   }
   revalidatePath("/recorrencias");
+  return { erro: null };
 }
 
-/** Renomeia uma conta. Apelido vazio limpa e volta ao nome da Pluggy. */
-export async function renomearConta(dados: FormData): Promise<void> {
-  "use server";
+/**
+ * Renomeia uma conta. `limpar` apaga o apelido e volta ao nome da Pluggy;
+ * apelido em branco faz o mesmo, porque a API recusa texto vazio.
+ */
+export async function renomearConta(dados: FormData): Promise<ResultadoDaAcao> {
   const id = String(dados.get("conta_id"));
-  const apelido = String(dados.get("apelido") ?? "").trim();
+  const apelido = dados.get("limpar") ? "" : String(dados.get("apelido") ?? "").trim();
 
-  try {
-    await fetch(`${FINANCE_API_URL}/contas/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ apelido: apelido || null }),
-      cache: "no-store",
-    });
-  } catch {
-    // Mesmo motivo do acima.
+  const motivo = await enviar(`/contas/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ apelido: apelido || null }),
+  });
+  if (motivo) {
+    return { erro: `Não foi possível salvar: ${motivo}. O nome digitado foi mantido.` };
   }
   revalidatePath("/");
   revalidatePath("/movimentos");
+  return { erro: null };
 }

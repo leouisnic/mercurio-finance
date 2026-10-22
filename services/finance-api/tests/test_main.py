@@ -1,13 +1,16 @@
-from datetime import date
+import asyncio
+from datetime import UTC, date, datetime
 
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 from finance_api.compromissos import somar_meses
 from finance_api.main import app
+from finance_api.models import ContaORM
 from finance_api.seed import EXTRATO_FICTICIO, seed_contas_ficticias
 from ingestion_worker.extrato import carregar_extrato, processar_movimentos
 from mercurio_domain import Proveniencia
+from sqlalchemy import update
 
 client = TestClient(app)
 
@@ -394,6 +397,59 @@ def test_casamento_ambiguo_nao_esconde_duas_saidas(
         "2026-08-05": "335.80",
         "2026-08-06": "385.80",
     }
+
+
+def _segunda_transferencia_de_mesmo_valor() -> pd.DataFrame:
+    return processar_movimentos(
+        pd.DataFrame(
+            [
+                {
+                    "data": "2026-08-06",
+                    "valor": 335.80,
+                    "descricao": "Transferência enviada",
+                    "conta_id": "conta-corrente",
+                    "tipo": "despesa",
+                    "identificador_externo": "FAT-SAIDA-2",
+                    "categoria": "Transfers",
+                    "categoria_id": "05000000",
+                }
+            ]
+        )
+    )
+
+
+def test_baixa_ja_usada_nao_justifica_saida_de_outra_sincronizacao(
+    semear_contas, semear_movimentos, rodar_casamento_de_fatura
+) -> None:
+    """Uma baixa de fatura paga uma saída só, mesmo que a segunda saída de
+    mesmo valor chegue numa sincronização posterior."""
+    semear_contas(CONTAS_CORRENTE_E_CARTAO)
+    semear_movimentos(_extrato_com_pagamento_de_fatura(), Proveniencia.PLUGGY.value)
+    assert rodar_casamento_de_fatura() == 1
+
+    semear_movimentos(_segunda_transferencia_de_mesmo_valor(), Proveniencia.PLUGGY.value)
+
+    assert rodar_casamento_de_fatura() == 0
+    assert len(client.get("/movimentos/pagamentos-de-fatura").json()) == 1
+    # 50,00 do mercado mais os 335,80 da segunda transferência.
+    assert _gastos_de_agosto() == {"2026-08-06": "385.80"}
+
+
+def test_baixa_confirmada_a_mao_tambem_fica_usada(
+    semear_contas, semear_movimentos, rodar_casamento_de_fatura
+) -> None:
+    semear_contas(CONTAS_CORRENTE_E_CARTAO)
+    semear_movimentos(_extrato_com_pagamento_de_fatura(), Proveniencia.PLUGGY.value)
+    rodar_casamento_de_fatura()
+    (detectado,) = client.get("/movimentos/pagamentos-de-fatura").json()
+    client.patch(
+        f"/movimentos/{detectado['id']}/pagamento-de-fatura", json={"estado": "confirmado"}
+    )
+
+    semear_movimentos(_segunda_transferencia_de_mesmo_valor(), Proveniencia.PLUGGY.value)
+
+    assert rodar_casamento_de_fatura() == 0
+    assert _gastos_de_agosto() == {"2026-08-06": "385.80"}
 
 
 def test_duplicado_possivel_nao_e_marcado_como_pagamento_de_fatura(
@@ -975,6 +1031,30 @@ def test_apelido_sobrevive_a_uma_nova_sincronizacao(semear_contas) -> None:
     (conta,) = client.get("/resumo").json()["contas"]
     assert conta["apelido"] == "Cartão Nubank"
     assert conta["saldo"] == "999.00"
+
+
+def test_renomear_nao_finge_uma_sincronizacao(semear_contas, sessao_de_teste_factory) -> None:
+    """`atualizado_em` diz quando a Pluggy mandou o saldo. Renomear é escolha
+    local e não pode fazer saldo antigo parecer recém-buscado."""
+    semear_contas([{"id": "conta-cartao", "nome": "gold", "tipo": "CREDIT", "saldo": 143.12}])
+
+    async def envelhecer() -> None:
+        async with sessao_de_teste_factory() as sessao:
+            await sessao.execute(
+                update(ContaORM).values(
+                    atualizado_em=datetime(2026, 8, 1, 12, 0, tzinfo=UTC)
+                )
+            )
+            await sessao.commit()
+
+    asyncio.run(envelhecer())
+    antes = client.get("/resumo").json()["atualizado_em"]
+
+    client.patch("/contas/conta-cartao", json={"apelido": "Cartão Nubank"})
+
+    depois = client.get("/resumo").json()
+    assert depois["contas"][0]["apelido"] == "Cartão Nubank"
+    assert depois["atualizado_em"] == antes
 
 
 def test_apelido_nulo_volta_a_mostrar_o_nome_da_pluggy(semear_contas) -> None:

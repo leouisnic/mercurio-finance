@@ -1,4 +1,4 @@
-import { SeloDoBanco, nomeDaConta } from "./banco";
+import { CabecalhoDaConta } from "./cabecalho-da-conta";
 import type { Conta } from "./buscar-resumo";
 import type { FluxoDaConta } from "./buscar-movimentos";
 import { comoData, diasEntre, diaEMes, moeda } from "./formato";
@@ -31,7 +31,7 @@ function Indicador({
         {rotulo}
       </span>
       <span
-        className={`num text-[21px] font-semibold ${destaque ? "text-gasto-forte" : "text-tinta"}`}
+        className={`num text-[21px] font-semibold ${destaque ? "text-gasto" : "text-tinta"}`}
       >
         {moeda(valor)}
       </span>
@@ -40,44 +40,18 @@ function Indicador({
   );
 }
 
-function Selo({ texto, tom }: { texto: string; tom: "saldo" | "fatura" }) {
-  const classe =
-    tom === "saldo" ? "bg-positivo-fundo text-positivo" : "bg-gasto-fundo text-gasto";
-  return (
-    <span
-      className={`${classe} rounded-full px-2.5 py-1 text-[10px] font-bold tracking-[0.04em]`}
-    >
-      {texto}
-    </span>
-  );
-}
-
-function Cabecalho({ conta, tom }: { conta: Conta; tom: "saldo" | "fatura" }) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <div className="flex min-w-0 items-center gap-[11px]">
-        <SeloDoBanco conta={conta} />
-        <span className="flex min-w-0 flex-col leading-tight">
-          {/* Nome longo trunca em vez de quebrar o card em duas linhas: a
-              Pluggy devolve coisas como "Nu Pagamentos S.A. - Instituição
-              de Pagamento (Conta Pré-paga)". */}
-          <span className="truncate text-[14.5px] font-semibold" title={conta.nome}>
-            {nomeDaConta(conta)}
-          </span>
-          <span className="text-tinta-3 text-xs">
-            {tom === "saldo" ? "Conta corrente" : "Cartão de crédito"}
-          </span>
-        </span>
-      </div>
-      <Selo texto={tom === "saldo" ? "SALDO" : "FATURA"} tom={tom} />
-    </div>
-  );
-}
-
-function CartaoCorrente({ conta, fluxo }: { conta: Conta; fluxo: FluxoDaConta | undefined }) {
+function CartaoCorrente({
+  conta,
+  fluxo,
+  fluxoIndisponivel,
+}: {
+  conta: Conta;
+  fluxo: FluxoDaConta | undefined;
+  fluxoIndisponivel: boolean;
+}) {
   return (
     <article className="bg-superficie border-borda flex flex-col gap-4 rounded-2xl border p-5">
-      <Cabecalho conta={conta} tom="saldo" />
+      <CabecalhoDaConta conta={conta} tom="saldo" />
       <div className="flex items-end justify-between gap-3.5">
         <span className="flex flex-col gap-0.5">
           <span className="num text-positivo text-[27px] font-semibold tracking-[-0.3px]">
@@ -85,6 +59,12 @@ function CartaoCorrente({ conta, fluxo }: { conta: Conta; fluxo: FluxoDaConta | 
           </span>
           <span className="text-tinta-3 text-xs">disponível para gastar</span>
         </span>
+        {fluxoIndisponivel && (
+          <span className="flex flex-col items-end gap-[3px]">
+            <span className="text-tinta-2 text-[13px] font-semibold">Indisponível</span>
+            <span className="text-tinta-3 text-[10.5px]">entradas/saídas no ciclo</span>
+          </span>
+        )}
         {fluxo && (
           <span className="flex flex-col items-end gap-[3px]">
             <span className="num text-positivo text-[13px] font-semibold">
@@ -131,7 +111,7 @@ function CartaoCredito({ conta, hoje }: { conta: Conta; hoje: Date }) {
 
   return (
     <article className="bg-superficie border-borda flex flex-col gap-4 rounded-2xl border p-5">
-      <Cabecalho conta={conta} tom="fatura" />
+      <CabecalhoDaConta conta={conta} tom="fatura" />
 
       <div className="flex items-end justify-between gap-3.5">
         <span className="flex flex-col gap-0.5">
@@ -195,7 +175,8 @@ export function ResumoPainel({
   hoje,
 }: {
   contas: Conta[];
-  fluxos: FluxoDaConta[];
+  /** `null` quando a API não devolveu o fluxo do ciclo. */
+  fluxos: FluxoDaConta[] | null;
   hoje: Date;
 }) {
   const correntes = contas.filter((conta) => conta.tipo === "BANK");
@@ -206,7 +187,7 @@ export function ResumoPainel({
   const disponivelNoCartao = cartoes.reduce((total, conta) => total + (conta.disponivel ?? 0), 0);
   const limiteTotal = cartoes.reduce((total, conta) => total + (conta.limite ?? 0), 0);
 
-  const porConta = new Map(fluxos.map((fluxo) => [fluxo.contaId, fluxo]));
+  const porConta = new Map((fluxos ?? []).map((fluxo) => [fluxo.contaId, fluxo]));
 
   return (
     <>
@@ -238,7 +219,12 @@ export function ResumoPainel({
             conta.tipo === "CREDIT" ? (
               <CartaoCredito key={conta.id} conta={conta} hoje={hoje} />
             ) : (
-              <CartaoCorrente key={conta.id} conta={conta} fluxo={porConta.get(conta.id)} />
+              <CartaoCorrente
+                key={conta.id}
+                conta={conta}
+                fluxo={porConta.get(conta.id)}
+                fluxoIndisponivel={fluxos === null}
+              />
             ),
           )}
         </div>

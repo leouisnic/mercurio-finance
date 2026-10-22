@@ -71,11 +71,12 @@ In another terminal, start the dashboard:
 ```
 cd apps/web
 npm install
-$env:FINANCE_API_URL = "http://localhost:8100"
+$env:FINANCE_API_URL = "http://127.0.0.1:8100"
 npm run dev -- --port 3100
 ```
 
-- Open `http://localhost:3100`. The demo reads only the fictional data in `mercurio_test`.
+- Open `http://127.0.0.1:3100`. The demo reads only the fictional data in `mercurio_test`.
+- The dashboard listens only on 127.0.0.1: it has no login yet, so other devices on the network cannot reach it.
 - Pytest and Playwright reset that database, so do not run them while using the demo.
 - The Sync button needs Pluggy credentials in `.env` and the queue worker
   (`uv run --package finance-api python -m finance_api.worker`). The demo works without both.

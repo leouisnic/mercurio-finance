@@ -1,5 +1,6 @@
 import { buscarRecorrencias } from "../buscar-recorrencias";
 import { buscarResumo } from "../buscar-resumo";
+import { BlocoIndisponivel, FaixaDeFalha, FalhaTotal } from "../indisponivel";
 import { CartaoPendente, LinhaDecidida } from "./cartao";
 
 function Secao({
@@ -32,17 +33,23 @@ export default async function Recorrencias() {
 
   if (pendentes === null) {
     return (
-      <p
-        role="alert"
-        className="bg-superficie border-borda text-tinta-2 rounded-[14px] border p-5 text-sm"
-      >
-        Não foi possível falar com o finance-api. Confira se ele está rodando.
-      </p>
+      <>
+        <header className="flex flex-col gap-[3px]">
+          <h1 className="text-[23px] font-bold tracking-[-0.2px]">Recorrências</h1>
+        </header>
+        <FalhaTotal />
+      </>
     );
   }
 
   const contaPor = new Map((resumo?.contas ?? []).map((conta) => [conta.id, conta]));
-  const decididas = [...(aprovadas ?? []), ...(rejeitadas ?? [])];
+  // Lista parcial pareceria completa: se um dos dois status falhou, a seção
+  // inteira fica indisponível em vez de mostrar só metade.
+  const decididas = aprovadas && rejeitadas ? [...aprovadas, ...rejeitadas] : null;
+  const falhas = [
+    decididas === null && "recorrências já decididas",
+    resumo === null && "nomes das contas",
+  ].filter((parte): parte is string => typeof parte === "string");
 
   return (
     <>
@@ -53,6 +60,8 @@ export default async function Recorrencias() {
           assinatura quanto parcelamento com prazo, e só quem viveu o gasto sabe a diferença.
         </span>
       </header>
+
+      <FaixaDeFalha partes={falhas} />
 
       <Secao
         titulo="Esperando decisão"
@@ -79,7 +88,11 @@ export default async function Recorrencias() {
         )}
       </Secao>
 
-      {decididas.length > 0 && (
+      {decididas === null && (
+        <BlocoIndisponivel titulo="Já decididas" rotulo="Já decididas" />
+      )}
+
+      {decididas && decididas.length > 0 && (
         <Secao titulo="Já decididas" descricao="Dá para voltar atrás a qualquer momento.">
           <div className="bg-superficie border-borda flex flex-col overflow-hidden rounded-2xl border">
             {decididas.map((recorrencia) => (

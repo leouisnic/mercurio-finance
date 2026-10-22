@@ -79,8 +79,5 @@ test("Recorrências mostra a fila de decisão vinda do finance-api", async ({ pa
   await expect(fila.getByLabel("Categoria")).toHaveValue("");
 });
 
-// A decisao em si (aprovar, rejeitar, classificar) nao e' exercitada aqui de
-// proposito: so' existe uma candidata na base ficticia, e o Playwright roda os
-// arquivos em paralelo, entao um teste que a consumisse deixaria os outros
-// instaveis. A mutacao esta coberta onde e' deterministica: nos endpoints, em
-// test_main.py, e na fiacao do formulario, em cartao.test.tsx.
+// A decisão em si (aprovar, classificar) roda em decisoes.mutavel.spec.ts, no
+// projeto que só começa depois deste e restaura a base a cada tentativa.

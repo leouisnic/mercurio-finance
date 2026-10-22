@@ -1,7 +1,8 @@
-import { sincronizar } from "./acoes";
+import { BotaoSincronizar } from "./botao-sincronizar";
 import { buscarCiclos, buscarFluxoPorConta } from "./buscar-movimentos";
 import { buscarResumo } from "./buscar-resumo";
 import { porExtenso, tempoDesde } from "./formato";
+import { FaixaDeFalha, FalhaTotal } from "./indisponivel";
 import { ResumoPainel } from "./resumo-painel";
 
 /** Verde até 15 min, laranja até 4 h, vermelho acima: o quanto o dado da
@@ -29,7 +30,7 @@ export default async function VisaoGeral() {
           </span>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-start gap-2.5">
           {resumo?.atualizadoEm && (
             <span
               className={`${tomDaSincronizacao(resumo.atualizadoEm, agora)} rounded-[10px] px-3.5 py-2 text-[12.5px] font-semibold`}
@@ -37,27 +38,16 @@ export default async function VisaoGeral() {
               Sincronizado {tempoDesde(resumo.atualizadoEm, agora)}
             </span>
           )}
-          <form action={sincronizar}>
-            <button
-              type="submit"
-              className="bg-superficie border-borda text-tinta-2 hover:bg-superficie-2 cursor-pointer rounded-[10px] border px-4 py-2.5 text-[12.5px] font-semibold"
-            >
-              Sincronizar
-            </button>
-          </form>
+          <BotaoSincronizar />
         </div>
       </header>
 
+      {resumo && fluxos === null && <FaixaDeFalha partes={["entradas e saídas do ciclo"]} />}
+
       {resumo ? (
-        <ResumoPainel contas={resumo.contas} fluxos={fluxos ?? []} hoje={agora} />
+        <ResumoPainel contas={resumo.contas} fluxos={fluxos} hoje={agora} />
       ) : (
-        <p
-          role="alert"
-          className="bg-superficie border-borda text-tinta-2 rounded-[14px] border p-5 text-sm"
-        >
-          Não foi possível carregar o resumo financeiro agora. Confira se o finance-api está
-          rodando.
-        </p>
+        <FalhaTotal />
       )}
     </>
   );

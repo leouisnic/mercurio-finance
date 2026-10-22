@@ -17,7 +17,7 @@
 
   --color-tinta: oklch(22% 0.02 260);
   --color-tinta-2: oklch(45% 0.02 260);
-  --color-tinta-3: oklch(55% 0.02 260);
+  --color-tinta-3: oklch(52% 0.02 260);
   --color-tinta-4: oklch(64% 0.015 260);
 
   /* Roxo da marca. */
@@ -40,6 +40,12 @@
   --color-alerta: oklch(45% 0.19 27);
   --color-alerta-forte: oklch(55% 0.19 27);
   --color-alerta-fundo: oklch(93% 0.06 25);
+
+  /* Amarelo: dado que não carregou. Não é erro do usuário nem gasto. */
+  --color-aviso: oklch(45% 0.12 75);
+  --color-aviso-forte: oklch(35% 0.1 70);
+  --color-aviso-fundo: oklch(95% 0.06 85);
+  --color-aviso-borda: oklch(85% 0.08 80);
 
   /* Cor de cada banco, usada no quadradinho com a inicial. */
   --color-nubank: oklch(42% 0.19 322);

@@ -1,13 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const FINANCE_API_URL = "http://localhost:8100";
+// 127.0.0.1 e não localhost: o painel e a API só escutam em IPv4, e no
+// Windows localhost pode resolver primeiro para ::1.
+const FINANCE_API_URL = "http://127.0.0.1:8100";
+const PAINEL_URL = "http://127.0.0.1:3100";
 
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   reporter: "list",
   use: {
-    baseURL: "http://localhost:3100",
+    baseURL: PAINEL_URL,
   },
   webServer: [
     {
@@ -28,17 +31,28 @@ export default defineConfig({
     },
     {
       command:
-        "node node_modules/next/dist/bin/next build && node node_modules/next/dist/bin/next start --port 3100",
-      url: "http://localhost:3100",
+        "node node_modules/next/dist/bin/next build && node node_modules/next/dist/bin/next start -H 127.0.0.1 --port 3100",
+      url: PAINEL_URL,
       env: { FINANCE_API_URL, NEXT_DIST_DIR: ".next-e2e" },
       reuseExistingServer: false,
       timeout: 60_000,
     },
   ],
+  // Os testes que gravam na base fictícia só rodam depois que todos os de
+  // leitura passaram, em série, e restauram a base antes de cada tentativa:
+  // rodando junto, uma recorrência aprovada sumiria da fila que outro teste lê.
   projects: [
     {
-      name: "chromium",
+      name: "leitura",
       use: { ...devices["Desktop Chrome"] },
+      testIgnore: /\.mutavel\.spec\.ts$/,
+    },
+    {
+      name: "mutavel",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: /\.mutavel\.spec\.ts$/,
+      dependencies: ["leitura"],
+      fullyParallel: false,
     },
   ],
 });

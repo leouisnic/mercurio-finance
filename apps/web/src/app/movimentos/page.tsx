@@ -8,6 +8,7 @@ import {
 import Link from "next/link";
 import { buscarResumo } from "../buscar-resumo";
 import { diaEMes } from "../formato";
+import { BlocoIndisponivel, FaixaDeFalha, FalhaTotal } from "../indisponivel";
 import { CicloContraAnterior, GastoPorConta } from "./comparativo";
 import { Filtros } from "./filtros";
 import { GraficoGastoDiario } from "./grafico-gasto-diario";
@@ -29,9 +30,10 @@ function paginaValida(valor: string | undefined): number {
   return Number.isInteger(pagina) && pagina > 0 ? pagina : 1;
 }
 
-async function somaDoCiclo(ciclo: Ciclo, contaId: string | undefined): Promise<number> {
+/** `null` quando a API falhou: ciclo sem dado não é ciclo sem gasto. */
+async function somaDoCiclo(ciclo: Ciclo, contaId: string | undefined): Promise<number | null> {
   const gastos = await buscarGastosDiarios(ciclo.inicio, ciclo.fim, contaId);
-  return gastos?.reduce((soma, gasto) => soma + gasto.total, 0) ?? 0;
+  return gastos === null ? null : gastos.reduce((soma, gasto) => soma + gasto.total, 0);
 }
 
 export default async function Movimentos(props: PageProps<"/movimentos">) {
@@ -46,12 +48,12 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
 
   if (ciclos === null) {
     return (
-      <p
-        role="alert"
-        className="bg-superficie border-borda text-tinta-2 rounded-[14px] border p-5 text-sm"
-      >
-        Não foi possível falar com o finance-api. Confira se ele está rodando.
-      </p>
+      <>
+        <header className="flex flex-col gap-[3px]">
+          <h1 className="text-[23px] font-bold tracking-[-0.2px]">Movimentos</h1>
+        </header>
+        <FalhaTotal />
+      </>
     );
   }
 
@@ -66,16 +68,31 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
     buscarGastosDiarios(ciclo.inicio, ciclo.fim, contaEscolhida),
     buscarFluxoPorConta(ciclo.inicio, ciclo.fim),
     buscarMovimentos(ciclo.inicio, ciclo.fim, contaEscolhida, limite, (pagina - 1) * limite),
-    anteriorAoEscolhido ? somaDoCiclo(anteriorAoEscolhido, contaEscolhida) : Promise.resolve(0),
+    anteriorAoEscolhido ? somaDoCiclo(anteriorAoEscolhido, contaEscolhida) : Promise.resolve(null),
   ]);
 
-  const gastosDoCiclo = gastos ?? [];
-  const somaAtual = gastosDoCiclo.reduce((soma, gasto) => soma + gasto.total, 0);
-  const totalEmRevisao = gastosDoCiclo.reduce((soma, gasto) => soma + gasto.emRevisao, 0);
+  const somaAtual = gastos?.reduce((soma, gasto) => soma + gasto.total, 0) ?? null;
+  const totalEmRevisao = gastos?.reduce((soma, gasto) => soma + gasto.emRevisao, 0) ?? 0;
   const contas = resumo?.contas ?? [];
-  const fluxosVisiveis = contaEscolhida
-    ? (fluxos ?? []).filter((fluxo) => fluxo.contaId === contaEscolhida)
-    : (fluxos ?? []);
+  const fluxosVisiveis =
+    fluxos && contaEscolhida ? fluxos.filter((fluxo) => fluxo.contaId === contaEscolhida) : fluxos;
+  const comparativoFalhou = anteriorAoEscolhido !== null && (somaAtual === null || somaAnterior === null);
+
+  const falhas = [
+    gastos === null && "gasto por dia",
+    comparativoFalhou && "comparativo com o ciclo anterior",
+    fluxos === null && "gasto por conta",
+    movimentos === null && "lista de movimentos",
+    resumo === null && "nomes das contas",
+  ].filter((parte): parte is string => typeof parte === "string");
+
+  const tituloDoGrafico = `Gasto por dia · Ciclo ${ciclo.numero} (${diaEMes(ciclo.inicio)} a ${diaEMes(ciclo.fim)})`;
+  const gastoPorConta =
+    fluxosVisiveis === null ? (
+      <BlocoIndisponivel titulo="Gasto por conta no período" rotulo="Gasto por conta no período" />
+    ) : (
+      <GastoPorConta fluxos={fluxosVisiveis} />
+    );
 
   return (
     <>
@@ -86,6 +103,8 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
           {diaEMes(ciclo.fim)}.
         </span>
       </header>
+
+      <FaixaDeFalha partes={falhas} />
 
       <Filtros
         ciclos={CICLOS.map((chave) => ({ chave, ciclo: ciclos[chave] }))}
@@ -105,22 +124,35 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
       )}
 
       <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-[1.6fr_1fr]">
-        <GraficoGastoDiario
-          gastos={gastosDoCiclo}
-          inicio={ciclo.inicio}
-          fim={ciclo.fim}
-          titulo={`Gasto por dia · Ciclo ${ciclo.numero} (${diaEMes(ciclo.inicio)} a ${diaEMes(ciclo.fim)})`}
-        />
-        {anteriorAoEscolhido ? (
-          <CicloContraAnterior atual={somaAtual} anterior={somaAnterior} numero={ciclo.numero} />
+        {gastos === null ? (
+          <BlocoIndisponivel titulo={tituloDoGrafico} rotulo="Gasto por dia" />
         ) : (
-          <GastoPorConta fluxos={fluxosVisiveis} />
+          <GraficoGastoDiario
+            gastos={gastos}
+            inicio={ciclo.inicio}
+            fim={ciclo.fim}
+            titulo={tituloDoGrafico}
+          />
+        )}
+        {!anteriorAoEscolhido ? (
+          gastoPorConta
+        ) : somaAtual === null || somaAnterior === null ? (
+          <BlocoIndisponivel
+            titulo={`Ciclo ${ciclo.numero} vs ciclo anterior`}
+            rotulo="Comparativo com o ciclo anterior"
+          />
+        ) : (
+          <CicloContraAnterior atual={somaAtual} anterior={somaAnterior} numero={ciclo.numero} />
         )}
       </div>
 
-      {anteriorAoEscolhido && <GastoPorConta fluxos={fluxosVisiveis} />}
+      {anteriorAoEscolhido && gastoPorConta}
 
-      <Lista movimentos={movimentos ?? []} contas={contas} />
+      {movimentos === null ? (
+        <BlocoIndisponivel titulo="Movimentos" rotulo="Movimentos" />
+      ) : (
+        <Lista movimentos={movimentos} contas={contas} />
+      )}
 
       <nav aria-label="Paginação dos movimentos" className="flex justify-end gap-2">
         {pagina > 1 && (
