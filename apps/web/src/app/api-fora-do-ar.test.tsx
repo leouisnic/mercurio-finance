@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import type { Conta } from "./buscar-resumo";
 import type { Recorrencia } from "./buscar-recorrencias";
+import { ProvedorDeDicas } from "./info";
 
 // Cada tela é renderizada com as buscas falhando, como `buscarJson` faz
 // quando a API cai: devolve `null`. Nenhum número pode aparecer como zero.
@@ -13,10 +14,12 @@ const buscas = vi.hoisted(() => ({
   buscarMovimentos: vi.fn(),
   buscarResumo: vi.fn(),
   buscarRecorrencias: vi.fn(),
+  buscarDinheiroLivre: vi.fn(),
 }));
 
 vi.mock("./buscar-movimentos", () => buscas);
 vi.mock("./buscar-resumo", () => ({ buscarResumo: buscas.buscarResumo }));
+vi.mock("./buscar-dinheiro-livre", () => ({ buscarDinheiroLivre: buscas.buscarDinheiroLivre }));
 vi.mock("./buscar-recorrencias", async (original) => ({
   ...(await original<typeof import("./buscar-recorrencias")>()),
   buscarRecorrencias: buscas.buscarRecorrencias,
@@ -28,7 +31,7 @@ vi.mock("./acoes", () => ({
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
-const { default: VisaoGeral } = await import("./page");
+const { default: Inicio } = await import("./page");
 const { default: Movimentos } = await import("./movimentos/page");
 const { default: Recorrencias } = await import("./recorrencias/page");
 
@@ -113,13 +116,46 @@ test("Movimentos: só o ciclo anterior falhando já derruba o comparativo", asyn
   expect(screen.queryByText(/^Ciclo anterior:/)).toBeNull();
 });
 
-test("Visão geral sem o fluxo do ciclo avisa em vez de esconder entradas e saídas", async () => {
-  buscas.buscarResumo.mockResolvedValue({ atualizadoEm: null, contas: [CONTA] });
+const DINHEIRO = {
+  hoje: "2026-08-10",
+  ciclo: CICLOS.atual,
+  cicloSeguinte: CICLOS.seguinte,
+  saldoContas: 3152.9,
+  cartaoUsado: 0,
+  contasFixas: [],
+  contasFixasTotal: 0,
+  caixinha: 0,
+  livre: 3152.9,
+  diasDoCiclo: 12,
+  diasRestantes: 7,
+  cotaDoDia: 308.2,
+  cofrinho: 1060.5,
+  gastoHoje: 65,
+  hojeDisponivel: 1303.7,
+  gastosPorDia: [{ data: "2026-08-07", total: 300 }],
+};
 
-  render(await VisaoGeral());
+test("Início sem o fluxo do ciclo avisa em vez de esconder entradas e saídas", async () => {
+  buscas.buscarResumo.mockResolvedValue({ atualizadoEm: null, contas: [CONTA] });
+  buscas.buscarDinheiroLivre.mockResolvedValue(DINHEIRO);
+
+  // Na aplicação o provedor dos balões fica no layout, que o teste não monta.
+  render(<ProvedorDeDicas>{await Inicio()}</ProvedorDeDicas>);
 
   expect(screen.getByRole("alert").textContent).toMatch(/entradas e saídas do ciclo/);
   expect(screen.getByText("Indisponível")).toBeDefined();
+});
+
+test("Início sem o dinheiro livre mostra indisponível, nunca zero", async () => {
+  buscas.buscarResumo.mockResolvedValue({ atualizadoEm: null, contas: [CONTA] });
+
+  render(await Inicio());
+
+  expect(screen.getByRole("alert").textContent).toMatch(/dinheiro livre/);
+  expect(
+    within(screen.getByRole("region", { name: "Hoje dá para gastar" })).getByText("Indisponível"),
+  ).toBeDefined();
+  semZero();
 });
 
 test("Recorrências com as decididas falhando não mostra metade da lista", async () => {
@@ -137,7 +173,7 @@ test("Recorrências com as decididas falhando não mostra metade da lista", asyn
 
 test("com a API toda fora, as três telas mostram a faixa e nenhum zero", async () => {
   for (const tela of [
-    await VisaoGeral(),
+    await Inicio(),
     await Movimentos({ searchParams: Promise.resolve({}), params: Promise.resolve({}) }),
     await Recorrencias(),
   ]) {

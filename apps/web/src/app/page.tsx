@@ -1,8 +1,15 @@
 import { BotaoSincronizar } from "./botao-sincronizar";
-import { buscarCiclos, buscarFluxoPorConta } from "./buscar-movimentos";
+import { buscarDinheiroLivre } from "./buscar-dinheiro-livre";
+import { buscarFluxoPorConta } from "./buscar-movimentos";
 import { buscarResumo } from "./buscar-resumo";
-import { porExtenso, tempoDesde } from "./formato";
-import { FaixaDeFalha, FalhaTotal } from "./indisponivel";
+import { comoData, tempoDesde } from "./formato";
+import { dataDeHoje } from "./hoje";
+import { BlocoIndisponivel, FaixaDeFalha, FalhaTotal } from "./indisponivel";
+import { ComposicaoDoSaldo } from "./inicio/composicao-do-saldo";
+import { GraficoDoCiclo } from "./inicio/grafico-do-ciclo";
+import { HojeDaParaGastar } from "./inicio/hoje-da-para-gastar";
+import { LinhaDoTempo } from "./inicio/linha-do-tempo";
+import { lerPagadores } from "./pagadores";
 import { ResumoPainel } from "./resumo-painel";
 
 /** Verde até 15 min, laranja até 4 h, vermelho acima: o quanto o dado da
@@ -15,21 +22,23 @@ function tomDaSincronizacao(atualizadoEm: string, agora: Date) {
   return minutos <= 240 ? "bg-gasto-fundo text-gasto" : "bg-alerta-fundo text-alerta";
 }
 
-export default async function VisaoGeral() {
+export default async function Inicio() {
   const agora = new Date();
-  const [resumo, ciclos] = await Promise.all([buscarResumo(), buscarCiclos()]);
-  const fluxos = ciclos ? await buscarFluxoPorConta(ciclos.atual.inicio, ciclos.atual.fim) : null;
+  const hoje = dataDeHoje();
+  const pagadores = lerPagadores();
+  const [resumo, dinheiro] = await Promise.all([buscarResumo(), buscarDinheiroLivre(hoje)]);
+  const fluxos = dinheiro ? await buscarFluxoPorConta(dinheiro.ciclo.inicio, dinheiro.ciclo.fim) : null;
+
+  const falhas = [
+    dinheiro === null && "dinheiro livre e gasto por dia",
+    resumo === null && "contas conectadas",
+    dinheiro !== null && resumo !== null && fluxos === null && "entradas e saídas do ciclo",
+  ].filter((parte): parte is string => typeof parte === "string");
 
   return (
     <>
       <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-col gap-[3px]">
-          <h1 className="text-[23px] font-bold tracking-[-0.2px]">Visão geral</h1>
-          <span className="text-tinta-3 text-[13px] first-letter:uppercase">
-            {porExtenso(agora)}
-          </span>
-        </div>
-
+        <h1 className="text-[23px] font-bold tracking-[-0.2px]">Início</h1>
         <div className="flex items-start gap-2.5">
           {resumo?.atualizadoEm && (
             <span
@@ -42,12 +51,45 @@ export default async function VisaoGeral() {
         </div>
       </header>
 
-      {resumo && fluxos === null && <FaixaDeFalha partes={["entradas e saídas do ciclo"]} />}
-
-      {resumo ? (
-        <ResumoPainel contas={resumo.contas} fluxos={fluxos} hoje={agora} />
-      ) : (
+      {dinheiro === null && resumo === null ? (
         <FalhaTotal />
+      ) : (
+        <>
+          <FaixaDeFalha partes={falhas} />
+
+          {dinheiro ? (
+            <>
+              <LinhaDoTempo
+                hoje={hoje}
+                ciclo={dinheiro.ciclo}
+                cicloSeguinte={dinheiro.cicloSeguinte}
+                pagadores={pagadores}
+              />
+              <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-[1fr_1.25fr]">
+                <HojeDaParaGastar dinheiro={dinheiro} />
+                <ComposicaoDoSaldo
+                  dinheiro={dinheiro}
+                  temCartao={resumo === null || resumo.contas.some((conta) => conta.tipo === "CREDIT")}
+                />
+              </div>
+              <GraficoDoCiclo
+                inicio={dinheiro.ciclo.inicio}
+                fim={dinheiro.ciclo.fim}
+                hoje={hoje}
+                cota={dinheiro.cotaDoDia}
+                gastos={dinheiro.gastosPorDia}
+              />
+            </>
+          ) : (
+            <BlocoIndisponivel titulo="Hoje dá para gastar" rotulo="Hoje dá para gastar" />
+          )}
+
+          {resumo ? (
+            <ResumoPainel contas={resumo.contas} fluxos={fluxos} hoje={comoData(hoje)} />
+          ) : (
+            <BlocoIndisponivel titulo="Contas conectadas" rotulo="Contas conectadas" />
+          )}
+        </>
       )}
     </>
   );

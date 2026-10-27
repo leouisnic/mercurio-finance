@@ -33,7 +33,15 @@ export default defineConfig({
       command:
         "node node_modules/next/dist/bin/next build && node node_modules/next/dist/bin/next start -H 127.0.0.1 --port 3100",
       url: PAINEL_URL,
-      env: { FINANCE_API_URL, NEXT_DIST_DIR: ".next-e2e" },
+      env: {
+        FINANCE_API_URL,
+        NEXT_DIST_DIR: ".next-e2e",
+        // A base fictícia é de agosto de 2026; fixar o dia mantém o ciclo
+        // corrente com movimentos e os números conferíveis à mão.
+        MERCURIO_HOJE: "2026-08-10",
+        PAGADOR_CICLO_1: "Empresa A",
+        PAGADOR_CICLO_2: "Empresa B",
+      },
       reuseExistingServer: false,
       timeout: 60_000,
     },

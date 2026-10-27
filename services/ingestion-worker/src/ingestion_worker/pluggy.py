@@ -24,6 +24,11 @@ CATEGORIA_ID_TRANSFERENCIA_PROPRIA = "04000000"
 # (05000000), genérico demais para servir de regra. Ver
 # `finance_api.repositorio.marcar_pagamentos_de_fatura`.
 CATEGORIA_ID_PAGAMENTO_DE_FATURA = "05100000"
+# Família "Investments": aplicar e resgatar move o próprio dinheiro, como a
+# transferência entre contas do titular. A exceção é "Proceeds interests and
+# dividends", rendimento, que é dinheiro novo e continua receita.
+PREFIXO_CATEGORIA_INVESTIMENTO = "03"
+CATEGORIA_ID_RENDIMENTO = "03060000"
 
 
 class RespostaPluggyInvalida(ValueError):
@@ -114,6 +119,15 @@ def _saiu_dinheiro(transacao: dict) -> bool:
     raise RespostaPluggyInvalida("transação sem type DEBIT ou CREDIT")
 
 
+def e_movimento_de_investimento(categoria_id: str | None) -> bool:
+    """Aplicação ou resgate, que não é gasto nem receita."""
+    return (
+        categoria_id is not None
+        and categoria_id.startswith(PREFIXO_CATEGORIA_INVESTIMENTO)
+        and categoria_id != CATEGORIA_ID_RENDIMENTO
+    )
+
+
 def mapear_para_movimento(transacao: dict) -> dict:
     """Converte uma transação da Pluggy para o formato que
     `finance_api.repositorio.inserir_movimentos` espera (mesmo shape que
@@ -127,6 +141,7 @@ def mapear_para_movimento(transacao: dict) -> dict:
     e_transferencia_propria = (
         categoria_id == CATEGORIA_ID_TRANSFERENCIA_PROPRIA
         or categoria == CATEGORIA_TRANSFERENCIA_PROPRIA
+        or e_movimento_de_investimento(categoria_id)
     )
 
     if categoria_id == CATEGORIA_ID_PAGAMENTO_DE_FATURA:

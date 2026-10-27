@@ -223,6 +223,41 @@ class CiclosOut(BaseModel):
     seguinte: CicloOut
 
 
+class ContaFixaOut(BaseModel):
+    nome: str
+    valor: Decimal
+    data_prevista: date
+    origem: Literal["recorrencia", "compromisso"]
+    atrasada: bool
+
+
+class GastoDoDiaOut(BaseModel):
+    data: date
+    total: Decimal
+
+
+class DinheiroLivreOut(BaseModel):
+    """Quanto dá para gastar até a véspera do próximo pagamento. A regra
+    está em `finance_api.dinheiro_livre`."""
+
+    hoje: date
+    ciclo: CicloOut
+    ciclo_seguinte: CicloOut
+    saldo_contas: Decimal
+    cartao_usado: Decimal
+    contas_fixas: list[ContaFixaOut]
+    contas_fixas_total: Decimal
+    caixinha: Decimal
+    livre: Decimal
+    dias_do_ciclo: int
+    dias_restantes: int
+    cota_do_dia: Decimal
+    cofrinho: Decimal
+    gasto_hoje: Decimal
+    hoje_disponivel: Decimal
+    gastos_por_dia: list[GastoDoDiaOut]
+
+
 class StatusRecorrencia(str, Enum):
     PENDENTE = "pendente"
     APROVADA = "aprovada"

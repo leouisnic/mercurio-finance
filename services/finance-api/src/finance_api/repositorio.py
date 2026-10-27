@@ -20,6 +20,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
+from finance_api.dinheiro_livre import CompromissoAtivo, RecorrenciaAprovada
 from finance_api.models import CompromissoORM, ContaORM, MovimentoORM, RecorrenciaORM
 from finance_api.recorrencias import LancamentoObservado, RecorrenciaCandidata
 
@@ -327,6 +328,67 @@ async def agregar_fluxo_por_conta(
 
     resultado = await sessao.execute(consulta)
     return [tuple(linha) for linha in resultado.all()]
+
+
+async def entradas_do_dinheiro_livre(
+    sessao: AsyncSession, *, inicio: date, hoje: date
+) -> tuple[Decimal, Decimal, list[RecorrenciaAprovada], list[CompromissoAtivo], dict[date, Decimal]]:
+    """O que `finance_api.dinheiro_livre.calcular` precisa, lido do banco:
+    `(saldo_contas, cartao_usado, recorrencias, compromissos, gastos_por_dia)`.
+
+    Gasto do dia a dia é despesa sem pagamento de fatura e sem conta fixa:
+    as duas já são descontadas à parte, e contá-las de novo tiraria o mesmo
+    dinheiro duas vezes da cota. Conta fixa é a despesa da mesma conta e
+    descrição de uma recorrência aprovada, a chave que a detecção usa.
+    """
+    zero = Decimal(0)
+    saldos = dict(
+        (await sessao.execute(select(ContaORM.tipo, func.sum(ContaORM.saldo)).group_by(ContaORM.tipo))).all()
+    )
+
+    aprovadas = (
+        await sessao.execute(select(RecorrenciaORM).where(RecorrenciaORM.status == "aprovada"))
+    ).scalars().all()
+    ativos = (
+        await sessao.execute(select(CompromissoORM).where(CompromissoORM.status == "ativo"))
+    ).scalars().all()
+
+    e_conta_fixa = (
+        select(RecorrenciaORM.id)
+        .where(
+            RecorrenciaORM.status == "aprovada",
+            RecorrenciaORM.conta_id == MovimentoORM.conta_id,
+            RecorrenciaORM.descricao == MovimentoORM.descricao,
+        )
+        .exists()
+    )
+    gastos = (
+        await sessao.execute(
+            select(MovimentoORM.data, func.sum(MovimentoORM.valor))
+            .where(
+                MovimentoORM.tipo == "despesa",
+                MovimentoORM.data >= inicio,
+                MovimentoORM.data <= hoje,
+                _nao_e_pagamento_de_fatura(),
+                ~e_conta_fixa,
+            )
+            .group_by(MovimentoORM.data)
+        )
+    ).all()
+
+    return (
+        saldos.get("BANK") or zero,
+        saldos.get("CREDIT") or zero,
+        [
+            RecorrenciaAprovada(recorrencia.apelido or recorrencia.descricao, recorrencia.valor_medio, recorrencia.ultima_data)
+            for recorrencia in aprovadas
+        ],
+        [
+            CompromissoAtivo(compromisso.descricao, compromisso.valor_parcela, compromisso.data_inicio, compromisso.data_fim)
+            for compromisso in ativos
+        ],
+        {data: total for data, total in gastos},
+    )
 
 
 async def lancamentos_para_deteccao(sessao: AsyncSession) -> list[LancamentoObservado]:

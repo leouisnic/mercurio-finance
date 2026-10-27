@@ -50,9 +50,7 @@ function montar(contas: Conta[] = [CORRENTE, CARTAO], fluxos: FluxoDaConta[] = F
   render(<ResumoPainel contas={contas} fluxos={fluxos} hoje={HOJE} />);
 }
 
-/** Indicador e card mostram o mesmo número de propósito, então cada
- *  asserção precisa dizer de qual seção está falando. */
-function em(secao: "Indicadores" | "Contas conectadas") {
+function em(secao: "Contas conectadas") {
   return within(screen.getByRole("region", { name: secao }));
 }
 
@@ -92,18 +90,6 @@ test("limite folgado pinta a barra de verde", () => {
   montar([{ ...CARTAO, saldo: 35, disponivel: 315 }], []);
 
   expect(screen.getByText("10% usado").className).toContain("positivo");
-});
-
-test("indicadores somam as contas por natureza", () => {
-  montar();
-
-  const indicadores = em("Indicadores");
-  expect(indicadores.getByText("R$ 480,20")).toBeDefined(); // saldo em conta
-  expect(indicadores.getByText("R$ 340,04")).toBeDefined(); // usado no cartão
-  expect(indicadores.getByText("R$ 9,96")).toBeDefined(); // disponível no cartão
-  expect(indicadores.getByText("1 conta corrente")).toBeDefined();
-  expect(indicadores.getByText("1 fatura em aberto")).toBeDefined();
-  expect(indicadores.getByText("de R$ 350,00 de limite")).toBeDefined();
 });
 
 test("conta corrente sem movimento no ciclo não mostra entradas e saídas", () => {

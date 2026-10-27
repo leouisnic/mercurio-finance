@@ -14,32 +14,6 @@ function corDoUso(percentual: number): { barra: string; texto: string; trilho: s
   return { barra: "bg-positivo-forte", texto: "text-positivo", trilho: "bg-positivo-fundo" };
 }
 
-function Indicador({
-  rotulo,
-  valor,
-  contexto,
-  destaque,
-}: {
-  rotulo: string;
-  valor: number;
-  contexto: string;
-  destaque?: boolean;
-}) {
-  return (
-    <div className="bg-superficie border-borda flex flex-col gap-1.5 rounded-[14px] border px-[18px] py-4">
-      <span className="text-tinta-3 text-[11.5px] font-semibold tracking-[0.04em] uppercase">
-        {rotulo}
-      </span>
-      <span
-        className={`num text-[21px] font-semibold ${destaque ? "text-gasto" : "text-tinta"}`}
-      >
-        {moeda(valor)}
-      </span>
-      <span className="text-tinta-3 text-[11.5px]">{contexto}</span>
-    </div>
-  );
-}
-
 function CartaoCorrente({
   conta,
   fluxo,
@@ -179,37 +153,10 @@ export function ResumoPainel({
   fluxos: FluxoDaConta[] | null;
   hoje: Date;
 }) {
-  const correntes = contas.filter((conta) => conta.tipo === "BANK");
-  const cartoes = contas.filter((conta) => conta.tipo === "CREDIT");
-
-  const saldoEmConta = correntes.reduce((total, conta) => total + conta.saldo, 0);
-  const usadoNoCartao = cartoes.reduce((total, conta) => total + conta.saldo, 0);
-  const disponivelNoCartao = cartoes.reduce((total, conta) => total + (conta.disponivel ?? 0), 0);
-  const limiteTotal = cartoes.reduce((total, conta) => total + (conta.limite ?? 0), 0);
-
   const porConta = new Map((fluxos ?? []).map((fluxo) => [fluxo.contaId, fluxo]));
 
   return (
     <>
-      <section aria-label="Indicadores" className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
-        <Indicador
-          rotulo="Saldo em conta"
-          valor={saldoEmConta}
-          contexto={`${correntes.length} ${correntes.length === 1 ? "conta corrente" : "contas correntes"}`}
-        />
-        <Indicador
-          rotulo="Usado no cartão"
-          valor={usadoNoCartao}
-          contexto={`${cartoes.length} ${cartoes.length === 1 ? "fatura em aberto" : "faturas em aberto"}`}
-          destaque
-        />
-        <Indicador
-          rotulo="Disponível no cartão"
-          valor={disponivelNoCartao}
-          contexto={`de ${moeda(limiteTotal)} de limite`}
-        />
-      </section>
-
       <section aria-label="Contas conectadas" className="flex flex-col gap-3">
         <h2 className="text-tinta-3 text-xs font-semibold tracking-[0.06em] uppercase">
           Contas conectadas

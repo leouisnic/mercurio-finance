@@ -41,6 +41,14 @@
   --color-alerta-forte: oklch(55% 0.19 27);
   --color-alerta-fundo: oklch(93% 0.06 25);
 
+  /* Vermelho escuro: conta fixa, gasto que já tem dia marcado. */
+  --color-fixa: oklch(40% 0.14 20);
+  --color-fixa-fundo: oklch(95% 0.03 20);
+
+  /* Dourado: dinheiro guardado na caixinha. Não é gasto. */
+  --color-caixinha: oklch(76% 0.14 82);
+  --color-caixinha-texto: oklch(48% 0.1 70);
+
   /* Amarelo: dado que não carregou. Não é erro do usuário nem gasto. */
   --color-aviso: oklch(45% 0.12 75);
   --color-aviso-forte: oklch(35% 0.1 70);

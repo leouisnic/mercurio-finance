@@ -1,12 +1,13 @@
 import asyncio
 from datetime import UTC, date, datetime
+from decimal import Decimal
 
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 from finance_api.compromissos import somar_meses
 from finance_api.main import app
-from finance_api.models import ContaORM
+from finance_api.models import ContaORM, MovimentoORM, RecorrenciaORM
 from finance_api.seed import EXTRATO_FICTICIO, seed_contas_ficticias
 from ingestion_worker.extrato import carregar_extrato, processar_movimentos
 from mercurio_domain import Proveniencia
@@ -1074,3 +1075,94 @@ def test_apelido_vazio_e_rejeitado(semear_contas) -> None:
 
 def test_renomear_conta_que_nao_existe_da_404() -> None:
     assert client.patch("/contas/nao-existe", json={"apelido": "X"}).status_code == 404
+
+
+def _despesa(identificador: str, data: str, valor: float, descricao: str, conta: str = "corrente") -> dict:
+    return {
+        "data": data,
+        "valor": valor,
+        "descricao": descricao,
+        "conta_id": conta,
+        "tipo": "despesa",
+        "identificador_externo": identificador,
+        "categoria_id": "10000000",
+    }
+
+
+def test_dinheiro_livre_soma_exclui_fatura_e_conta_fixa(
+    semear_contas, semear_movimentos, sessao_de_teste_factory
+) -> None:
+    """Ciclo de dez dias, hoje no sexto. Conta feita à mão:
+    3.152,90 - 640,30 - 188,90 = 2.323,70 livres; (2.323,70 + 743,70) / 10
+    = 306,74 de cota; 5 x 306,74 - 743,70 = 790,00 no cofrinho."""
+    semear_contas(
+        [
+            {"id": "corrente", "nome": "Conta fictícia", "tipo": "BANK", "saldo": 2900.00},
+            {"id": "outra", "nome": "Outra fictícia", "tipo": "BANK", "saldo": 252.90},
+            {"id": "cartao", "nome": "Cartão fictício", "tipo": "CREDIT", "saldo": 640.30},
+        ]
+    )
+    semear_movimentos(
+        processar_movimentos(
+            pd.DataFrame(
+                [
+                    _despesa("g1", "2026-10-05", 120.00, "Mercado"),
+                    _despesa("g2", "2026-10-07", 450.00, "Loja", conta="cartao"),
+                    _despesa("g3", "2026-10-09", 173.70, "Farmácia"),
+                    # Fora do dia a dia: conta fixa já paga e pagamento de fatura.
+                    _despesa("fx", "2026-10-08", 39.90, "Streaming"),
+                    _despesa("ft", "2026-10-06", 500.00, "Pagamento de fatura"),
+                    # Fora do ciclo.
+                    _despesa("velha", "2026-10-02", 999.00, "Antes do ciclo"),
+                ]
+            )
+        ),
+        Proveniencia.PLUGGY.value,
+    )
+
+    async def preparar() -> None:
+        async with sessao_de_teste_factory() as sessao:
+            await sessao.execute(
+                update(MovimentoORM)
+                .where(MovimentoORM.identificador_externo == "ft")
+                .values(pagamento_de_fatura="confirmado")
+            )
+            for descricao, valor, ultima in [
+                ("Internet", "99.90", date(2026, 9, 12)),
+                ("Academia", "89.00", date(2026, 9, 13)),
+                ("Streaming", "39.90", date(2026, 10, 8)),
+            ]:
+                sessao.add(
+                    RecorrenciaORM(
+                        conta_id="corrente",
+                        descricao=descricao,
+                        valor_medio=Decimal(valor),
+                        ocorrencias=3,
+                        primeira_data=date(2026, 7, ultima.day),
+                        ultima_data=ultima,
+                        status="aprovada",
+                    )
+                )
+            await sessao.commit()
+
+    asyncio.run(preparar())
+
+    corpo = client.get("/dinheiro-livre", params={"hoje": "2026-10-10"}).json()
+
+    assert corpo["ciclo"] == {"numero": 1, "inicio": "2026-10-05", "fim": "2026-10-14"}
+    assert corpo["saldo_contas"] == "3152.90"
+    assert corpo["cartao_usado"] == "640.30"
+    assert [(conta["nome"], conta["data_prevista"]) for conta in corpo["contas_fixas"]] == [
+        ("Internet", "2026-10-12"),
+        ("Academia", "2026-10-13"),
+    ]
+    assert corpo["contas_fixas_total"] == "188.90"
+    assert corpo["livre"] == "2323.70"
+    assert corpo["cota_do_dia"] == "306.74"
+    assert corpo["cofrinho"] == "790.00"
+    assert corpo["hoje_disponivel"] == "1096.74"
+    assert {dia["data"]: dia["total"] for dia in corpo["gastos_por_dia"] if dia["total"] != "0"} == {
+        "2026-10-05": "120.00",
+        "2026-10-07": "450.00",
+        "2026-10-09": "173.70",
+    }

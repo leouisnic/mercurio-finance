@@ -30,6 +30,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from finance_api.ciclo import Ciclo, ciclo_anterior, ciclo_de, ciclo_seguinte
 from finance_api.compromissos import resumo_parcelas
 from finance_api.db import obter_sessao
+from finance_api.dinheiro_livre import calcular as calcular_dinheiro_livre
+from finance_api.dinheiro_livre import contas_fixas_pendentes
 from finance_api.domain import (
     CicloOut,
     CiclosOut,
@@ -37,10 +39,13 @@ from finance_api.domain import (
     CompromissoOut,
     CompromissoUpdate,
     Conta,
+    ContaFixaOut,
     ContaUpdate,
+    DinheiroLivreOut,
     EstadoPagamentoFatura,
     FluxoDaConta,
     GastoDiario,
+    GastoDoDiaOut,
     MovimentoOut,
     PagamentoFaturaUpdate,
     RecorrenciaOut,
@@ -61,6 +66,7 @@ from finance_api.repositorio import (
     atualizar_recorrencia,
     criar_compromisso,
     definir_pagamento_de_fatura,
+    entradas_do_dinheiro_livre,
     listar_compromissos,
     listar_contas,
     listar_movimentos,
@@ -310,6 +316,50 @@ def ciclos(referencia: date | None = None) -> CiclosOut:
         atual=_ciclo_out(atual),
         anterior=_ciclo_out(ciclo_anterior(atual)),
         seguinte=_ciclo_out(ciclo_seguinte(atual)),
+    )
+
+
+@app.get("/dinheiro-livre", response_model=DinheiroLivreOut)
+async def dinheiro_livre(
+    hoje: date | None = None,
+    sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
+) -> DinheiroLivreOut:
+    """Quanto dá para gastar até a véspera do próximo pagamento, com a conta
+    item por item, a cota do dia e o cofrinho. `hoje` existe para a
+    demonstração e os testes fixarem a data."""
+    dia = hoje or date.today()  # noqa: DTZ011 (ciclo é data civil, sem fuso)
+    ciclo = ciclo_de(dia)
+    saldo, cartao, recorrencias, compromissos, gastos = await entradas_do_dinheiro_livre(
+        sessao, inicio=ciclo.inicio, hoje=dia
+    )
+    resultado = calcular_dinheiro_livre(
+        hoje=dia,
+        inicio=ciclo.inicio,
+        fim=ciclo.fim,
+        saldo_contas=saldo,
+        cartao_usado=cartao,
+        contas_fixas=contas_fixas_pendentes(
+            recorrencias, compromissos, hoje=dia, inicio=ciclo.inicio, fim=ciclo.fim
+        ),
+        gastos_por_dia=gastos,
+    )
+    return DinheiroLivreOut(
+        hoje=dia,
+        ciclo=_ciclo_out(ciclo),
+        ciclo_seguinte=_ciclo_out(ciclo_seguinte(ciclo)),
+        saldo_contas=resultado.saldo_contas,
+        cartao_usado=resultado.cartao_usado,
+        contas_fixas=[ContaFixaOut(**vars(conta)) for conta in resultado.contas_fixas],
+        contas_fixas_total=resultado.contas_fixas_total,
+        caixinha=resultado.caixinha,
+        livre=resultado.livre,
+        dias_do_ciclo=resultado.dias_do_ciclo,
+        dias_restantes=resultado.dias_restantes,
+        cota_do_dia=resultado.cota_do_dia,
+        cofrinho=resultado.cofrinho,
+        gasto_hoje=resultado.gasto_hoje,
+        hoje_disponivel=resultado.hoje_disponivel,
+        gastos_por_dia=[GastoDoDiaOut(data=data, total=total) for data, total in resultado.gastos_por_dia.items()],
     )
 
 

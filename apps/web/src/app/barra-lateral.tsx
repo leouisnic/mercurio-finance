@@ -23,7 +23,7 @@ const traco = {
 const ITENS: Item[] = [
   {
     href: "/",
-    rotulo: "Visão geral",
+    rotulo: "Início",
     icone: (
       <svg viewBox="0 0 24 24" stroke="currentColor" {...traco}>
         <rect x="3" y="3" width="7" height="7" rx="1.5" />

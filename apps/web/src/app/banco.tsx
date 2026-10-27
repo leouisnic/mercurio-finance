@@ -12,9 +12,18 @@
  * chutado.
  */
 
-const BANCOS: { padrao: RegExp; nome: string; classe: string }[] = [
-  { padrao: /nu ?bank|nu pagamentos/i, nome: "Nubank", classe: "bg-nubank" },
-  { padrao: /mercado ?pago/i, nome: "Mercado Pago", classe: "bg-mercadopago" },
+import Image from "next/image";
+
+// O logo é o arquivo oficial de cada banco, guardado em `public/bancos`. O do
+// Mercado Pago é transparente e vai sobre fundo branco com borda.
+const BANCOS: { padrao: RegExp; nome: string; classe: string; logo: string }[] = [
+  { padrao: /nu ?bank|nu pagamentos/i, nome: "Nubank", classe: "bg-nubank", logo: "/bancos/nubank.svg" },
+  {
+    padrao: /mercado ?pago/i,
+    nome: "Mercado Pago",
+    classe: "bg-superficie border-borda border",
+    logo: "/bancos/mercado-pago.svg",
+  },
 ];
 
 /** Uma conta como o painel precisa dela para se identificar. */
@@ -45,13 +54,18 @@ export function SeloDoBanco({
   conta: ContaIdentificavel;
   tamanho?: number;
 }) {
+  const logo = banco(conta)?.logo;
   return (
     <span
       aria-hidden
       style={{ width: tamanho, height: tamanho, borderRadius: tamanho * 0.29 }}
-      className={`${classeDoBanco(conta)} flex shrink-0 items-center justify-center font-bold text-white`}
+      className={`${classeDoBanco(conta)} flex shrink-0 items-center justify-center overflow-hidden font-bold text-white`}
     >
-      <span style={{ fontSize: tamanho * 0.4 }}>{inicialDoBanco(conta)}</span>
+      {logo ? (
+        <Image src={logo} alt="" width={tamanho} height={tamanho} unoptimized />
+      ) : (
+        <span style={{ fontSize: tamanho * 0.4 }}>{inicialDoBanco(conta)}</span>
+      )}
     </span>
   );
 }

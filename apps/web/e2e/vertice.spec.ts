@@ -1,23 +1,36 @@
 import { test, expect } from "@playwright/test";
 
-test("Visão geral mostra o resumo calculado pelo finance-api de verdade", async ({ page }) => {
+test("Início mostra o dinheiro livre calculado pelo finance-api de verdade", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { level: 1, name: "Visão geral" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Início" })).toBeVisible();
+
+  // Conta da base fictícia no dia que MERCURIO_HOJE fixa: livre de R$ 3.152,90
+  // nas duas contas e R$ 545,50 de gasto no ciclo, R$ 65,00 deles hoje; cota
+  // (3.152,90 + 545,50) / 12 = 308,20; cofrinho 5 x 308,20 - 480,50.
+  const hoje = page.getByRole("region", { name: "Hoje dá para gastar" });
+  await expect(hoje.getByText("R$ 1.303,70")).toBeVisible();
+  await expect(hoje.getByText("R$ 308,20")).toBeVisible();
+  await expect(hoje.getByText("+ R$ 1.060,50")).toBeVisible();
+
+  const saldo = page.getByRole("region", { name: "Saldo nas contas" });
+  await expect(saldo.getByText("sem cartão conectado")).toBeVisible();
+  await expect(saldo.getByText("R$ 3.152,90").last()).toBeVisible();
+
+  const ciclos = page.getByRole("region", { name: "Ciclos e pagamentos" });
+  await expect(ciclos.getByText(/dia 6 de 12 do Ciclo Empresa A/)).toBeVisible();
 
   const contas = page.getByRole("region", { name: "Contas conectadas" });
   await expect(contas.getByText("Conta A (fictícia)")).toBeVisible();
-  await expect(contas.getByText("Conta B (fictícia)")).toBeVisible();
-
-  // Valores batendo com o que finance_api.seed grava nas contas, não mais
-  // hardcoded no componente: prova de que apps/web busca o dado de verdade.
   await expect(contas.getByText("R$ 2.898,40")).toBeVisible();
-  await expect(contas.getByText("R$ 254,50")).toBeVisible();
+});
 
-  // Indicador somando as duas contas correntes fictícias.
-  const indicadores = page.getByRole("region", { name: "Indicadores" });
-  await expect(indicadores.getByText("R$ 3.152,90")).toBeVisible();
-  await expect(indicadores.getByText("2 contas correntes")).toBeVisible();
+test("o ícone de informação explica o número ao tocar", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "O que é cofrinho" }).click();
+
+  await expect(page.getByRole("tooltip")).toContainText("O que sobrou ou faltou das cotas");
 });
 
 test("Movimentos filtra por ciclo com as datas que o finance-api calcula", async ({ page }) => {
@@ -59,8 +72,8 @@ test("a navegação leva de uma tela para a outra", async ({ page }) => {
   await page.getByRole("navigation", { name: "Navegação principal" }).getByText("Movimentos").click();
   await expect(page.getByRole("heading", { level: 1, name: "Movimentos" })).toBeVisible();
 
-  await page.getByRole("navigation", { name: "Navegação principal" }).getByText("Visão geral").click();
-  await expect(page.getByRole("heading", { level: 1, name: "Visão geral" })).toBeVisible();
+  await page.getByRole("navigation", { name: "Navegação principal" }).getByText("Início").click();
+  await expect(page.getByRole("heading", { level: 1, name: "Início" })).toBeVisible();
 });
 
 test("Recorrências mostra a fila de decisão vinda do finance-api", async ({ page }) => {

@@ -182,6 +182,41 @@ def test_transferencia_propria_casa_por_id_de_categoria() -> None:
     assert movimento["tipo"] == "retirada_titular"
 
 
+def _investimento(tipo_pluggy: str, categoria_id: str) -> dict:
+    return {
+        "id": "i1",
+        "accountId": "conta-nubank-corrente",
+        "date": "2026-08-10T10:00:00.000Z",
+        "description": "Movimento de investimento fictício",
+        "amount": -500.0 if tipo_pluggy == "DEBIT" else 500.0,
+        "type": tipo_pluggy,
+        "category": "Investments",
+        "categoryId": categoria_id,
+    }
+
+
+@pytest.mark.parametrize("categoria_id", ["03000000", "03010000", "03020000", "03070000"])
+def test_guardar_no_investimento_nao_e_despesa(categoria_id: str) -> None:
+    """Aplicar na caixinha tira o dinheiro da conta, mas continua sendo dele:
+    como despesa, guardar dinheiro aparecia como gasto."""
+    movimento = pluggy.mapear_para_movimento(_investimento("DEBIT", categoria_id))
+
+    assert movimento["tipo"] == "retirada_titular"
+
+
+def test_resgatar_do_investimento_nao_e_receita() -> None:
+    movimento = pluggy.mapear_para_movimento(_investimento("CREDIT", "03000000"))
+
+    assert movimento["tipo"] == "aporte_titular"
+
+
+def test_rendimento_do_investimento_continua_receita() -> None:
+    """Juros e dividendos são dinheiro novo, não o próprio dinheiro voltando."""
+    movimento = pluggy.mapear_para_movimento(_investimento("CREDIT", "03060000"))
+
+    assert movimento["tipo"] == "receita"
+
+
 def test_sem_type_e_rejeitado() -> None:
     with pytest.raises(pluggy.RespostaPluggyInvalida, match="DEBIT ou CREDIT"):
         pluggy.mapear_para_movimento(
