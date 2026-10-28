@@ -1,4 +1,4 @@
-# Telas do Vértice
+# Telas do Mercúrio
 
 As capturas desta pasta são geradas pelo Playwright contra a base de teste
 semeada com dados fictícios. Nenhuma captura usa o banco local de

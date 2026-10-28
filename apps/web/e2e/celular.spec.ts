@@ -1,17 +1,23 @@
 import { expect, test } from "@playwright/test";
 
-// Largura de um celular comum. O layout inteiro das telas fica para a
-// identidade visual; aqui só o que esta leva acrescentou precisa caber.
+// Largura de um celular comum.
 test.use({ viewport: { width: 390, height: 844 } });
 
+test("no celular a navegação fica embaixo e nada passa da largura da tela", async ({ page }) => {
+  for (const caminho of ["/", "/movimentos", "/recorrencias"]) {
+    await page.goto(caminho);
+    const navegacao = page.getByRole("navigation", { name: "Navegação principal" });
+    await expect(navegacao).toHaveCount(1);
+    const caixa = await navegacao.boundingBox();
+    expect(caixa!.y + caixa!.height).toBeGreaterThanOrEqual(844 - 1);
+    const largura = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(largura, caminho).toBeLessThanOrEqual(390);
+  }
+});
+
 test("o formulário de renomear cabe na largura do celular", async ({ page }) => {
-  // Falha conhecida: a barra lateral tem largura fixa de 232 px e, em 390 px,
-  // o conteúdo fica com 110 px, onde nenhum card cabe. Quando a navegação do
-  // celular existir, este teste passa a acusar e a marca precisa sair.
-  test.fail();
   await page.goto("/");
   const contas = page.getByRole("region", { name: "Contas conectadas" });
-  // Prazo próprio: estouro do prazo do teste não conta como a falha esperada.
   await contas.getByRole("button", { name: "Renomear Conta A (fictícia)" }).click({ timeout: 5_000 });
 
   const formulario = contas.getByRole("form", { name: "Renomear Conta A (fictícia)" });

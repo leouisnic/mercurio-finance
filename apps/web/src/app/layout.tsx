@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { BarraLateral } from "./barra-lateral";
 import { ProvedorDeDicas } from "./info";
+import { SCRIPT_DO_TEMA } from "./tema";
 
 const sora = localFont({
   src: "./fonts/Sora-Variable.ttf",
@@ -12,18 +13,22 @@ const sora = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Vértice",
-  description: "Painel consolidado do Mercúrio: saldo das suas contas conectadas.",
+  title: "Mercúrio",
+  description: "Quanto dá para gastar até o próximo pagamento, com as contas conectadas por Open Finance.",
   manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="pt-BR" className={`${sora.variable} h-full antialiased`}>
-      <body className="bg-fundo text-tinta flex min-h-full font-sans">
+    // O script do tema muda data-tema antes da hidratação, de propósito.
+    <html lang="pt-BR" className={`${sora.variable} h-full antialiased`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_DO_TEMA }} />
+      </head>
+      <body className="bg-fundo text-tinta flex min-h-full flex-col font-sans md:flex-row">
         <ProvedorDeDicas>
           <BarraLateral />
-          <div className="flex min-w-0 flex-1 flex-col gap-5 px-6 py-7 sm:px-9">{children}</div>
+          <div className="flex min-w-0 flex-1 flex-col gap-5 px-4 pt-6 pb-24 sm:px-9 md:py-7">{children}</div>
         </ProvedorDeDicas>
       </body>
     </html>

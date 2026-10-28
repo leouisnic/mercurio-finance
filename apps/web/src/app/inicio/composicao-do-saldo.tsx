@@ -45,20 +45,20 @@ export function ComposicaoDoSaldo({
       rotulo: "Cartão usado",
       valor: dinheiro.cartaoUsado,
       cor: "bg-alerta-forte",
-      dica: "Total usado nos cartões. Sai do livre desde a compra.",
+      dica: "Já sai do livre no dia da compra.",
       semValor: temCartao ? undefined : "sem cartão conectado",
     },
     {
       rotulo: "Contas fixas",
       valor: dinheiro.contasFixasTotal,
       cor: "bg-fixa",
-      dica: "Recorrências aprovadas e compromissos que vencem antes do pagamento e ainda não foram pagos.",
+      dica: "Vencem antes do próximo pagamento e ainda não saíram.",
     },
     {
       rotulo: "Caixinha",
       valor: dinheiro.caixinha,
       cor: "bg-caixinha",
-      dica: "Aporte deste ciclo para a sua meta de reserva.",
+      dica: "O que você separou para guardar neste ciclo.",
     },
     {
       rotulo: `Livre até ${fim}`,
@@ -82,7 +82,7 @@ export function ComposicaoDoSaldo({
         <h2 className="text-sm font-bold">
           Saldo nas contas: <span className="num">{moeda(dinheiro.saldoContas)}</span>
         </h2>
-        <Info sobre="saldo nas contas" texto="Soma dos saldos das contas correntes na última sincronização." />
+        <Info sobre="saldo nas contas" texto="Soma das contas correntes na última sincronização." />
       </div>
 
       {total > 0 && (

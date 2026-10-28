@@ -1,10 +1,16 @@
 {
-  "name": "Vértice · Mercúrio",
-  "short_name": "Vértice",
-  "description": "Painel consolidado do Mercúrio: saldo das suas contas conectadas.",
+  "name": "Mercúrio",
+  "short_name": "Mercúrio",
+  "description": "Quanto dá para gastar até o próximo pagamento, com as contas conectadas por Open Finance.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#fafafa",
-  "theme_color": "#0a0a0a",
-  "lang": "pt-BR"
+  "background_color": "#f6f6fa",
+  "theme_color": "#31327a",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "/marca/app-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/marca/app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/marca/app-mascaravel-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/marca/app-monocromatico-512.png", "sizes": "512x512", "type": "image/png", "purpose": "monochrome" }
+  ]
 }

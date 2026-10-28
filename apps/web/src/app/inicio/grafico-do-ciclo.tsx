@@ -80,7 +80,7 @@ export function GraficoDoCiclo({
         <h2 className="text-sm font-bold">Gasto por dia</h2>
         <Info
           sobre="gasto por dia"
-          texto="Quanto saiu em cada dia do ciclo, sem contas fixas e fatura. A linha tracejada é a cota do dia."
+          texto="Sem contas fixas e fatura. A linha tracejada é a cota."
         />
       </div>
 

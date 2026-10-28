@@ -30,7 +30,7 @@ test("o ícone de informação explica o número ao tocar", async ({ page }) => 
 
   await page.getByRole("button", { name: "O que é cofrinho" }).click();
 
-  await expect(page.getByRole("tooltip")).toContainText("O que sobrou ou faltou das cotas");
+  await expect(page.getByRole("tooltip")).toContainText("Sobra ou falta dos dias anteriores");
 });
 
 test("Movimentos filtra por ciclo com as datas que o finance-api calcula", async ({ page }) => {
@@ -95,3 +95,16 @@ test("Recorrências mostra a fila de decisão vinda do finance-api", async ({ pa
 
 // A decisão em si roda em decisoes.mutavel.spec.ts, no
 // projeto que só começa depois deste e restaura a base a cada tentativa.
+
+test("o tema escolhido no painel continua depois de recarregar", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.goto("/");
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-tema", "claro");
+
+  await page.getByRole("group", { name: "Tema" }).getByRole("button", { name: "Tema escuro" }).click();
+  await expect(html).toHaveAttribute("data-tema", "escuro");
+
+  await page.reload();
+  await expect(html).toHaveAttribute("data-tema", "escuro");
+});

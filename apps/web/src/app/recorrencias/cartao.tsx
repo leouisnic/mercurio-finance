@@ -95,7 +95,7 @@ function Decisoes({ enviando, recorrencia }: { enviando: boolean; recorrencia: R
           name="status"
           value="aprovada"
           disabled={enviando}
-          className={`${BOTAO} bg-positivo border-positivo text-white`}
+          className={`${BOTAO} bg-positivo border-positivo text-sobre-cor`}
         >
           Conta fixa
         </button>
@@ -132,7 +132,7 @@ function Decisoes({ enviando, recorrencia }: { enviando: boolean; recorrencia: R
             name="status"
             value="parcelamento"
             disabled={enviando}
-            className={`${BOTAO} bg-positivo border-positivo text-white`}
+            className={`${BOTAO} bg-positivo border-positivo text-sobre-cor`}
           >
             Confirmar
           </button>

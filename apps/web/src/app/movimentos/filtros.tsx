@@ -25,7 +25,7 @@ function Pilula({
       aria-current={ativo ? "true" : undefined}
       className={
         ativo
-          ? "bg-marca flex items-center gap-1.5 rounded-full px-3.5 py-[7px] text-[12.5px] font-semibold text-white"
+          ? "bg-marca flex items-center gap-1.5 rounded-full px-3.5 py-[7px] text-[12.5px] font-semibold text-sobre-cor"
           : "bg-superficie border-borda text-tinta-2 hover:bg-superficie-2 flex items-center gap-1.5 rounded-full border px-3.5 py-[7px] text-[12.5px]"
       }
     >

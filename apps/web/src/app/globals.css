@@ -1,53 +1,61 @@
 @import "tailwindcss";
 
-/* Paleta do Vértice, em oklch, igual aos mockups aprovados em
-   design/vertice. Tema só claro por decisão: não existe mockup escuro, e
-   inventar uma paleta escura sem aprovação daria uma tela que ninguém viu.
-   Os tokens ficam aqui para o dia em que houver um. */
+/* O tema vem do atributo data-tema, que o script do <head> em layout.tsx põe
+   antes da primeira pintura: a escolha guardada ou, sem ela, a do sistema. */
+@custom-variant dark (&:where([data-tema=escuro], [data-tema=escuro] *));
+
+/* Paleta do Mercúrio, em oklch, escolhida no mockup da spec
+   2026-10-27-identidade-visual (variante A, com o dourado só no que é
+   guardado). O contraste dos pares usados é conferido por
+   `scripts/contraste.py`, que lê este arquivo. */
 @theme {
   --font-sans: var(--font-sora), system-ui, sans-serif;
 
-  --color-fundo: oklch(97.3% 0.004 250);
+  --color-fundo: oklch(97.5% 0.005 278);
   --color-superficie: oklch(100% 0 0);
-  --color-superficie-2: oklch(98.5% 0.004 250);
-  --color-superficie-3: oklch(98% 0.006 265);
+  --color-superficie-2: oklch(98.5% 0.004 278);
+  --color-superficie-3: oklch(98% 0.006 278);
 
-  --color-borda: oklch(90% 0.01 250);
-  --color-borda-sutil: oklch(93.5% 0.006 250);
+  --color-borda: oklch(91% 0.01 278);
+  --color-borda-sutil: oklch(94% 0.008 278);
 
-  --color-tinta: oklch(22% 0.02 260);
-  --color-tinta-2: oklch(45% 0.02 260);
-  --color-tinta-3: oklch(52% 0.02 260);
-  --color-tinta-4: oklch(64% 0.015 260);
+  --color-tinta: oklch(22% 0.03 278);
+  --color-tinta-2: oklch(44% 0.03 278);
+  --color-tinta-3: oklch(50% 0.025 278);
+  --color-tinta-4: oklch(64% 0.015 278);
 
-  /* Roxo da marca. */
-  --color-marca: oklch(48% 0.16 265);
-  --color-marca-escura: oklch(38% 0.14 265);
-  --color-marca-clara: oklch(93% 0.03 265);
+  /* Índigo do símbolo: marca, ciclo e item ativo, nada além. */
+  --color-marca: oklch(36% 0.12 278);
+  --color-marca-escura: oklch(30% 0.11 278);
+  --color-marca-clara: oklch(93% 0.03 278);
+
+  /* Texto sobre um preenchimento de cor cheia (botão, contador). */
+  --color-sobre-cor: oklch(100% 0 0);
 
   /* Verde: saldo, entrada, pago, sincronização recente. */
-  --color-positivo: oklch(38% 0.11 155);
-  --color-positivo-forte: oklch(58% 0.13 160);
-  --color-positivo-fundo: oklch(93% 0.05 155);
+  --color-positivo: oklch(40% 0.11 155);
+  --color-positivo-forte: oklch(60% 0.13 160);
+  --color-positivo-fundo: oklch(94% 0.05 155);
 
   /* Laranja: fatura, saída, gasto. */
-  --color-gasto: oklch(50% 0.15 55);
-  --color-gasto-forte: oklch(58% 0.15 55);
-  --color-gasto-fundo: oklch(94% 0.06 55);
+  --color-gasto: oklch(50% 0.14 55);
+  --color-gasto-forte: oklch(64% 0.15 55);
+  --color-gasto-fundo: oklch(95% 0.05 55);
   --color-gasto-fundo-fraco: oklch(93% 0.05 55);
 
   /* Vermelho: atraso, limite estourando. */
-  --color-alerta: oklch(45% 0.19 27);
-  --color-alerta-forte: oklch(55% 0.19 27);
-  --color-alerta-fundo: oklch(93% 0.06 25);
+  --color-alerta: oklch(46% 0.19 27);
+  --color-alerta-forte: oklch(54% 0.2 27);
+  --color-alerta-fundo: oklch(94% 0.05 25);
 
   /* Vermelho escuro: conta fixa, gasto que já tem dia marcado. */
-  --color-fixa: oklch(40% 0.14 20);
+  --color-fixa: oklch(42% 0.13 20);
   --color-fixa-fundo: oklch(95% 0.03 20);
 
-  /* Dourado: dinheiro guardado na caixinha. Não é gasto. */
-  --color-caixinha: oklch(76% 0.14 82);
+  /* Dourado: dinheiro guardado (cofrinho e caixinha). Não é gasto nem enfeite. */
+  --color-caixinha: oklch(64% 0.13 75);
   --color-caixinha-texto: oklch(48% 0.1 70);
+  --color-caixinha-fundo: oklch(95% 0.05 85);
 
   /* Amarelo: dado que não carregou. Não é erro do usuário nem gasto. */
   --color-aviso: oklch(45% 0.12 75);
@@ -55,9 +63,65 @@
   --color-aviso-fundo: oklch(95% 0.06 85);
   --color-aviso-borda: oklch(85% 0.08 80);
 
-  /* Cor de cada banco, usada no quadradinho com a inicial. */
+  /* Cor de cada banco, usada no quadradinho com a inicial; não muda com o tema. */
   --color-nubank: oklch(42% 0.19 322);
   --color-mercadopago: oklch(62% 0.14 230);
+}
+
+/* Tema escuro: os mesmos papéis, com o claro e o escuro trocados. Fica fora
+   das camadas do Tailwind para vencer os valores do @theme. */
+:root[data-tema="escuro"] {
+  --color-fundo: oklch(16% 0.02 278);
+  --color-superficie: oklch(20.5% 0.025 278);
+  --color-superficie-2: oklch(23% 0.025 278);
+  --color-superficie-3: oklch(22% 0.025 278);
+
+  --color-borda: oklch(32% 0.03 278);
+  --color-borda-sutil: oklch(27% 0.03 278);
+
+  --color-tinta: oklch(95% 0.01 278);
+  --color-tinta-2: oklch(80% 0.02 278);
+  --color-tinta-3: oklch(72% 0.02 278);
+  --color-tinta-4: oklch(55% 0.015 278);
+
+  --color-marca: oklch(76% 0.1 278);
+  --color-marca-escura: oklch(88% 0.06 278);
+  --color-marca-clara: oklch(32% 0.06 278);
+
+  --color-sobre-cor: oklch(17% 0.02 278);
+
+  --color-positivo: oklch(82% 0.12 155);
+  --color-positivo-forte: oklch(70% 0.13 160);
+  --color-positivo-fundo: oklch(30% 0.06 155);
+
+  --color-gasto: oklch(82% 0.11 60);
+  --color-gasto-forte: oklch(72% 0.14 55);
+  --color-gasto-fundo: oklch(31% 0.06 55);
+  --color-gasto-fundo-fraco: oklch(28% 0.05 55);
+
+  --color-alerta: oklch(80% 0.12 27);
+  --color-alerta-forte: oklch(70% 0.17 27);
+  --color-alerta-fundo: oklch(30% 0.07 25);
+
+  --color-fixa: oklch(80% 0.09 20);
+  --color-fixa-fundo: oklch(29% 0.05 20);
+
+  --color-caixinha: oklch(78% 0.13 82);
+  --color-caixinha-texto: oklch(85% 0.11 85);
+  --color-caixinha-fundo: oklch(30% 0.05 85);
+
+  --color-aviso: oklch(86% 0.1 80);
+  --color-aviso-forte: oklch(92% 0.07 85);
+  --color-aviso-fundo: oklch(29% 0.05 80);
+  --color-aviso-borda: oklch(44% 0.07 80);
+}
+
+:root {
+  color-scheme: light;
+}
+
+:root[data-tema="escuro"] {
+  color-scheme: dark;
 }
 
 body {

@@ -19,7 +19,7 @@ function Titulo() {
       <h1 className="text-[23px] font-bold tracking-[-0.2px]">Recorrências</h1>
       <Info
         sobre="recorrências"
-        texto="Cobranças que se repetem no extrato. Você decide se é conta fixa, parcelamento, se já acabou ou se não é recorrência."
+        texto="Cobranças repetidas no extrato, para você classificar."
       />
     </header>
   );

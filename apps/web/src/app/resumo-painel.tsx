@@ -73,12 +73,6 @@ function CartaoCorrente({
   const foi = fluxo?.transferenciasSaida ?? 0;
   const entrou = (fluxo?.entradas ?? 0) + veio;
   const saiu = (fluxo?.saidas ?? 0) + fatura + foi;
-  const composicao = [
-    `Gastos ${moeda(fluxo?.saidas ?? 0)}`,
-    `fatura do cartão ${moeda(fatura)}`,
-    `enviado para outras contas suas ${moeda(foi)}`,
-    `recebido de outras contas suas ${moeda(veio)}`,
-  ].join(", ");
 
   return (
     <article className={CARTAO}>
@@ -106,7 +100,7 @@ function CartaoCorrente({
           <Caixa
             rotulo="Variação"
             valor={comSinal(entrou - saiu)}
-            dica={`Quanto o saldo mudou no ciclo. Saiu: ${composicao}.`}
+            dica="Entrou menos saiu. Fatura e transferências entre suas contas contam."
           />
         </div>
       )}

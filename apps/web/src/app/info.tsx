@@ -34,7 +34,7 @@ export function Info({ sobre, texto }: { sobre: string; texto: string }) {
           side="bottom"
           sideOffset={4}
           collisionPadding={12}
-          className="bg-tinta z-50 max-w-[240px] rounded-lg px-2.5 py-2 text-[13px] leading-snug font-normal tracking-normal text-white normal-case"
+          className="bg-tinta z-50 max-w-[240px] rounded-lg px-2.5 py-2 text-[13px] leading-snug font-normal tracking-normal text-superficie normal-case"
         >
           {texto}
           <Tooltip.Arrow className="fill-tinta" />

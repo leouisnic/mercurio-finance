@@ -43,15 +43,15 @@ export function GraficoGastoDiario({
         <span className="num text-tinta-2 text-[13px]">total no período: {moeda(total)}</span>
       </div>
 
-      <ol className="flex h-[124px] items-end gap-2 px-1">
-        {dias.map((dia) => {
+      <ol className="flex h-[124px] items-end gap-1 px-1 sm:gap-2">
+        {dias.map((dia, indice) => {
           const valor = porDia.get(dia) ?? 0;
           const altura = maior > 0 && valor > 0 ? (valor / maior) * ALTURA_MAXIMA : ALTURA_VAZIA;
           return (
             <li
               key={dia}
               title={`${diaEMes(dia)}: ${moeda(valor)}`}
-              className="flex flex-1 flex-col items-center gap-1.5"
+              className="flex min-w-0 flex-1 flex-col items-center gap-1.5"
             >
               <span
                 aria-hidden
@@ -59,7 +59,10 @@ export function GraficoGastoDiario({
                 className={`w-full rounded-t-[5px] ${valor > 0 ? "bg-gasto-forte" : "bg-gasto-fundo-fraco"}`}
               />
               <span
-                className={`text-[13px] ${valor > 0 ? "text-gasto font-semibold" : "text-tinta-3"}`}
+                className={`text-xs sm:text-[13px] ${valor > 0 ? "text-gasto font-semibold" : "text-tinta-3"} ${
+                  // No celular não cabe um rótulo por dia: fica um a cada três.
+                  indice % 3 === 0 ? "" : "max-sm:invisible"
+                }`}
               >
                 {dia.slice(8, 10)}
               </span>

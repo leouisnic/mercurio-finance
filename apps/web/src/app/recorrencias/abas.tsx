@@ -31,7 +31,7 @@ export function AbasDeRecorrencias({ abas }: { abas: Aba[] }) {
               onClick={() => setAtiva(aba.chave)}
               className={`inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm ${
                 selecionada
-                  ? "bg-tinta border-tinta font-semibold text-white"
+                  ? "bg-tinta border-tinta text-superficie font-semibold"
                   : "bg-superficie border-borda text-tinta-2 hover:bg-superficie-2"
               }`}
             >
@@ -39,9 +39,9 @@ export function AbasDeRecorrencias({ abas }: { abas: Aba[] }) {
               <span
                 className={`num grid h-[22px] min-w-[22px] place-items-center rounded-full px-1.5 text-xs font-bold ${
                   aba.pede_atencao && aba.quantidade > 0
-                    ? "bg-alerta-forte text-white"
+                    ? "bg-alerta-forte text-sobre-cor"
                     : selecionada
-                      ? "text-tinta bg-white"
+                      ? "text-tinta bg-superficie"
                       : "bg-borda text-tinta-2"
                 }`}
               >

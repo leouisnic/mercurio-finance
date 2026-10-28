@@ -130,7 +130,7 @@ export function CabecalhoDaConta({
             <button
               type="submit"
               disabled={salvando}
-              className={`${BOTAO} bg-marca border-marca text-white`}
+              className={`${BOTAO} bg-marca border-marca text-sobre-cor`}
             >
               {salvando ? "Salvando..." : "Salvar"}
             </button>

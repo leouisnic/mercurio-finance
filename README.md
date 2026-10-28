@@ -1,4 +1,11 @@
-<h1>Mercúrio</h1>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="apps/web/public/marca/ilustracao-escura.png">
+    <img alt="Mercúrio symbol: the profile of the god Mercury wearing his winged helmet" src="apps/web/public/marca/ilustracao.png" width="120">
+  </picture>
+</p>
+
+<h1 align="center">Mercúrio</h1>
 
 A personal finance dashboard that reads Brazilian bank and credit card accounts through Open
 Finance and shows where the money goes, one pay cycle at a time.
@@ -20,7 +27,7 @@ cycle.
 
 ## What it does
 
-- **Overview** (the Vértice dashboard): one card per connected account, with balance, card
+- **Overview**: one card per connected account, with balance, card
   usage against the limit, and inflows and outflows in the current cycle.
 - **Transactions**: daily spending chart, comparison with the previous cycle, spending per
   account and the transaction list, filtered by cycle and account.
@@ -88,7 +95,7 @@ npm run dev -- --port 3100
 ## Structure
 
 ```
-apps/web                    Next.js, React, TypeScript, Tailwind. The Vértice dashboard.
+apps/web                    Next.js, React, TypeScript, Tailwind. The dashboard.
 services/finance-api        FastAPI, SQLAlchemy, Alembic. API, PostgreSQL, Redis queue.
 services/ingestion-worker   Pandas importers for CSV statements and Pluggy.
 services/mercurio-domain    Shared types and the reconciliation fingerprint.

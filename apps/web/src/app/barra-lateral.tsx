@@ -1,9 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { Logo } from "./logo";
+import { SeletorDeTema } from "./tema";
 
 type Item = {
   href: string;
@@ -105,29 +106,83 @@ function Item({ item, ativo }: { item: Item; ativo: boolean }) {
   );
 }
 
+/** No celular, a barra embaixo: as quatro telas ao alcance do polegar. */
+function ItemDoCelular({ item, ativo }: { item: Item; ativo: boolean }) {
+  const conteudo = (
+    <>
+      <span
+        className={`flex h-7 w-12 items-center justify-center rounded-full ${ativo ? "bg-marca-clara" : ""}`}
+      >
+        <span className="size-5">{item.icone}</span>
+      </span>
+      <span className="text-[12px]">{item.rotulo.split(" ")[0]}</span>
+    </>
+  );
+  const classe = "flex flex-1 flex-col items-center justify-center gap-0.5";
+
+  if (item.futura) {
+    return (
+      <span aria-disabled title="Ainda não construída" className={`${classe} text-tinta-4`}>
+        {conteudo}
+      </span>
+    );
+  }
+
+  return (
+    <Link
+      href={item.href}
+      aria-current={ativo ? "page" : undefined}
+      className={`${classe} ${ativo ? "text-marca-escura font-semibold" : "text-tinta-2"}`}
+    >
+      {conteudo}
+    </Link>
+  );
+}
+
 export function BarraLateral() {
   const caminho = usePathname();
 
   return (
-    <nav
-      aria-label="Navegação principal"
-      className="bg-superficie-2 border-borda flex w-[232px] shrink-0 flex-col border-r px-4 py-6"
-    >
-      <Link href="/" className="flex items-center gap-2.5 px-2 pt-1 pb-7">
-        <span className="bg-marca flex size-8 shrink-0 items-center justify-center rounded-[9px]">
-          <Logo />
-        </span>
-        <span className="flex flex-col leading-tight">
-          <span className="text-[17px] font-bold tracking-[0.1px]">Vértice</span>
-          <span className="text-tinta-3 text-[13px]">por Mercúrio</span>
-        </span>
-      </Link>
+    <>
+      <nav
+        aria-label="Navegação principal"
+        className="bg-superficie-2 border-borda flex w-[232px] shrink-0 flex-col border-r px-4 py-6 max-md:hidden"
+      >
+        <Link href="/" className="flex items-center gap-2.5 px-2 pt-1 pb-7">
+          {/* A ilustração índigo some no fundo escuro: lá entra a versão prateada. */}
+          <Image src="/marca/ilustracao.png" alt="" width={40} height={40} loading="eager" className="dark:hidden" />
+          <Image src="/marca/ilustracao-escura.png" alt="" width={40} height={40} loading="eager" className="hidden dark:block" />
+          <span className="text-[18px] font-bold tracking-[0.1px]">Mercúrio</span>
+        </Link>
 
-      <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-0.5">
+          {ITENS.map((item) => (
+            <Item key={item.href} item={item} ativo={caminho === item.href} />
+          ))}
+        </div>
+
+        <div className="mt-auto px-2 pt-6">
+          <SeletorDeTema />
+        </div>
+      </nav>
+
+      <header className="bg-superficie-2 border-borda sticky top-0 z-20 flex h-14 items-center justify-between border-b px-4 md:hidden">
+        <Link href="/" className="flex items-center gap-2">
+          <Image src="/marca/icone.png" alt="" width={26} height={26} loading="eager" className="dark:hidden" />
+          <Image src="/marca/icone-escuro.png" alt="" width={26} height={26} loading="eager" className="hidden dark:block" />
+          <span className="text-base font-bold">Mercúrio</span>
+        </Link>
+        <SeletorDeTema />
+      </header>
+
+      <nav
+        aria-label="Navegação principal"
+        className="bg-superficie border-borda fixed inset-x-0 bottom-0 z-20 flex h-16 border-t md:hidden"
+      >
         {ITENS.map((item) => (
-          <Item key={item.href} item={item} ativo={caminho === item.href} />
+          <ItemDoCelular key={item.href} item={item} ativo={caminho === item.href} />
         ))}
-      </div>
-    </nav>
+      </nav>
+    </>
   );
 }

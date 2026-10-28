@@ -1,6 +1,6 @@
 # Arquitetura
 
-Mercúrio é uma plataforma financeira pessoal. O painel Vértice mostra contas
+Mercúrio é uma plataforma financeira pessoal. O painel (`apps/web`) mostra contas
 conectadas, movimentos, ciclos e indicadores calculados pela API.
 
 ## Componentes
@@ -24,7 +24,7 @@ Pluggy e importadores locais
   -> fila Redis
   -> persistência e conciliação no finance-api
   -> endpoints de leitura
-  -> Server Components do Vértice
+  -> Server Components do painel
 ```
 
 O saldo exibido vem diretamente da conta sincronizada. O histórico de

@@ -26,7 +26,7 @@ export function HojeDaParaGastar({ dinheiro }: { dinheiro: DinheiroLivre }) {
         <h2 className="text-sm font-bold">Hoje dá para gastar</h2>
         <Info
           sobre="hoje dá para gastar"
-          texto="Cota do dia mais o cofrinho, menos o que você já gastou hoje."
+          texto="Cota de hoje mais o cofrinho, menos o já gasto hoje."
         />
       </div>
 
@@ -71,22 +71,22 @@ export function HojeDaParaGastar({ dinheiro }: { dinheiro: DinheiroLivre }) {
               Cota do dia
               <Info
                 sobre="cota do dia"
-                texto="Livre do ciclo dividido pelos dias do ciclo. Muda quando entra dinheiro ou surge conta fixa nova."
+                texto="O livre dividido pelos dias do ciclo."
               />
             </span>
             <b className="num text-base">{moeda(cotaDoDia)}</b>
           </span>
         </div>
         <div className="bg-superficie-2 border-borda-sutil flex items-center gap-3 rounded-xl border p-3">
-          <span className="bg-marca-clara text-marca grid size-[30px] shrink-0 place-items-center rounded-[9px]">
+          <span className="bg-caixinha-fundo text-caixinha-texto grid size-[30px] shrink-0 place-items-center rounded-[9px]">
             <PiggyBank size={18} strokeWidth={2} aria-hidden />
           </span>
           <span className="flex flex-col">
             <span className="text-tinta-2 flex items-center gap-1 text-[13px]">
               Cofrinho
-              <Info sobre="cofrinho" texto="O que sobrou ou faltou das cotas dos dias anteriores deste ciclo." />
+              <Info sobre="cofrinho" texto="Sobra ou falta dos dias anteriores do ciclo." />
             </span>
-            <b className={`num text-base ${cofrinho < 0 ? "text-alerta" : "text-marca"}`}>{comSinal(cofrinho)}</b>
+            <b className={`num text-base ${cofrinho < 0 ? "text-alerta" : "text-caixinha-texto"}`}>{comSinal(cofrinho)}</b>
           </span>
         </div>
       </div>

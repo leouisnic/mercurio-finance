@@ -1,0 +1,13 @@
+{
+  "public/marca/ilustracao.png": "f47c0889bcd04cf8c3fc1fccc2155a8353830997c8061e914b6e6e9d5fd95d97",
+  "public/marca/ilustracao-escura.png": "a5227b63089df25da0bfaa27252d3076c6ddf028105d2159db45f786d235ee6d",
+  "public/marca/icone.png": "7d109763f95141362e530fe42fa8c52d0f424e4dba3296c4e7dcd89b4da2fb52",
+  "public/marca/icone-escuro.png": "2702a0ec1e30965f53156f9f19ab72878f65558950b6927681cb7af789d66db3",
+  "public/marca/app-192.png": "0dfd81aa49138492e1b728e0425f865ad4067e9ca3606a5a60be4de40c0678fb",
+  "public/marca/app-512.png": "06a5adec905d43c37e70aea8c88ed667c892593971d37e89202907bf5b8f9a35",
+  "public/marca/app-mascaravel-512.png": "a3e748085765b55b81361a9daab1657d501c92eb25aaa627b1e1e0d743460dbe",
+  "public/marca/app-monocromatico-512.png": "9deb1edc7615faa53e9dd1191174c741921bf261c10dee31bf05c19855ec797f",
+  "src/app/icon.png": "0dfd81aa49138492e1b728e0425f865ad4067e9ca3606a5a60be4de40c0678fb",
+  "src/app/apple-icon.png": "33986bdcaa6a71945f7c93e8692a14031b7cd9e1582f18d1d9d68634a75a2cc6",
+  "src/app/favicon.ico": "2ad59ae8e3f31dc7ed26fea7b68d9cc6ede38d25c784f79d01e41c27c82e4144"
+}
