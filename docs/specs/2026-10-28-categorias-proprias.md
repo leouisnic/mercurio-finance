@@ -169,6 +169,12 @@ Implementação prevista:
   categoria), Vitest (busca, ordem do histórico, alcance, criação), Playwright de leitura e
   mutável, `celular.spec.ts`, contraste das cores novas nos dois temas, capturas fictícias.
 
+## Validações obrigatórias
+
+```json
+{"versao": 2, "natureza": "produto", "mudanca": ["logica", "tela", "dado", "migracao"], "aprovacoes": [], "locais": [{"id": "suite", "prova": "suite", "comando": ["uv", "run", "python", "scripts/validar.py", "--e2e"]}, {"id": "contraste", "prova": "tela", "comando": ["uv", "run", "python", "scripts/contraste.py"]}], "declaradas": {"regressao": "test_categorias.py com a ordem de decisão, destinatário misto, correção só este e todos, importação do Mobills, tags, lote e criação de categoria; Vitest do painel, da busca, do padrão só este e da seleção de vários; e2e de leitura e mutável para classificar e marcar tag", "mutacao": "padrão do alcance trocado para todos: dois testes de Vitest do painel falharam; gasto da tag somando receita: o teste do gasto da tag falhou; desfeitas as duas mudanças, passaram", "borda": "destinatário misto com categoria da Pluggy fica para classificar; transferência própria recusada e pulada no lote; categoria repetida sem acento recusada; importação do Mobills rodada duas vezes sem mudar nada; correção do dono sobrevive à importação; movimento da véspera do sexto ciclo fora da fila", "diff": "diff lido; nenhum nome real nem valor do banco real em arquivo versionado; exemplos com Pessoa A, Ana Exemplo e viagem Exemplo", "tela": "capturas fictícias do painel, da seleção no celular, do resumo por tag, do submenu e das abas, nos dois temas e em 1280 e 390 px; conferido com o dado real no localhost pelo dono", "numero": "importação no banco local conferida contra a medição: 355 casados, 147 regras e 18 destinatários mistos; tag não muda o gasto por dia (teste)", "ida-e-volta": "migrações c4e1a7d93b20 e d7f3b2a91c45 com upgrade, downgrade e upgrade no mercurio_test antes do banco local"}, "aceitacoes": []}
+```
+
 ## Riscos
 
 - Se a categorização da Pluggy for desligada no fim do teste, a tradução deixa de existir e
