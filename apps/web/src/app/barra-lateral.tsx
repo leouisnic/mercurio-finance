@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { ContaParaClassificar, SUBPAGINAS } from "./movimentos/abas";
 import { SeletorDeTema } from "./tema";
 
 type Item = {
@@ -139,14 +140,44 @@ function ItemDoCelular({ item, ativo }: { item: Item; ativo: boolean }) {
   );
 }
 
-export function BarraLateral() {
+/** A tela do item: Movimentos continua marcado nas páginas de dentro dele. */
+function estaEm(caminho: string, href: string): boolean {
+  return href === "/" ? caminho === "/" : caminho === href || caminho.startsWith(`${href}/`);
+}
+
+/** As páginas de dentro de Movimentos, só os títulos recuados, à vista
+ *  enquanto se está em Movimentos. A principal é o próprio item. */
+function Submenu({ caminho, paraClassificar }: { caminho: string; paraClassificar: number | null }) {
+  return (
+    <div className="flex flex-col gap-0.5 pt-0.5 pb-1">
+      {SUBPAGINAS.slice(1).map((pagina) => {
+        const ativa = caminho === pagina.href;
+        return (
+          <Link
+            key={pagina.href}
+            href={pagina.href}
+            aria-current={ativa ? "page" : undefined}
+            className={`flex items-center justify-between gap-2 rounded-[9px] py-2 pr-2.5 pl-[38px] text-[13px] ${
+              ativa ? "text-marca-escura font-semibold" : "text-tinta-2 hover:bg-superficie font-medium"
+            }`}
+          >
+            {pagina.rotulo}
+            {pagina.href === "/movimentos/classificar" && <ContaParaClassificar total={paraClassificar} />}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+export function BarraLateral({ paraClassificar = null }: { paraClassificar?: number | null }) {
   const caminho = usePathname();
 
   return (
     <>
       <nav
         aria-label="Navegação principal"
-        className="bg-superficie-2 border-borda flex w-[232px] shrink-0 flex-col border-r px-4 py-6 max-md:hidden"
+        className="bg-superficie-2 border-borda sticky top-0 flex h-dvh w-[232px] shrink-0 flex-col border-r px-4 py-6 max-md:hidden"
       >
         <Link href="/" className="flex items-center gap-2.5 px-2 pt-1 pb-7">
           {/* A ilustração índigo some no fundo escuro: lá entra a versão prateada. */}
@@ -157,7 +188,12 @@ export function BarraLateral() {
 
         <div className="flex flex-col gap-0.5">
           {ITENS.map((item) => (
-            <Item key={item.href} item={item} ativo={caminho === item.href} />
+            <div key={item.href} className="flex flex-col">
+              <Item item={item} ativo={estaEm(caminho, item.href)} />
+              {item.href === "/movimentos" && estaEm(caminho, item.href) && (
+                <Submenu caminho={caminho} paraClassificar={paraClassificar} />
+              )}
+            </div>
           ))}
         </div>
 
@@ -180,7 +216,7 @@ export function BarraLateral() {
         className="bg-superficie border-borda fixed inset-x-0 bottom-0 z-20 flex h-16 border-t md:hidden"
       >
         {ITENS.map((item) => (
-          <ItemDoCelular key={item.href} item={item} ativo={caminho === item.href} />
+          <ItemDoCelular key={item.href} item={item} ativo={estaEm(caminho, item.href)} />
         ))}
       </nav>
     </>

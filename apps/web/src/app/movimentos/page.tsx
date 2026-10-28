@@ -1,18 +1,24 @@
 import {
+  buscarCategorias,
   buscarCiclos,
   buscarFluxoPorConta,
   buscarGastosDiarios,
   buscarMovimentos,
+  buscarParaClassificar,
+  buscarTags,
   type Ciclo,
 } from "../buscar-movimentos";
 import Link from "next/link";
 import { buscarResumo } from "../buscar-resumo";
 import { diaEMes } from "../formato";
+import { dataDeHoje } from "../hoje";
 import { BlocoIndisponivel, FaixaDeFalha, FalhaTotal } from "../indisponivel";
 import { CicloContraAnterior, GastoPorConta } from "./comparativo";
 import { Filtros } from "./filtros";
 import { GraficoGastoDiario } from "./grafico-gasto-diario";
 import { Lista } from "./lista";
+import { redirect } from "next/navigation";
+import { AbasDeMovimentos } from "./abas";
 
 const CICLOS = ["anterior", "atual", "seguinte"] as const;
 type ChaveDeCiclo = (typeof CICLOS)[number];
@@ -38,6 +44,13 @@ async function somaDoCiclo(ciclo: Ciclo, contaId: string | undefined): Promise<n
 
 export default async function Movimentos(props: PageProps<"/movimentos">) {
   const parametros = await props.searchParams;
+  // Os endereços antigos da fila e da tag continuam funcionando.
+  if (umParametro(parametros.classificar)) {
+    redirect("/movimentos/classificar");
+  }
+  if (umParametro(parametros.tag)) {
+    redirect(`/movimentos/tags?tag=${umParametro(parametros.tag)}`);
+  }
   const escolhido = chaveValida(umParametro(parametros.ciclo));
   const contaEscolhida = umParametro(parametros.conta);
   const referencia = umParametro(parametros.referencia);
@@ -52,6 +65,7 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
         <header className="flex flex-col gap-[3px]">
           <h1 className="text-[23px] font-bold tracking-[-0.2px]">Movimentos</h1>
         </header>
+        <AbasDeMovimentos paraClassificar={null} />
         <FalhaTotal />
       </>
     );
@@ -64,11 +78,14 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
   const anteriorAoEscolhido =
     escolhido === "atual" ? ciclos.anterior : escolhido === "seguinte" ? ciclos.atual : null;
 
-  const [gastos, fluxos, movimentos, somaAnterior] = await Promise.all([
+  const [gastos, fluxos, movimentos, somaAnterior, categorias, paraClassificar, tags] = await Promise.all([
     buscarGastosDiarios(ciclo.inicio, ciclo.fim, contaEscolhida),
     buscarFluxoPorConta(ciclo.inicio, ciclo.fim),
     buscarMovimentos(ciclo.inicio, ciclo.fim, contaEscolhida, limite, (pagina - 1) * limite),
     anteriorAoEscolhido ? somaDoCiclo(anteriorAoEscolhido, contaEscolhida) : Promise.resolve(null),
+    buscarCategorias(),
+    buscarParaClassificar(dataDeHoje()),
+    buscarTags(),
   ]);
 
   const somaAtual = gastos?.reduce((soma, gasto) => soma + gasto.total, 0) ?? null;
@@ -84,6 +101,7 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
     fluxos === null && "gasto por conta",
     movimentos === null && "lista de movimentos",
     resumo === null && "nomes das contas",
+    categorias === null && "categorias",
   ].filter((parte): parte is string => typeof parte === "string");
 
   const tituloDoGrafico = `Gasto por dia no Ciclo ${ciclo.numero}, de ${diaEMes(ciclo.inicio)} a ${diaEMes(ciclo.fim)}`;
@@ -103,6 +121,8 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
           {diaEMes(ciclo.fim)}.
         </span>
       </header>
+
+      <AbasDeMovimentos paraClassificar={paraClassificar} />
 
       <FaixaDeFalha partes={falhas} />
 
@@ -151,7 +171,14 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
       {movimentos === null ? (
         <BlocoIndisponivel titulo="Movimentos" rotulo="Movimentos" />
       ) : (
-        <Lista movimentos={movimentos} contas={contas} />
+        <>
+          <Lista
+            movimentos={movimentos}
+            contas={contas}
+            categorias={categorias}
+            tagsExistentes={(tags ?? []).map((tag) => tag.nome)}
+          />
+        </>
       )}
 
       <nav aria-label="Paginação dos movimentos" className="flex justify-end gap-2">

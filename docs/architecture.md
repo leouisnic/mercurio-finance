@@ -39,7 +39,15 @@ são:
   dono escolheu, que a sincronização não sobrescreve;
 - `movimentos`: histórico e dados de conciliação;
 - `recorrencias`: padrões sugeridos e decisão humana;
-- `compromissos`: obrigações futuras cadastradas manualmente.
+- `compromissos`: obrigações futuras cadastradas manualmente;
+- `categorias`: as categorias do Mercúrio, criadas pela migração;
+- `regras_de_categoria`: a categoria de cada destinatário, ou a marca de que
+  ele é misto;
+- `tags` e `movimento_tags`: os grupos que o dono marca nos movimentos.
+
+A categoria do Mobills entra no banco local pelo comando
+`python -m finance_api.mobills <arquivo>`, que lê a exportação de onde ela
+está e não grava arquivo.
 
 Postgres e Redis ficam acessíveis somente em `127.0.0.1`. O banco de teste é
 separado e protegido contra configuração acidental para desenvolvimento.
@@ -50,7 +58,8 @@ separado e protegido contra configuração acidental para desenvolvimento.
 ciclo e página ficam na URL. A interface não replica regras de ciclo ou
 agregação financeira.
 
-As telas são Visão geral, Movimentos e Recorrências. As mutações usam server
+As telas são Visão geral, Movimentos (com as páginas Ciclo, Para classificar e Tags) e
+Recorrências. As mutações usam server
 action, sem cliente HTTP no navegador: a página recarrega com
 `revalidatePath` depois da chamada.
 
@@ -58,6 +67,8 @@ Os principais grupos de endpoints são:
 
 - resumo das contas, e o apelido editável de cada uma;
 - movimentos, gastos diários e fluxo por conta;
+- categorias, correção da categoria de um movimento e fila para classificar;
+- tags, resumo por tag e marcação de vários movimentos de uma vez;
 - ciclos de pagamento;
 - recorrências e compromissos;
 - sincronização assíncrona por Redis e RQ.

@@ -69,3 +69,42 @@ test("renomear a conta vale depois de recarregar e volta ao nome do banco", asyn
   await expect(contas.getByText("Conta A (fictícia)")).toBeVisible();
   await expect(contas.getByText("Conta principal")).toHaveCount(0);
 });
+
+test("classificar para todos grava a categoria na API e tira da fila", async ({ page, request }) => {
+  await page.goto("/movimentos/classificar");
+  const fila = page.getByRole("region", { name: "Movimentos" });
+
+  await fila.getByRole("button", { name: /Categoria de Pagamento cliente Alfa/ }).click();
+  const escolha = page.getByRole("dialog", { name: "Categoria de Pagamento cliente Alfa" });
+  await escolha.getByText("Salário e extras").click();
+  await escolha.getByRole("button", { name: "Salvar" }).click();
+
+  await expect(fila.getByText("Pagamento cliente Alfa")).toHaveCount(0);
+  await expect(fila.getByText("Pagamento cliente Beta")).toBeVisible();
+  const movimentos = await (await request.get(`${API}/movimentos`)).json();
+  const alfa = movimentos.find((movimento: { descricao: string }) => movimento.descricao === "Pagamento cliente Alfa");
+  expect(alfa).toMatchObject({ categoria_propria: "salario-e-extras", origem_da_categoria: "dono" });
+  expect(await (await request.get(`${API}/movimentos/para-classificar?hoje=2026-08-10`)).json()).toEqual({ total: 1 });
+});
+
+test("marcar dois com uma tag grava na API e o filtro mostra o total", async ({ page, request }) => {
+  await page.goto("/movimentos?ciclo=atual&referencia=2026-08-10");
+  const lista = page.getByRole("region", { name: "Movimentos" });
+
+  await lista.getByRole("checkbox", { name: "Selecionar Mercado" }).check();
+  await lista.getByRole("checkbox", { name: "Selecionar Ferramenta de trabalho" }).check();
+  const acoes = page.getByRole("region", { name: "Ações nos selecionados" });
+  await acoes.getByRole("button", { name: "Marcar com tag" }).click();
+  await acoes.getByLabel("Nome da tag").fill("viagem Exemplo");
+  await acoes.getByRole("button", { name: "Aplicar" }).click();
+  await expect(acoes).toHaveCount(0);
+
+  const [tag] = await (await request.get(`${API}/tags`)).json();
+  expect(tag).toMatchObject({ nome: "viagem Exemplo", gasto: "480.50", quantidade: 2 });
+
+  await page.goto("/movimentos/tags");
+  await page.getByRole("navigation", { name: "Tag" }).getByRole("link", { name: /viagem Exemplo/ }).click();
+  const resumo = page.getByRole("region", { name: "Tag viagem Exemplo" });
+  await expect(resumo.getByText("R$ 480,50")).toBeVisible();
+  await expect(resumo.getByText("Supermercado")).toBeVisible();
+});

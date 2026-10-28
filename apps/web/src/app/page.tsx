@@ -1,9 +1,10 @@
 import { BotaoSincronizar } from "./botao-sincronizar";
 import { buscarDinheiroLivre } from "./buscar-dinheiro-livre";
-import { buscarFluxoPorConta } from "./buscar-movimentos";
+import { buscarFluxoPorConta, buscarParaClassificar } from "./buscar-movimentos";
 import { buscarResumo } from "./buscar-resumo";
 import { comoData, tempoDesde } from "./formato";
 import { dataDeHoje } from "./hoje";
+import Link from "next/link";
 import { BlocoIndisponivel, FaixaDeFalha, FalhaTotal } from "./indisponivel";
 import { ComposicaoDoSaldo } from "./inicio/composicao-do-saldo";
 import { GraficoDoCiclo } from "./inicio/grafico-do-ciclo";
@@ -26,13 +27,18 @@ export default async function Inicio() {
   const agora = new Date();
   const hoje = dataDeHoje();
   const pagadores = lerPagadores();
-  const [resumo, dinheiro] = await Promise.all([buscarResumo(), buscarDinheiroLivre(hoje)]);
+  const [resumo, dinheiro, paraClassificar] = await Promise.all([
+    buscarResumo(),
+    buscarDinheiroLivre(hoje),
+    buscarParaClassificar(hoje),
+  ]);
   const fluxos = dinheiro ? await buscarFluxoPorConta(dinheiro.ciclo.inicio, dinheiro.ciclo.fim) : null;
 
   const falhas = [
     dinheiro === null && "dinheiro livre e gasto por dia",
     resumo === null && "contas conectadas",
     dinheiro !== null && resumo !== null && fluxos === null && "entradas e saídas do ciclo",
+    dinheiro !== null && paraClassificar === null && "movimentos para classificar",
   ].filter((parte): parte is string => typeof parte === "string");
 
   return (
@@ -56,6 +62,18 @@ export default async function Inicio() {
       ) : (
         <>
           <FaixaDeFalha partes={falhas} />
+
+          {(paraClassificar ?? 0) > 0 && (
+            <div className="bg-aviso-fundo border-aviso-borda text-aviso flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-[13.5px] font-semibold">
+              <span>
+                {paraClassificar === 1 ? "1 movimento" : `${paraClassificar} movimentos`} para
+                classificar
+              </span>
+              <Link href="/movimentos/classificar" className="underline">
+                Classificar
+              </Link>
+            </div>
+          )}
 
           {dinheiro ? (
             <>

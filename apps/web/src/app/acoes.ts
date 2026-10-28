@@ -98,3 +98,93 @@ export async function renomearConta(dados: FormData): Promise<ResultadoDaAcao> {
   revalidatePath("/movimentos");
   return { erro: null };
 }
+
+/**
+ * Grava a categoria escolhida para um movimento. Com `alcance=todos`, a
+ * escolha vira regra do destinatário e alcança os antigos dele que o
+ * Mercúrio classificou sozinho.
+ */
+export async function classificarMovimento(dados: FormData): Promise<ResultadoDaAcao> {
+  const id = String(dados.get("movimento_id"));
+  const categoria = String(dados.get("categoria") ?? "");
+  if (!categoria) {
+    return { erro: "Escolha uma categoria." };
+  }
+
+  const motivo = await enviar(`/movimentos/${encodeURIComponent(id)}/categoria`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ categoria, todos_do_destinatario: dados.get("alcance") === "todos" }),
+  });
+  if (motivo) {
+    return { erro: `Não foi possível salvar a categoria: ${motivo}.` };
+  }
+  revalidatePath("/movimentos");
+  revalidatePath("/");
+  return { erro: null };
+}
+
+const JSON_HEADERS = { "Content-Type": "application/json" };
+
+function recarregarMovimentos() {
+  revalidatePath("/movimentos");
+  revalidatePath("/");
+}
+
+/** Troca as tags de um movimento. As que não existem são criadas. */
+export async function definirTags(movimentoId: number, tags: string[]): Promise<ResultadoDaAcao> {
+  const motivo = await enviar(`/movimentos/${movimentoId}/tags`, {
+    method: "PUT",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ tags }),
+  });
+  if (motivo) {
+    return { erro: `Não foi possível salvar as tags: ${motivo}.` };
+  }
+  recarregarMovimentos();
+  return { erro: null };
+}
+
+/** A mesma categoria (só para estes, sem virar regra) ou a mesma tag para vários. */
+export async function marcarVarios(
+  ids: number[],
+  marca: { categoria?: string; tag?: string },
+): Promise<ResultadoDaAcao> {
+  const motivo = await enviar("/movimentos/lote", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ ids, ...marca }),
+  });
+  if (motivo) {
+    return { erro: `Não foi possível marcar os selecionados: ${motivo}.` };
+  }
+  recarregarMovimentos();
+  return { erro: null };
+}
+
+/** Cria uma categoria do dono. Devolve o id para a tela já escolhê-la. */
+export async function criarCategoria(dados: {
+  nome: string;
+  icone: string;
+  cor: number;
+}): Promise<ResultadoDaAcao & { id: string | null }> {
+  try {
+    const resposta = await fetch(`${FINANCE_API_URL}/categorias`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify(dados),
+      cache: "no-store",
+    });
+    if (resposta.status === 422) {
+      return { erro: "Já existe uma categoria com esse nome.", id: null };
+    }
+    if (!resposta.ok) {
+      return { erro: `Não foi possível criar a categoria: a API respondeu com erro ${resposta.status}.`, id: null };
+    }
+    const criada = (await resposta.json()) as { id: string };
+    recarregarMovimentos();
+    return { erro: null, id: criada.id };
+  } catch {
+    return { erro: "Não foi possível criar a categoria: a API não respondeu.", id: null };
+  }
+}

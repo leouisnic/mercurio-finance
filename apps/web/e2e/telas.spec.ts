@@ -66,6 +66,43 @@ test("escolher outro ciclo troca o recorte pela URL", async ({ page }) => {
   await expect(page.locator("header").getByText(`de ${inicio} a ${fim}`, { exact: false })).toBeVisible();
 });
 
+test("o que falta classificar aparece no Início e abre a fila", async ({ page }) => {
+  await page.goto("/");
+
+  // Na base fictícia, os dois Pix recebidos não têm tradução da Pluggy.
+  await page.getByRole("link", { name: "Classificar" }).click();
+
+  await expect(page.getByRole("heading", { level: 1, name: "Para classificar" })).toBeVisible();
+  const fila = page.getByRole("region", { name: "Movimentos" });
+  await expect(fila.getByText("Pagamento cliente Alfa")).toBeVisible();
+  await expect(fila.getByText("Pagamento cliente Beta")).toBeVisible();
+  await expect(fila.getByText("Mercado")).toHaveCount(0);
+});
+
+test("a categoria na lista abre a escolha e fecha com Esc", async ({ page }) => {
+  // Movimentos usa a data real; a referência leva ao ciclo da base fictícia.
+  await page.goto("/movimentos?ciclo=atual&referencia=2026-08-10");
+
+  const lista = page.getByRole("region", { name: "Movimentos" });
+  await expect(lista.getByRole("button", { name: /Categoria de Mercado: Supermercado/ })).toBeVisible();
+  await lista.getByRole("button", { name: /Categoria de Pagamento cliente Alfa: Para classificar/ }).click();
+
+  const escolha = page.getByRole("dialog", { name: "Categoria de Pagamento cliente Alfa" });
+  await expect(escolha.getByRole("radio", { name: "Salário e extras" })).toBeAttached();
+  await page.keyboard.press("Escape");
+  await expect(escolha).toHaveCount(0);
+});
+
+test("dentro de Movimentos a barra lateral mostra as três páginas", async ({ page }) => {
+  await page.goto("/movimentos/tags");
+
+  const navegacao = page.getByRole("navigation", { name: "Navegação principal" }).first();
+  await expect(navegacao.getByRole("link", { name: "Tags" })).toHaveAttribute("aria-current", "page");
+  await navegacao.getByRole("link", { name: /Para classificar/ }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Para classificar" })).toBeVisible();
+  await expect(navegacao.getByRole("link", { name: "Ciclo" })).toHaveCount(0);
+});
+
 test("a navegação leva de uma tela para a outra", async ({ page }) => {
   await page.goto("/");
 

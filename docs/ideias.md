@@ -29,7 +29,7 @@ Formato: `Estado:` aceita `adiada` ou `virou leva`. `Gatilho:` é data, evento o
 
 ## Categorias próprias
 
-Estado: adiada
+Estado: virou leva (`docs/specs/2026-10-28-categorias-proprias.md`)
 
 Adiada em: 2026-10-27
 
@@ -37,15 +37,25 @@ Gatilho: a identidade visual publicada.
 
 Por quê: A Pluggy classifica com modelo próprio, não com a categoria do app do banco, e marca como transferência quase tudo que foi pago por Pix, inclusive alimentação, viagem e saúde. Medido no banco local, só leitura: a maior parte das linhas classificadas pelo dono no Mobills casa com movimentos já trazidos pela Pluggy, e os extratos do Nubank de janeiro a agosto já estão inteiros nela, então não há histórico a importar. A leva cria a categoria do Mercúrio (lista do dono, a partir das categorias que ele usa no Mobills), copia a categoria do Mobills para os movimentos casados no Postgres local, aprende regras por descrição e destinatário do Pix, usa a categoria da Pluggy só como reserva e transforma cada correção na lista em regra. Riscos: a categorização da Pluggy é recurso pago depois do teste; dado do Mobills nunca entra no repositório. Origem: rodada de opções de 2026-10-27.
 
+## Tags e gráficos
+
+Estado: adiada
+
+Adiada em: 2026-10-28
+
+Gatilho: a leva de categorias próprias publicada.
+
+Por quê: A tela de Tags ficou só com a lista e o total. O dono quer: orçamento por tag (criar a tag antes, com teto, e acompanhar gasto contra o teto e o ritmo); evolução do gasto da tag no tempo; criar, renomear, apagar (os movimentos ficam, só perdem a tag) e arquivar tag; maiores gastos e divisão por categoria num card de análise; e o impacto da tag no orçamento, calculado sem IA: quanto ela tirou de cada ciclo em que caiu, quanto esses ciclos passaram do gasto típico e em quantos ciclos o rombo se recupera no ritmo de sobra. Junto, o padrão de detalhe dos gráficos na identidade do Mercúrio (no lugar da dica do navegador), valor curto com R$ em cima de cada barra com gasto, e as cores do gasto por dia: dia sem gasto em dourado, dentro da cota em índigo, acima da cota em vermelho. Tudo por mockup antes do código.
+
 ## Movimentos redesenhada
 
 Estado: adiada
 
 Adiada em: 2026-10-27
 
-Gatilho: as categorias próprias publicadas.
+Gatilho: a leva Tags e gráficos publicada.
 
-Por quê: Escolhido na rodada de opções: para onde foi por categoria, com a média dos últimos ciclos e uma meta sugerida pela média e editável (absorve a ideia de limite por categoria); ritmo do ciclo contra o anterior num cartão compacto; entradas e saídas por ciclo refeitas como entrou, gastou, guardou e sobrou, com o investido fora do gasto (absorve o resumo do ciclo fechado); e o fluxo do que entrou até cada destino, com o guardado à vista. Recusado: maiores destinos. Referências: Monarch (fluxo de caixa e categorias) e caderno de educação financeira do Banco Central.
+Por quê: Escolhido na rodada de opções: para onde foi por categoria, com a média dos últimos ciclos e uma meta sugerida pela média e editável (absorve a ideia de limite por categoria); ritmo do ciclo contra o anterior num cartão compacto; entradas e saídas por ciclo refeitas como entrou, gastou, guardou e sobrou, com o investido fora do gasto (absorve o resumo do ciclo fechado); e o fluxo do que entrou até cada destino, com o guardado à vista. Recusado: maiores destinos. Depois das categorias, o dono pediu também: filtros de ciclo e conta e os cards mais bem organizados. O padrão de detalhe dos gráficos foi para a leva Tags e gráficos. Referências: Monarch (fluxo de caixa e categorias) e caderno de educação financeira do Banco Central.
 
 ## Planejamento
 
@@ -55,7 +65,7 @@ Adiada em: 2026-10-27
 
 Gatilho: a Movimentos redesenhada publicada.
 
-Por quê: Escolhido na rodada de opções: matriz do ano no formato da planilha do dono (linha por conta, agrupada pelo ciclo de quem paga, mês a mês com pago, pendente, atrasado e previsto); comprometido nos próximos meses contra o que costuma entrar, mais direto; despesa que não é todo mês detectada no histórico e editável, que vira linha da matriz, entra no comprometido e reserva por ciclo no dinheiro livre; e cadastro fácil em todas as telas (botão Adicionar, edição na célula da matriz, Repetir na lista de movimentos). Absorve a caixinha com meta, as contas fixas do mês e as parcelas do cartão (`creditCardMetadata.installmentNumber` e `totalInstallments`, hoje ignorados pelo worker). Recusado: calendário do mês, porque o dono paga quase tudo nos dias 5 e 15. Leva também o reconhecimento de recorrência por valor e destinatário quando a descrição muda, o histórico de pagamento mês a mês e a conciliação de compromisso com o extrato. Referências: YNAB (despesa futura guardada por mês) e CFPB (conta ligada ao pagamento que a cobre).
+Por quê: Escolhido na rodada de opções: matriz do ano no formato da planilha do dono (linha por conta, agrupada pelo ciclo de quem paga, mês a mês com pago, pendente, atrasado e previsto); comprometido nos próximos meses contra o que costuma entrar, mais direto; despesa que não é todo mês detectada no histórico e editável, que vira linha da matriz, entra no comprometido e reserva por ciclo no dinheiro livre; e cadastro fácil em todas as telas (botão Adicionar, edição na célula da matriz, Repetir na lista de movimentos: num Pix que vai se repetir, como a parcela de uma hospedagem, "Repetir todo mês" cria um compromisso com o número de parcelas, e a API de compromissos já existe). Absorve a caixinha com meta, as contas fixas do mês e as parcelas do cartão (`creditCardMetadata.installmentNumber` e `totalInstallments`, hoje ignorados pelo worker). Recusado: calendário do mês, porque o dono paga quase tudo nos dias 5 e 15. Leva também o reconhecimento de recorrência por valor e destinatário quando a descrição muda, o histórico de pagamento mês a mês e a conciliação de compromisso com o extrato. Referências: YNAB (despesa futura guardada por mês) e CFPB (conta ligada ao pagamento que a cobre).
 
 ## Investimentos
 
@@ -87,6 +97,16 @@ Gatilho: a projeção do ciclo publicada.
 
 Por quê: Tela Início: uma faixa curta com o que pede ação agora, como hoje negativo, conta fixa atrasada e fatura acima de 80% do limite. Os mesmos alertas alimentam o aviso no Telegram.
 
+## Dinheiro livre quando estoura
+
+Estado: adiada
+
+Adiada em: 2026-10-28
+
+Gatilho: a leva de categorias próprias publicada.
+
+Por quê: A cota do dia é o livre do começo do ciclo dividido pelos dias dele, fixa no ciclo. Quando o livre fica negativo, o Início continua mostrando a cota, o que engana. Decidido: com o livre negativo, "Hoje dá para gastar" mostra R$ 0 e quanto falta para fechar o ciclo; cota e cofrinho somem até o livre voltar a positivo. Muda número na tela, então tem spec própria.
+
 ## Página Ajustes
 
 Estado: adiada
@@ -95,7 +115,7 @@ Adiada em: 2026-10-27
 
 Gatilho: as metas por categoria da Movimentos em construção, que precisam de um lugar para configurar.
 
-Por quê: Reúne o que é cadastro: recorrências (saem do menu principal), compromissos, nomes das contas e dos pagadores, limites por categoria e notificações. Fecha a navegação de quatro páginas (Início, Movimentos, Planejamento, Ajustes) decidida na spec do Início.
+Por quê: Reúne o que é cadastro: recorrências (saem do menu principal), compromissos, nomes das contas e dos pagadores, limites por categoria e notificações. Depois das categorias próprias, também editar e apagar categoria (apagar pergunta para onde vão os movimentos) e ver e desfazer as regras por destinatário. Fecha a navegação de quatro páginas (Início, Movimentos, Planejamento, Ajustes) decidida na spec do Início.
 
 ## Aviso no Telegram
 

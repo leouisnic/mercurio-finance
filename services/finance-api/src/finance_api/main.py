@@ -27,12 +27,17 @@ from rq.exceptions import NoSuchJobError
 from rq.job import Job
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from finance_api.categorias import chave_do_destinatario
 from finance_api.ciclo import Ciclo, ciclo_anterior, ciclo_de, ciclo_seguinte
 from finance_api.compromissos import resumo_parcelas
 from finance_api.db import obter_sessao
 from finance_api.dinheiro_livre import calcular as calcular_dinheiro_livre
 from finance_api.dinheiro_livre import contas_fixas_pendentes
 from finance_api.domain import (
+    CategoriaIn,
+    CategoriaJaUsada,
+    CategoriaOut,
+    CategoriaUpdate,
     CicloOut,
     CiclosOut,
     CompromissoIn,
@@ -46,35 +51,59 @@ from finance_api.domain import (
     FluxoDaConta,
     GastoDiario,
     GastoDoDiaOut,
+    GastoPorCategoria,
+    LoteIn,
+    LoteOut,
     MovimentoOut,
     PagamentoFaturaUpdate,
+    ParaClassificarOut,
     RecorrenciaOut,
     RecorrenciaUpdate,
+    ResumoDaTagOut,
     ResumoFinanceiro,
     StatusCompromisso,
     StatusRecorrencia,
+    TagOut,
+    TagsUpdate,
 )
 from finance_api.fila import conexao_redis, fila
 from finance_api.jobs import job_reimportar_seed, job_sincronizar_pluggy
 from finance_api.models import CompromissoORM, ContaORM, MovimentoORM, RecorrenciaORM
 from finance_api.repositorio import (
+    CategoriaInvalida,
     PagamentoFaturaInvalido,
     agregar_despesas_por_dia,
     agregar_fluxo_por_conta,
     atualizar_compromisso,
     atualizar_conta,
     atualizar_recorrencia,
+    contar_para_classificar,
+    corrigir_categoria,
+    criar_categoria,
     criar_compromisso,
     definir_pagamento_de_fatura,
+    definir_tags,
     entradas_do_dinheiro_livre,
+    gasto_da_tag_por_categoria,
+    historico_dos_destinatarios,
+    listar_categorias,
     listar_compromissos,
     listar_contas,
     listar_movimentos,
     listar_pagamentos_de_fatura,
     listar_recorrencias,
+    listar_tags,
+    marcar_em_lote,
     obter_compromisso,
+    tags_dos_movimentos,
     ultima_sincronizacao,
 )
+
+# A fila para classificar cobre seis ciclos, uns três meses: a média por
+# categoria usa os ciclos recentes, e movimento mais antigo sem categoria só
+# faria o aviso crescer sem mudar número nenhum.
+CICLOS_NA_FILA = 6
+
 
 app = FastAPI(
     title="Mercúrio · finance-api",
@@ -99,7 +128,18 @@ def _recorrencia_out(recorrencia: RecorrenciaORM) -> RecorrenciaOut:
     )
 
 
-def _movimento_out(movimento: MovimentoORM) -> MovimentoOut:
+def _inicio_da_fila(hoje: date) -> date:
+    ciclo = ciclo_de(hoje)
+    for _ in range(CICLOS_NA_FILA - 1):
+        ciclo = ciclo_anterior(ciclo)
+    return ciclo.inicio
+
+
+def _movimento_out(
+    movimento: MovimentoORM,
+    historico: list[tuple[str, int]] | None = None,
+    tags: list[str] | None = None,
+) -> MovimentoOut:
     return MovimentoOut(
         id=movimento.id,
         conta_id=movimento.conta_id,
@@ -111,6 +151,10 @@ def _movimento_out(movimento: MovimentoORM) -> MovimentoOut:
         categoria=movimento.categoria,
         duplicado_possivel=movimento.duplicado_possivel,
         pagamento_de_fatura=movimento.pagamento_de_fatura,
+        categoria_propria=movimento.categoria_propria,
+        origem_da_categoria=movimento.origem_da_categoria,
+        historico=[CategoriaJaUsada(categoria=categoria, vezes=vezes) for categoria, vezes in historico or []],
+        tags=tags or [],
     )
 
 
@@ -210,22 +254,160 @@ async def movimentos(
     conta_id: str | None = None,
     data_inicio: date | None = None,
     data_fim: date | None = None,
+    para_classificar: bool = False,
+    tag_id: int | None = None,
+    hoje: date | None = None,
     limite: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
 ) -> list[MovimentoOut]:
     """Lista movimentos já importados, mais recente primeiro. Filtros
-    opcionais por conta e por intervalo de data (inclusive nas duas
-    pontas); paginação por `limite`/`offset` (padrão: 100 por página)."""
+    opcionais por conta, por intervalo de data (inclusive nas duas
+    pontas) e pelos que esperam categoria; paginação por `limite`/`offset`
+    (padrão: 100 por página).
+
+    A fila `para_classificar` começa, sem `data_inicio`, `CICLOS_NA_FILA`
+    ciclos antes de `hoje`. Cada movimento dela traz as categorias que o dono
+    já deu ao mesmo destinatário, para a tela sugerir primeiro a provável."""
+    if para_classificar and data_inicio is None:
+        data_inicio = _inicio_da_fila(hoje or date.today())  # noqa: DTZ011 (ciclo é data civil, sem fuso)
     encontrados = await listar_movimentos(
         sessao,
         conta_id=conta_id,
         data_inicio=data_inicio,
         data_fim=data_fim,
+        para_classificar=para_classificar,
+        tag_id=tag_id,
         limite=limite,
         offset=offset,
     )
-    return [_movimento_out(movimento) for movimento in encontrados]
+    tags = await tags_dos_movimentos(sessao, [movimento.id for movimento in encontrados])
+    historico = (
+        await historico_dos_destinatarios(
+            sessao, {chave_do_destinatario(movimento.descricao) for movimento in encontrados}
+        )
+        if para_classificar
+        else {}
+    )
+    return [
+        _movimento_out(
+            movimento,
+            historico.get(chave_do_destinatario(movimento.descricao)),
+            tags.get(movimento.id),
+        )
+        for movimento in encontrados
+    ]
+
+
+@app.get("/movimentos/para-classificar", response_model=ParaClassificarOut)
+async def para_classificar(
+    hoje: date | None = None,
+    sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
+) -> ParaClassificarOut:
+    """Quantas receitas e despesas dos ciclos recentes esperam a categoria
+    do dono. `hoje` existe para a demonstração e os testes fixarem a data."""
+    desde = _inicio_da_fila(hoje or date.today())  # noqa: DTZ011 (ciclo é data civil, sem fuso)
+    return ParaClassificarOut(total=await contar_para_classificar(sessao, desde=desde))
+
+
+@app.patch("/movimentos/{movimento_id}/categoria", response_model=MovimentoOut)
+async def classificar_movimento(
+    movimento_id: int,
+    escolha: CategoriaUpdate,
+    sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
+) -> MovimentoOut:
+    """Grava a categoria escolhida pelo dono. A escolha vence regra e
+    Pluggy e nunca é recalculada."""
+    try:
+        movimento = await corrigir_categoria(
+            sessao, movimento_id, escolha.categoria, todos_do_destinatario=escolha.todos_do_destinatario
+        )
+    except CategoriaInvalida as erro:
+        raise HTTPException(status_code=422, detail=str(erro)) from erro
+    if movimento is None:
+        raise HTTPException(status_code=404, detail="movimento não encontrado")
+    tags = await tags_dos_movimentos(sessao, [movimento.id])
+    return _movimento_out(movimento, tags=tags.get(movimento.id))
+
+
+@app.put("/movimentos/{movimento_id}/tags", response_model=MovimentoOut)
+async def marcar_tags(
+    movimento_id: int,
+    alteracao: TagsUpdate,
+    sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
+) -> MovimentoOut:
+    """Troca as tags do movimento pelas da lista, criando as que não existem.
+    Lista vazia tira todas."""
+    movimento = await definir_tags(sessao, movimento_id, alteracao.tags)
+    if movimento is None:
+        raise HTTPException(status_code=404, detail="movimento não encontrado")
+    tags = await tags_dos_movimentos(sessao, [movimento.id])
+    return _movimento_out(movimento, tags=tags.get(movimento.id))
+
+
+@app.post("/movimentos/lote", response_model=LoteOut)
+async def marcar_varios(
+    lote: LoteIn,
+    sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
+) -> LoteOut:
+    """A mesma categoria ou a mesma tag para vários movimentos. A categoria vale
+    só para eles, sem virar regra; a tag se soma às que já tinham."""
+    try:
+        alterados = await marcar_em_lote(sessao, lote.ids, categoria=lote.categoria, tag=lote.tag)
+    except CategoriaInvalida as erro:
+        raise HTTPException(status_code=422, detail=str(erro)) from erro
+    return LoteOut(alterados=alterados)
+
+
+def _tag_out(linha: tuple) -> TagOut:
+    id_, nome, gasto, quantidade, primeira, ultima = linha
+    return TagOut(
+        id=id_, nome=nome, gasto=gasto, quantidade=quantidade, primeira_data=primeira, ultima_data=ultima
+    )
+
+
+@app.get("/tags", response_model=list[TagOut])
+async def tags(
+    sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
+) -> list[TagOut]:
+    """As tags com quanto se gastou em cada uma. A tag só agrupa: não muda
+    nenhum outro número."""
+    return [_tag_out(linha) for linha in await listar_tags(sessao)]
+
+
+@app.get("/tags/{tag_id}", response_model=ResumoDaTagOut)
+async def resumo_da_tag(
+    tag_id: int,
+    sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
+) -> ResumoDaTagOut:
+    linha = next((linha for linha in await listar_tags(sessao) if linha[0] == tag_id), None)
+    if linha is None:
+        raise HTTPException(status_code=404, detail="tag não encontrada")
+    por_categoria = await gasto_da_tag_por_categoria(sessao, tag_id)
+    return ResumoDaTagOut(
+        **_tag_out(linha).model_dump(),
+        por_categoria=[GastoPorCategoria(categoria=c, total=t) for c, t in por_categoria],
+    )
+
+
+@app.post("/categorias", response_model=CategoriaOut, status_code=201)
+async def nova_categoria(
+    categoria: CategoriaIn,
+    sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
+) -> CategoriaOut:
+    """Categoria criada pelo dono, no fim da lista."""
+    try:
+        criada = await criar_categoria(sessao, categoria.nome, categoria.icone, categoria.cor)
+    except CategoriaInvalida as erro:
+        raise HTTPException(status_code=422, detail=str(erro)) from erro
+    return CategoriaOut(id=criada.id, nome=criada.nome, icone=criada.icone, cor=criada.cor)
+
+
+@app.get("/categorias", response_model=list[CategoriaOut])
+async def categorias(
+    sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
+) -> list[CategoriaOut]:
+    return [CategoriaOut(id=categoria.id, nome=categoria.nome, icone=categoria.icone, cor=categoria.cor) for categoria in await listar_categorias(sessao)]
 
 
 @app.get("/movimentos/pagamentos-de-fatura", response_model=list[MovimentoOut])

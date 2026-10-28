@@ -14,11 +14,13 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -85,7 +87,65 @@ class MovimentoORM(Base):
     # fingerprint e representa o que a origem informou, imutável; isto é
     # interpretação, e por isso pode ser desfeita.
     pagamento_de_fatura: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    # Categoria do Mercúrio, ao lado da que a Pluggy mandou, que fica como veio.
+    # Nula em receita ou despesa é "para classificar". A origem diz quem
+    # decidiu, ver `finance_api.categorias.OrigemDaCategoria`.
+    categoria_propria: Mapped[str | None] = mapped_column(
+        ForeignKey("categorias.id"), nullable=True, index=True
+    )
+    origem_da_categoria: Mapped[str | None] = mapped_column(String(20), nullable=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CategoriaORM(Base):
+    __tablename__ = "categorias"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    nome: Mapped[str] = mapped_column(String(60))
+    ordem: Mapped[int] = mapped_column(Integer)
+    # Nome do ícone no `lucide-react` e o tom da cor, de 0 a 359. O claro e o
+    # escuro de cada tema saem de tokens do painel, medidos por
+    # `scripts/contraste.py`, e não daqui.
+    icone: Mapped[str] = mapped_column(String(40))
+    cor: Mapped[int] = mapped_column(Integer)
+
+
+class TagORM(Base):
+    """Agrupa movimentos, como uma viagem ou uma reforma. Não muda número
+    nenhum: só permite somar o que foi marcado com ela."""
+
+    __tablename__ = "tags"
+    __table_args__ = (Index("uq_tags_nome", func.lower(text("nome")), unique=True),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nome: Mapped[str] = mapped_column(String(60))
+
+
+class MovimentoTagORM(Base):
+    __tablename__ = "movimento_tags"
+
+    movimento_id: Mapped[int] = mapped_column(
+        ForeignKey("movimentos.id", ondelete="CASCADE"), primary_key=True
+    )
+    tag_id: Mapped[int] = mapped_column(ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True, index=True)
+
+
+class RegraDeCategoriaORM(Base):
+    """A categoria de tudo que vai para um destinatário, pela chave de
+    `finance_api.categorias.chave_do_destinatario`. Categoria nula é
+    destinatário misto: cada movimento novo dele fica para classificar."""
+
+    __tablename__ = "regras_de_categoria"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    chave: Mapped[str] = mapped_column(String(500), unique=True)
+    categoria_id: Mapped[str | None] = mapped_column(ForeignKey("categorias.id"), nullable=True)
+    # `mobills` (aprendida na importação) ou `dono` (correção na tela). A do
+    # dono nunca é trocada por uma importação.
+    origem: Mapped[str] = mapped_column(String(20))
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class RecorrenciaORM(Base):

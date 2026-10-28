@@ -1,5 +1,8 @@
-import { expect, test } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { expect, test, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+
+const { marcarVarios } = vi.hoisted(() => ({ marcarVarios: vi.fn() }));
+vi.mock("../acoes", () => ({ marcarVarios }));
 import { Lista } from "./lista";
 import type { Movimento } from "../buscar-movimentos";
 import type { Conta } from "../buscar-resumo";
@@ -32,6 +35,10 @@ function movimento(campos: Partial<Movimento>): Movimento {
     categoria: null,
     duplicadoPossivel: false,
     pagamentoDeFatura: null,
+    categoriaPropria: null,
+    origemDaCategoria: null,
+    historico: [],
+    tags: [],
     ...campos,
   };
 }
@@ -99,4 +106,52 @@ test("recorte sem movimento diz isso em vez de mostrar tabela vazia", () => {
   render(<Lista movimentos={[]} contas={CONTAS} />);
 
   expect(screen.getByText("Nenhum movimento neste recorte.")).toBeDefined();
+});
+
+test("marcar dois e aplicar uma tag manda os dois para a API e limpa a seleção", async () => {
+  marcarVarios.mockResolvedValue({ erro: null });
+  render(
+    <Lista
+      movimentos={[movimento({ id: 1, descricao: "Pousada" }), movimento({ id: 2, descricao: "Restaurante" })]}
+      contas={CONTAS}
+      tagsExistentes={["viagem Exemplo"]}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar Pousada" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar Restaurante" }));
+  expect(screen.getByText("2 selecionados")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Marcar com tag" }));
+  fireEvent.change(screen.getByLabelText("Nome da tag"), { target: { value: "viagem Exemplo" } });
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+
+  await waitFor(() => expect(marcarVarios).toHaveBeenCalledWith([1, 2], { tag: "viagem Exemplo" }));
+  await waitFor(() => expect(screen.queryByText("2 selecionados")).toBeNull());
+});
+
+test("a tag do movimento aparece na linha", () => {
+  render(<Lista movimentos={[movimento({ tags: ["viagem Exemplo"] })]} contas={CONTAS} />);
+
+  expect(screen.getByText("viagem Exemplo")).toBeTruthy();
+});
+
+test("categoria para vários usa a mesma lista com ícones e manda a escolhida", async () => {
+  marcarVarios.mockResolvedValue({ erro: null });
+  render(
+    <Lista
+      movimentos={[movimento({ id: 1, descricao: "Pousada" }), movimento({ id: 2, descricao: "Restaurante" })]}
+      contas={CONTAS}
+      categorias={[
+        { id: "viagem", nome: "Viagem", icone: "Plane", cor: 220 },
+        { id: "lazer", nome: "Lazer", icone: "PartyPopper", cor: 305 },
+      ]}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar todos" }));
+  fireEvent.click(screen.getByRole("button", { name: "Categoria" }));
+  fireEvent.click(screen.getByRole("radio", { name: "Viagem" }));
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+
+  await waitFor(() => expect(marcarVarios).toHaveBeenCalledWith([1, 2], { categoria: "viagem" }));
 });

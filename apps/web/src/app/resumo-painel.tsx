@@ -152,53 +152,63 @@ function CartaoCredito({ conta, hoje }: { conta: Conta; hoje: Date }) {
   const prazo = prazoDaFatura(conta, hoje);
   const quando = [prazo.fechamento, prazo.vencimento].filter(Boolean).join(" e ");
 
+  // O nome do banco fica em cima e os números juntos no pé: o card estica
+  // para ter a altura do vizinho, e a sobra fica no meio, não entre o valor
+  // e a barra.
   return (
     <article className={CARTAO}>
       <CabecalhoDaConta
         conta={conta}
         subtitulo={produtoDoCartao(conta)}
         direita={
-          <span className="flex shrink-0 items-center gap-2.5">
-            {conta.final && (
-              <span className="num text-tinta-2 text-sm font-semibold tracking-wide">
-                <span aria-hidden>•••• </span>
-                <span className="sr-only">final </span>
-                {conta.final}
+          <span className="flex shrink-0 flex-col items-end gap-1">
+            <span className="flex items-center gap-2.5">
+              {conta.final && (
+                <span className="num text-tinta-2 text-sm font-semibold tracking-wide">
+                  <span aria-hidden>•••• </span>
+                  <span className="sr-only">final </span>
+                  {conta.final}
+                </span>
+              )}
+              <Bandeira bandeira={conta.bandeira} />
+            </span>
+            {quando && (
+              <span className="text-tinta-3 text-[13px]">
+                {quando.charAt(0).toUpperCase()}
+                {quando.slice(1)}
               </span>
             )}
-            <Bandeira bandeira={conta.bandeira} />
           </span>
         }
       />
-      <div className="flex items-end justify-between gap-3.5">
-        <span className="flex flex-col gap-0.5">
+      <div className="mt-auto flex flex-col gap-2.5">
+        <div className="flex items-end justify-between gap-3.5">
           <span className="num text-gasto text-2xl font-bold tracking-[-0.3px]">{moeda(conta.saldo)}</span>
-          <span className="text-tinta-2 text-sm">{quando ? `fatura atual, ${quando}` : "fatura atual"}</span>
-        </span>
+          {conta.limite !== null && (
+            <span className={`${cor.trilho} ${cor.texto} shrink-0 rounded-full px-3 py-1 text-[13px] font-bold`}>
+              {Math.round(percentual)}% do limite
+            </span>
+          )}
+        </div>
         {conta.limite !== null && (
-          <span className={`${cor.trilho} ${cor.texto} shrink-0 rounded-full px-3 py-1 text-[13px] font-bold`}>
-            {Math.round(percentual)}% do limite
-          </span>
+          <div>
+            <div
+              role="meter"
+              aria-label={`Limite usado do ${conta.nome}`}
+              aria-valuenow={Math.round(percentual)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              className={`${cor.trilho} h-2.5 overflow-hidden rounded-full`}
+            >
+              <div className={`${cor.barra} h-full rounded-full`} style={{ width: `${percentual}%` }} />
+            </div>
+            <p className={ROTULO_DA_BARRA}>
+              <span className="num text-tinta-2">Limite {moeda(conta.limite)}</span>
+              {conta.disponivel !== null && <span className="num">{moeda(conta.disponivel)} disponível</span>}
+            </p>
+          </div>
         )}
       </div>
-      {conta.limite !== null && (
-        <div className="mt-auto">
-          <div
-            role="meter"
-            aria-label={`Limite usado do ${conta.nome}`}
-            aria-valuenow={Math.round(percentual)}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            className={`${cor.trilho} h-2.5 overflow-hidden rounded-full`}
-          >
-            <div className={`${cor.barra} h-full rounded-full`} style={{ width: `${percentual}%` }} />
-          </div>
-          <p className={ROTULO_DA_BARRA}>
-            <span className="num text-tinta-2">Limite {moeda(conta.limite)}</span>
-            {conta.disponivel !== null && <span className="num">{moeda(conta.disponivel)} disponível</span>}
-          </p>
-        </div>
-      )}
     </article>
   );
 }

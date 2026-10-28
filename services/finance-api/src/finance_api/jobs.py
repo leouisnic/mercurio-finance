@@ -14,6 +14,7 @@ from finance_api.config import PLUGGY_CLIENT_ID, PLUGGY_CLIENT_SECRET, PLUGGY_IT
 from finance_api.db import async_session, engine
 from finance_api.recorrencias import detectar_recorrencias
 from finance_api.repositorio import (
+    classificar_movimentos,
     inserir_movimentos,
     lancamentos_para_deteccao,
     marcar_pagamentos_de_fatura,
@@ -116,6 +117,8 @@ def job_sincronizar_pluggy() -> dict[str, int]:
             # Antes da detecção, de propósito: pagamento de fatura marcado
             # aqui sai da conta de despesa e não vira recorrência falsa.
             faturas = await marcar_pagamentos_de_fatura(sessao)
+            # Depois da fatura: pagamento de fatura não leva categoria.
+            await classificar_movimentos(sessao)
             candidatas = detectar_recorrencias(await lancamentos_para_deteccao(sessao))
             recorrencias = await salvar_recorrencias_detectadas(sessao, candidatas)
             return inseridos, faturas, recorrencias

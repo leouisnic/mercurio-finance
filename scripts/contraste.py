@@ -92,8 +92,21 @@ def ler_tokens(css: str) -> dict[str, dict[str, tuple[float, float, float]]]:
     return temas
 
 
+def ler_categorias(css: str) -> dict[str, dict[str, tuple[float, float]]]:
+    """`--categoria-fundo` e `--categoria-icone` guardam claridade e croma; o
+    tom vem de cada categoria. A primeira ocorrência é do claro, a segunda do
+    escuro."""
+    temas: dict[str, dict[str, tuple[float, float]]] = {"claro": {}, "escuro": {}}
+    for papel in ("fundo", "icone"):
+        valores = re.findall(rf"--categoria-{papel}:\s*([\d.]+)%\s+([\d.]+);", css)
+        for tema, (l, c) in zip(("claro", "escuro"), valores, strict=True):
+            temas[tema][papel] = (float(l) / 100, float(c))
+    return temas
+
+
 def main() -> int:
-    temas = ler_tokens(GLOBALS.read_text(encoding="utf-8"))
+    css = GLOBALS.read_text(encoding="utf-8")
+    temas = ler_tokens(css)
     falhas = 0
     for tema, tokens in temas.items():
         print(f"\nTema {tema}")
@@ -105,6 +118,23 @@ def main() -> int:
             falhas += not ok
             marca = "ok" if ok else "FALHA"
             print(f"  {marca:5} {razao:5.2f}:1 (mín. {minimo}) {frente} sobre {fundo}")
+    # Ícone de categoria sobre o círculo dela, em todo tom que o dono pode
+    # escolher: é gráfico, então o mínimo é 3:1.
+    for tema, papeis in ler_categorias(css).items():
+        razao, tom = min(
+            (
+                contraste(
+                    luminancia(oklch_para_srgb(*papeis["icone"], tom)),
+                    luminancia(oklch_para_srgb(*papeis["fundo"], tom)),
+                ),
+                tom,
+            )
+            for tom in range(0, 360, 5)
+        )
+        ok = razao >= GRAFICO
+        falhas += not ok
+        marca = "ok" if ok else "FALHA"
+        print(f"  {marca:5} {razao:5.2f}:1 (mín. {GRAFICO}) ícone de categoria, tema {tema}, pior tom {tom}")
     print(f"\n{falhas} par(es) abaixo do mínimo." if falhas else "\nTodos os pares no mínimo ou acima.")
     return 1 if falhas else 0
 

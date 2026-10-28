@@ -90,7 +90,7 @@ test("cartão mostra fatura, bandeira, final e quantos dias faltam para fechar",
   expect(contas.getByText("4073")).toBeDefined();
   expect(contas.queryByText(/·/)).toBeNull();
   // 04/09 até 08/09.
-  expect(contas.getByText("fatura atual, fecha em 4 dias e vence 15/09")).toBeDefined();
+  expect(contas.getByText("Fecha em 4 dias e vence 15/09")).toBeDefined();
   expect(contas.getByText("Limite R$ 350,00")).toBeDefined();
   expect(contas.getByText("R$ 9,96 disponível")).toBeDefined();
 });
@@ -123,7 +123,7 @@ test("vencimento já passado vira dia do mês, não uma data mentirosa", () => {
   // conectados hoje: "vence 05/08" em setembro seria falso.
   montar([{ ...CARTAO, fechamento: null, vencimento: "2026-08-05" }], []);
 
-  expect(screen.getByText("fatura atual, vence dia 5")).toBeDefined();
+  expect(screen.getByText("Vence dia 5")).toBeDefined();
   expect(screen.queryByText(/05\/08/)).toBeNull();
   expect(screen.queryByText(/fecha em/)).toBeNull();
 });
@@ -131,7 +131,7 @@ test("vencimento já passado vira dia do mês, não uma data mentirosa", () => {
 test("vencimento futuro aparece com data cheia", () => {
   montar([{ ...CARTAO, fechamento: null, vencimento: "2026-09-15" }], []);
 
-  expect(screen.getByText("fatura atual, vence 15/09")).toBeDefined();
+  expect(screen.getByText("Vence 15/09")).toBeDefined();
 });
 
 test("nome comprido da Pluggy vira o nome do banco", () => {

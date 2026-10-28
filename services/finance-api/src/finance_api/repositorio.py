@@ -15,14 +15,32 @@ from decimal import Decimal
 
 import pandas as pd
 from ingestion_worker.pluggy import CATEGORIA_ID_PAGAMENTO_DE_FATURA
-from sqlalchemy import Numeric, and_, case, cast, func, or_, select, update
+from sqlalchemy import Numeric, and_, case, cast, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
+from finance_api.categorias import (
+    ORIGENS_DO_DONO,
+    TIPOS_CLASSIFICAVEIS,
+    OrigemDaCategoria,
+    Regra,
+    chave_do_destinatario,
+    decidir,
+    sem_acento,
+)
 from finance_api.compromissos import somar_meses
 from finance_api.dinheiro_livre import CompromissoAtivo, RecorrenciaAprovada
-from finance_api.models import CompromissoORM, ContaORM, MovimentoORM, RecorrenciaORM
+from finance_api.models import (
+    CategoriaORM,
+    CompromissoORM,
+    ContaORM,
+    MovimentoORM,
+    MovimentoTagORM,
+    RecorrenciaORM,
+    RegraDeCategoriaORM,
+    TagORM,
+)
 from finance_api.recorrencias import LancamentoObservado, RecorrenciaCandidata
 
 # Quantos dias podem separar a saída da conta corrente da baixa no cartão.
@@ -34,6 +52,10 @@ PREFIXO_CATEGORIA_TRANSFERENCIA = "05"
 
 class PagamentoFaturaInvalido(ValueError):
     """A revisão tentou classificar um movimento incompatível como fatura."""
+
+
+class CategoriaInvalida(ValueError):
+    """Categoria que não existe, ou movimento que não leva categoria."""
 
 
 def _nao_e_pagamento_de_fatura():
@@ -181,19 +203,38 @@ async def inserir_movimentos(
     return resultado.rowcount or 0
 
 
+def _para_classificar():
+    """Receita ou despesa sem categoria própria. Pagamento de fatura fica de
+    fora pelo mesmo motivo que fica fora do gasto."""
+    return and_(
+        MovimentoORM.tipo.in_(TIPOS_CLASSIFICAVEIS),
+        _nao_e_pagamento_de_fatura(),
+        MovimentoORM.categoria_propria.is_(None),
+    )
+
+
 async def listar_movimentos(
     sessao: AsyncSession,
     *,
     conta_id: str | None = None,
     data_inicio: date | None = None,
     data_fim: date | None = None,
+    para_classificar: bool = False,
+    tag_id: int | None = None,
     limite: int = 100,
     offset: int = 0,
 ) -> list[MovimentoORM]:
     """Lista movimentos já gravados, mais recente primeiro, com filtro
-    opcional por conta e por intervalo de data (inclusive nas duas
-    pontas) e paginação simples (`limite`/`offset`)."""
+    opcional por conta, por intervalo de data (inclusive nas duas
+    pontas) e pelos que esperam categoria, e paginação simples
+    (`limite`/`offset`)."""
     consulta = select(MovimentoORM).order_by(MovimentoORM.data.desc(), MovimentoORM.id.desc())
+    if para_classificar:
+        consulta = consulta.where(_para_classificar())
+    if tag_id is not None:
+        consulta = consulta.join(
+            MovimentoTagORM, MovimentoTagORM.movimento_id == MovimentoORM.id
+        ).where(MovimentoTagORM.tag_id == tag_id)
     if conta_id is not None:
         consulta = consulta.where(MovimentoORM.conta_id == conta_id)
     if data_inicio is not None:
@@ -689,3 +730,315 @@ async def carregar_movimentos(sessao: AsyncSession) -> pd.DataFrame:
             for movimento in movimentos
         ]
     )
+
+
+async def listar_categorias(sessao: AsyncSession) -> list[CategoriaORM]:
+    resultado = await sessao.execute(select(CategoriaORM).order_by(CategoriaORM.ordem))
+    return list(resultado.scalars().all())
+
+
+async def carregar_regras(sessao: AsyncSession) -> dict[str, Regra]:
+    resultado = await sessao.execute(select(RegraDeCategoriaORM.chave, RegraDeCategoriaORM.categoria_id))
+    return {chave: Regra(categoria) for chave, categoria in resultado.all()}
+
+
+async def classificar_movimentos(sessao: AsyncSession) -> int:
+    """Recalcula a categoria de todo movimento sem escolha do dono, pela
+    ordem de `finance_api.categorias.decidir`. Roda depois de cada
+    sincronização e de cada correção, então regra nova também alcança os
+    movimentos antigos que o Mercúrio tinha classificado sozinho. Devolve
+    quantos mudaram."""
+    regras = await carregar_regras(sessao)
+    automaticos = (
+        await sessao.execute(
+            select(
+                MovimentoORM.id,
+                MovimentoORM.descricao,
+                MovimentoORM.tipo,
+                MovimentoORM.pagamento_de_fatura,
+                MovimentoORM.categoria_id,
+                MovimentoORM.categoria_propria,
+                MovimentoORM.origem_da_categoria,
+            ).where(
+                or_(
+                    MovimentoORM.origem_da_categoria.is_(None),
+                    MovimentoORM.origem_da_categoria.not_in(ORIGENS_DO_DONO),
+                )
+            )
+        )
+    ).all()
+
+    mudancas = []
+    for linha in automaticos:
+        categoria, origem = decidir(
+            tipo=linha.tipo,
+            fatura=linha.pagamento_de_fatura in ("detectado", "confirmado"),
+            regra=regras.get(chave_do_destinatario(linha.descricao)),
+            categoria_id_da_pluggy=linha.categoria_id,
+        )
+        if (categoria, origem) != (linha.categoria_propria, linha.origem_da_categoria):
+            mudancas.append({"id": linha.id, "categoria_propria": categoria, "origem_da_categoria": origem})
+
+    if mudancas:
+        await sessao.execute(update(MovimentoORM), mudancas)
+    await sessao.commit()
+    return len(mudancas)
+
+
+async def contar_para_classificar(sessao: AsyncSession, *, desde: date) -> int:
+    return (
+        await sessao.scalar(
+            select(func.count())
+            .select_from(MovimentoORM)
+            .where(_para_classificar(), MovimentoORM.data >= desde)
+        )
+        or 0
+    )
+
+
+async def historico_dos_destinatarios(
+    sessao: AsyncSession, chaves: set[str]
+) -> dict[str, list[tuple[str, int]]]:
+    """As categorias que o dono já deu a cada destinatário, da mais usada
+    para a menos, para a fila de classificação sugerir primeiro o provável."""
+    if not chaves:
+        return {}
+    escolhidos = (
+        await sessao.execute(
+            select(MovimentoORM.descricao, MovimentoORM.categoria_propria).where(
+                MovimentoORM.origem_da_categoria.in_(ORIGENS_DO_DONO)
+            )
+        )
+    ).all()
+    contagem: dict[str, Counter[str]] = {chave: Counter() for chave in chaves}
+    for descricao, categoria in escolhidos:
+        chave = chave_do_destinatario(descricao)
+        if chave in contagem and categoria is not None:
+            contagem[chave][categoria] += 1
+    return {chave: contador.most_common() for chave, contador in contagem.items() if contador}
+
+
+async def _escolher(
+    sessao: AsyncSession, movimento: MovimentoORM, categoria: str, *, todos_do_destinatario: bool
+) -> None:
+    """A escolha do dono num movimento, sem gravar: quem chama faz o commit
+    e reclassifica uma vez só, mesmo marcando vários."""
+    if movimento.tipo not in TIPOS_CLASSIFICAVEIS:
+        raise CategoriaInvalida("só receita e despesa levam categoria")
+    movimento.categoria_propria = categoria
+    movimento.origem_da_categoria = OrigemDaCategoria.DONO.value
+    chave = chave_do_destinatario(movimento.descricao)
+    if todos_do_destinatario:
+        instrucao = pg_insert(RegraDeCategoriaORM).values(
+            chave=chave, categoria_id=categoria, origem=OrigemDaCategoria.DONO.value
+        )
+        await sessao.execute(
+            instrucao.on_conflict_do_update(
+                index_elements=["chave"],
+                set_={
+                    "categoria_id": categoria,
+                    "origem": OrigemDaCategoria.DONO.value,
+                    "atualizado_em": func.now(),
+                },
+            )
+        )
+    else:
+        await sessao.execute(
+            update(RegraDeCategoriaORM)
+            .where(
+                RegraDeCategoriaORM.chave == chave,
+                RegraDeCategoriaORM.categoria_id.is_not(None),
+                RegraDeCategoriaORM.categoria_id != categoria,
+            )
+            .values(categoria_id=None, origem=OrigemDaCategoria.DONO.value)
+        )
+
+
+async def _conferir_categoria(sessao: AsyncSession, categoria: str) -> None:
+    if await sessao.get(CategoriaORM, categoria) is None:
+        raise CategoriaInvalida(f"categoria desconhecida: {categoria}")
+
+
+async def corrigir_categoria(
+    sessao: AsyncSession, movimento_id: int, categoria: str, *, todos_do_destinatario: bool
+) -> MovimentoORM | None:
+    """Grava a escolha do dono num movimento. Devolve `None` se ele não existe.
+
+    Com `todos_do_destinatario`, a escolha vira regra e alcança os movimentos
+    antigos dele que o Mercúrio tinha classificado sozinho; os que o dono já
+    escolheu ficam como estão. Sem isso, escolher outra categoria que a da
+    regra mostra que o destinatário recebe por coisas diferentes: a regra
+    vira mista e os próximos dele ficam para classificar.
+    """
+    movimento = await sessao.get(MovimentoORM, movimento_id)
+    if movimento is None:
+        return None
+    await _conferir_categoria(sessao, categoria)
+    await _escolher(sessao, movimento, categoria, todos_do_destinatario=todos_do_destinatario)
+    await sessao.commit()
+    await classificar_movimentos(sessao)
+    await sessao.refresh(movimento)
+    return movimento
+
+
+async def criar_categoria(sessao: AsyncSession, nome: str, icone: str, cor: int) -> CategoriaORM:
+    """Categoria nova do dono, no fim da lista. O id sai do nome sem acento,
+    com número no fim quando já existe."""
+    nome = nome.strip()
+    existentes = (await sessao.execute(select(CategoriaORM.id, CategoriaORM.nome))).all()
+    if any(sem_acento(outro) == sem_acento(nome) for _, outro in existentes):
+        raise CategoriaInvalida(f"já existe a categoria {nome}")
+    base = "-".join(sem_acento(nome).split())[:36] or "categoria"
+    ids = {id_ for id_, _ in existentes}
+    id_, numero = base, 2
+    while id_ in ids:
+        id_, numero = f"{base}-{numero}", numero + 1
+    ordem = (await sessao.scalar(select(func.max(CategoriaORM.ordem)))) or 0
+    categoria = CategoriaORM(id=id_, nome=nome, icone=icone, cor=cor, ordem=ordem + 1)
+    sessao.add(categoria)
+    await sessao.commit()
+    return categoria
+
+
+async def _tags_por_nome(sessao: AsyncSession, nomes: list[str]) -> list[int]:
+    """Os ids das tags com esses nomes, criando as que faltam. O nome é único
+    sem distinção de caixa: "Viagem Rio" e "viagem rio" são a mesma tag."""
+    limpos = list(dict.fromkeys(nome.strip() for nome in nomes if nome.strip()))
+    if not limpos:
+        return []
+    procurados = [nome.lower() for nome in limpos]
+    existentes = {
+        nome.lower(): id_
+        for id_, nome in (
+            await sessao.execute(
+                select(TagORM.id, TagORM.nome).where(func.lower(TagORM.nome).in_(procurados))
+            )
+        ).all()
+    }
+    ids = []
+    for nome in limpos:
+        if nome.lower() not in existentes:
+            tag = TagORM(nome=nome)
+            sessao.add(tag)
+            await sessao.flush()
+            existentes[nome.lower()] = tag.id
+        ids.append(existentes[nome.lower()])
+    return list(dict.fromkeys(ids))
+
+
+async def definir_tags(
+    sessao: AsyncSession, movimento_id: int, nomes: list[str]
+) -> MovimentoORM | None:
+    """Troca as tags de um movimento pelas desta lista."""
+    movimento = await sessao.get(MovimentoORM, movimento_id)
+    if movimento is None:
+        return None
+    ids = await _tags_por_nome(sessao, nomes)
+    await sessao.execute(
+        delete(MovimentoTagORM).where(MovimentoTagORM.movimento_id == movimento_id)
+    )
+    if ids:
+        await sessao.execute(
+            pg_insert(MovimentoTagORM).values(
+                [{"movimento_id": movimento_id, "tag_id": id_} for id_ in ids]
+            )
+        )
+    await sessao.commit()
+    return movimento
+
+
+async def marcar_em_lote(
+    sessao: AsyncSession, ids: list[int], *, categoria: str | None, tag: str | None
+) -> int:
+    """Dá a mesma categoria (só a estes, sem virar regra) ou acrescenta a
+    mesma tag a vários movimentos. Movimento que não leva categoria fica com
+    a que tinha. Devolve quantos movimentos existiam."""
+    movimentos = list(
+        (await sessao.execute(select(MovimentoORM).where(MovimentoORM.id.in_(ids)))).scalars()
+    )
+    if categoria is not None:
+        await _conferir_categoria(sessao, categoria)
+        for movimento in movimentos:
+            if movimento.tipo in TIPOS_CLASSIFICAVEIS:
+                await _escolher(sessao, movimento, categoria, todos_do_destinatario=False)
+    tag_ids = await _tags_por_nome(sessao, [tag]) if tag is not None else []
+    if tag_ids and movimentos:
+        await sessao.execute(
+            pg_insert(MovimentoTagORM)
+            .values([{"movimento_id": movimento.id, "tag_id": tag_ids[0]} for movimento in movimentos])
+            .on_conflict_do_nothing()
+        )
+    await sessao.commit()
+    if categoria is not None:
+        await classificar_movimentos(sessao)
+    return len(movimentos)
+
+
+async def tags_dos_movimentos(sessao: AsyncSession, ids: list[int]) -> dict[int, list[str]]:
+    if not ids:
+        return {}
+    resultado = await sessao.execute(
+        select(MovimentoTagORM.movimento_id, TagORM.nome)
+        .join(TagORM, TagORM.id == MovimentoTagORM.tag_id)
+        .where(MovimentoTagORM.movimento_id.in_(ids))
+        .order_by(TagORM.nome)
+    )
+    tags: dict[int, list[str]] = {}
+    for movimento_id, nome in resultado.all():
+        tags.setdefault(movimento_id, []).append(nome)
+    return tags
+
+
+def _gasto():
+    """Quanto saiu: despesa sem pagamento de fatura, como no gasto por dia."""
+    return cast(
+        func.coalesce(
+            func.sum(
+                case(
+                    (
+                        and_(MovimentoORM.tipo == "despesa", _nao_e_pagamento_de_fatura()),
+                        MovimentoORM.valor,
+                    ),
+                    else_=0,
+                )
+            ),
+            0,
+        ),
+        Numeric(12, 2),
+    )
+
+
+async def listar_tags(sessao: AsyncSession) -> list[tuple]:
+    """Cada tag como `(id, nome, gasto, quantidade, primeira_data,
+    ultima_data)`, a de movimento mais recente primeiro."""
+    resultado = await sessao.execute(
+        select(
+            TagORM.id,
+            TagORM.nome,
+            _gasto(),
+            func.count(MovimentoORM.id),
+            func.min(MovimentoORM.data),
+            func.max(MovimentoORM.data),
+        )
+        .select_from(TagORM)
+        .outerjoin(MovimentoTagORM, MovimentoTagORM.tag_id == TagORM.id)
+        .outerjoin(MovimentoORM, MovimentoORM.id == MovimentoTagORM.movimento_id)
+        .group_by(TagORM.id, TagORM.nome)
+        .order_by(func.max(MovimentoORM.data).desc().nulls_last(), TagORM.nome)
+    )
+    return [tuple(linha) for linha in resultado.all()]
+
+
+async def gasto_da_tag_por_categoria(
+    sessao: AsyncSession, tag_id: int
+) -> list[tuple[str | None, Decimal]]:
+    """O gasto da tag dividido pela categoria do Mercúrio, do maior para o menor."""
+    resultado = await sessao.execute(
+        select(MovimentoORM.categoria_propria, _gasto())
+        .join(MovimentoTagORM, MovimentoTagORM.movimento_id == MovimentoORM.id)
+        .where(MovimentoTagORM.tag_id == tag_id)
+        .group_by(MovimentoORM.categoria_propria)
+        .having(_gasto() > 0)
+        .order_by(_gasto().desc())
+    )
+    return [(categoria, total) for categoria, total in resultado.all()]

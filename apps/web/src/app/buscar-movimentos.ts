@@ -43,7 +43,35 @@ export type Movimento = {
   categoria: string | null;
   duplicadoPossivel: boolean;
   pagamentoDeFatura: string | null;
+  /** Categoria do Mercúrio. Nula em receita ou despesa é "para classificar". */
+  categoriaPropria: string | null;
+  origemDaCategoria: "dono" | "mobills" | "regra" | "pluggy" | null;
+  /** Só na fila para classificar: o que o dono já deu ao mesmo destinatário. */
+  historico: { categoria: string; vezes: number }[];
+  tags: string[];
 };
+
+/** `icone` é o nome no lucide-react; `cor` é só o tom, de 0 a 359. */
+export type Categoria = { id: string; nome: string; icone: string; cor: number };
+
+export type Tag = {
+  id: number;
+  nome: string;
+  gasto: number;
+  quantidade: number;
+  primeiraData: string | null;
+  ultimaData: string | null;
+};
+
+export type ResumoDaTag = Tag & { porCategoria: { categoria: string | null; total: number }[] };
+
+/** Só receita e despesa levam categoria, e pagamento de fatura não. */
+export function levaCategoria(movimento: Movimento): boolean {
+  return (
+    ["despesa", "receita"].includes(movimento.tipo) &&
+    (movimento.pagamentoDeFatura === null || movimento.pagamentoDeFatura === "descartado")
+  );
+}
 
 /**
  * O ciclo de pagamento que contém `referencia`, mais o anterior e o
@@ -107,12 +135,17 @@ export async function buscarFluxoPorConta(
   );
 }
 
+/** Com `paraClassificar` e sem `inicio`, a API devolve a fila dos ciclos
+ *  recentes contados a partir de `hoje`. */
 export async function buscarMovimentos(
-  inicio: string,
-  fim: string,
+  inicio: string | undefined,
+  fim: string | undefined,
   contaId?: string,
   limite = 50,
   offset = 0,
+  paraClassificar = false,
+  hoje?: string,
+  tagId?: number,
 ): Promise<Movimento[] | null> {
   type Linha = {
     id: number;
@@ -124,11 +157,18 @@ export async function buscarMovimentos(
     categoria: string | null;
     duplicado_possivel: boolean;
     pagamento_de_fatura: string | null;
+    categoria_propria?: string | null;
+    origem_da_categoria?: Movimento["origemDaCategoria"];
+    historico?: { categoria: string; vezes: number }[];
+    tags?: string[];
   };
   const corpo = await buscarJson<Linha[]>("/movimentos", {
     data_inicio: inicio,
     data_fim: fim,
     conta_id: contaId,
+    para_classificar: paraClassificar ? "true" : undefined,
+    hoje,
+    tag_id: tagId,
     limite,
     offset,
   });
@@ -143,6 +183,57 @@ export async function buscarMovimentos(
       categoria: linha.categoria,
       duplicadoPossivel: linha.duplicado_possivel,
       pagamentoDeFatura: linha.pagamento_de_fatura,
+      categoriaPropria: linha.categoria_propria ?? null,
+      origemDaCategoria: linha.origem_da_categoria ?? null,
+      historico: linha.historico ?? [],
+      tags: linha.tags ?? [],
     })) ?? null
   );
+}
+
+export async function buscarCategorias(): Promise<Categoria[] | null> {
+  return buscarJson<Categoria[]>("/categorias");
+}
+
+type LinhaDeTag = {
+  id: number;
+  nome: string;
+  gasto: string;
+  quantidade: number;
+  primeira_data: string | null;
+  ultima_data: string | null;
+};
+
+function comoTag(linha: LinhaDeTag): Tag {
+  return {
+    id: linha.id,
+    nome: linha.nome,
+    gasto: paraNumero(linha.gasto),
+    quantidade: linha.quantidade,
+    primeiraData: linha.primeira_data,
+    ultimaData: linha.ultima_data,
+  };
+}
+
+export async function buscarTags(): Promise<Tag[] | null> {
+  return (await buscarJson<LinhaDeTag[]>("/tags"))?.map(comoTag) ?? null;
+}
+
+export async function buscarResumoDaTag(id: number): Promise<ResumoDaTag | null> {
+  const corpo = await buscarJson<LinhaDeTag & { por_categoria: { categoria: string | null; total: string }[] }>(
+    `/tags/${id}`,
+  );
+  return corpo
+    ? {
+        ...comoTag(corpo),
+        porCategoria: corpo.por_categoria.map((item) => ({
+          categoria: item.categoria,
+          total: paraNumero(item.total),
+        })),
+      }
+    : null;
+}
+
+export async function buscarParaClassificar(hoje: string): Promise<number | null> {
+  return (await buscarJson<{ total: number }>("/movimentos/para-classificar", { hoje }))?.total ?? null;
 }

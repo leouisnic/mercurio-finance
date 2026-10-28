@@ -16,6 +16,7 @@ from finance_api.config import DATABASE_URL, validar_url_local_de_teste
 from finance_api.db import async_session
 from finance_api.recorrencias import detectar_recorrencias
 from finance_api.repositorio import (
+    classificar_movimentos,
     inserir_movimentos,
     lancamentos_para_deteccao,
     salvar_recorrencias_detectadas,
@@ -42,10 +43,12 @@ async def semear(*, limpar_teste: bool = False) -> None:
         if limpar_teste:
             await sessao.execute(
                 text(
-                    "TRUNCATE TABLE movimentos, contas, recorrencias, compromissos "
-                    "RESTART IDENTITY CASCADE"
+                    "TRUNCATE TABLE movimentos, contas, recorrencias, compromissos, regras_de_categoria, "
+                    "tags RESTART IDENTITY CASCADE"
                 )
             )
+            # As 19 da migração têm ordem de 0 a 18; acima disso foi criada no e2e.
+            await sessao.execute(text("DELETE FROM categorias WHERE ordem > 18"))
             await sessao.commit()
         await upsert_contas(sessao, seed_contas_ficticias())
         inseridos = await inserir_movimentos(
@@ -57,6 +60,7 @@ async def semear(*, limpar_teste: bool = False) -> None:
         # de Recorrências ficaria sem o que demonstrar.
         candidatas = detectar_recorrencias(await lancamentos_para_deteccao(sessao))
         recorrencias = await salvar_recorrencias_detectadas(sessao, candidatas)
+        await classificar_movimentos(sessao)
     print(
         f"{inseridos} movimentos inseridos e {recorrencias} recorrências detectadas "
         f"(fictícios, de {EXTRATO_FICTICIO.name})."

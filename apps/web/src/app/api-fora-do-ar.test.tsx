@@ -14,9 +14,14 @@ const buscas = vi.hoisted(() => ({
   buscarResumo: vi.fn(),
   buscarRecorrencias: vi.fn(),
   buscarDinheiroLivre: vi.fn(),
+  buscarCategorias: vi.fn(),
+  buscarParaClassificar: vi.fn(),
 }));
 
-vi.mock("./buscar-movimentos", () => buscas);
+vi.mock("./buscar-movimentos", async (original) => ({
+  ...(await original<typeof import("./buscar-movimentos")>()),
+  ...buscas,
+}));
 vi.mock("./buscar-resumo", () => ({ buscarResumo: buscas.buscarResumo }));
 vi.mock("./buscar-dinheiro-livre", () => ({ buscarDinheiroLivre: buscas.buscarDinheiroLivre }));
 vi.mock("./buscar-recorrencias", async (original) => ({
@@ -27,8 +32,13 @@ vi.mock("./acoes", () => ({
   sincronizar: vi.fn(),
   decidirRecorrencia: vi.fn(),
   renomearConta: vi.fn(),
+  classificarMovimento: vi.fn(),
 }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+  usePathname: () => "/movimentos",
+  redirect: vi.fn(),
+}));
 
 const { default: Inicio } = await import("./page");
 const { default: Movimentos } = await import("./movimentos/page");

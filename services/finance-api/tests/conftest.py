@@ -10,7 +10,15 @@ import pytest
 from finance_api.config import DATABASE_URL, TEST_DATABASE_URL, validar_banco_de_teste
 from finance_api.db import obter_sessao
 from finance_api.main import app
-from finance_api.models import CompromissoORM, ContaORM, MovimentoORM, RecorrenciaORM
+from finance_api.models import (
+    CategoriaORM,
+    CompromissoORM,
+    ContaORM,
+    MovimentoORM,
+    RecorrenciaORM,
+    RegraDeCategoriaORM,
+    TagORM,
+)
 from finance_api.recorrencias import detectar_recorrencias
 from finance_api.repositorio import (
     inserir_movimentos,
@@ -45,8 +53,12 @@ app.dependency_overrides[obter_sessao] = _obter_sessao_teste
 async def _limpar_movimentos() -> None:
     async with _sessao_teste() as sessao:
         # Tudo que aponta para contas primeiro: as três tabelas têm chave
-        # estrangeira para `contas`.
+        # estrangeira para `contas`. As categorias ficam: vêm da migração.
         await sessao.execute(delete(MovimentoORM))
+        await sessao.execute(delete(RegraDeCategoriaORM))
+        await sessao.execute(delete(TagORM))
+        # As 19 da migração têm ordem de 0 a 18; acima disso é categoria criada num teste.
+        await sessao.execute(delete(CategoriaORM).where(CategoriaORM.ordem > 18))
         await sessao.execute(delete(RecorrenciaORM))
         await sessao.execute(delete(CompromissoORM))
         await sessao.execute(delete(ContaORM))

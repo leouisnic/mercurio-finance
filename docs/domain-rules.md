@@ -60,6 +60,50 @@ variação de valor permitida é de 15%.
 Toda candidata nasce `pendente`. Aprovação e rejeição são humanas. Uma
 recorrência rejeitada não volta automaticamente para a fila.
 
+## Categorias
+
+Receita e despesa recebem uma das 19 categorias do Mercúrio. Transferência
+entre contas do titular, aplicação, resgate e pagamento de fatura não recebem
+categoria, porque não são gasto nem renda.
+
+A categoria vem da primeira fonte que existir, nesta ordem:
+
+1. escolha do dono, na tela ou importada do Mobills;
+2. regra do destinatário, que é o nome depois da barra no Pix
+   ("Transferência enviada|Nome") ou a descrição inteira;
+3. categoria da Pluggy traduzida, pelo prefixo mais longo da árvore dela.
+
+Sem nenhuma das três, o movimento fica "para classificar". A fila e o aviso
+cobrem o ciclo atual e os cinco anteriores, uns três meses: a média por
+categoria usa os ciclos recentes. Transferência da
+Pluggy não tem tradução, porque não diz para que o dinheiro foi. A categoria da
+Pluggy continua guardada como veio.
+
+Destinatário que já recebeu por categorias diferentes é misto e não tem regra:
+cada movimento novo dele fica para classificar, mesmo que a Pluggy sugira
+outra coisa. Corrigir "só este" com categoria diferente da regra torna o
+destinatário misto. A escolha começa em "só este"; corrigir "todos do destinatário" cria
+ou troca a regra e
+muda também os movimentos antigos dele que o Mercúrio classificou sozinho; a
+escolha anterior do dono nunca é refeita.
+
+A importação do Mobills casa cada linha com um movimento já gravado pelo mesmo
+valor, mesmo sentido e até um dia de diferença, um para um. Rodar de novo não
+muda nada, e não desfaz escolha feita na tela.
+
+O dono pode criar categoria com nome, ícone e cor. A cor é guardada só como
+o tom; claridade e croma vêm do tema, para o contraste do ícone continuar
+medido. Marcar vários de uma vez dá a mesma categoria só a eles, sem criar
+regra.
+
+## Tags
+
+Tag agrupa movimentos, como uma viagem ou uma reforma, e não muda nenhum
+outro número. Um movimento pode ter várias tags, e o nome da tag é único sem
+distinção de caixa. O gasto de uma tag soma só as despesas marcadas, sem
+pagamento de fatura, como o gasto por dia; a divisão é pela categoria do
+Mercúrio.
+
 ## Compromissos
 
 Compromisso representa obrigação futura cadastrada manualmente. Possui valor

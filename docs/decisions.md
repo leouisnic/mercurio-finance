@@ -48,6 +48,16 @@ um casamento único por valor exato, janela de três dias, categoria de
 transferência e natureza das contas. Ambiguidade não é resolvida
 automaticamente. A marcação pode ser confirmada ou descartada por uma pessoa.
 
+## Categorias próprias
+
+A categoria da Pluggy chama de transferência quase todo Pix, então não serve
+para média por categoria. O Mercúrio guarda a própria categoria ao lado da
+dela, com a origem de quem decidiu. A ordem é fixa: dono, regra, Pluggy. As 19
+categorias partem das que o dono usava no Mobills, com as raras juntas à
+vizinha. Destinatário misto pergunta em vez de chutar: a categoria mais comum
+acertaria só metade e contaminaria a média. Correções não são enviadas às
+regras da Pluggy, que seria escrita em serviço externo sem ganho.
+
 ## Recorrências e compromissos
 
 Recorrência é inferida de três despesas encadeadas, com intervalo de 28 a 35

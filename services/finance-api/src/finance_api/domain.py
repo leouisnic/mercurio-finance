@@ -18,8 +18,14 @@ from mercurio_domain import (
 )
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from finance_api.categorias import OrigemDaCategoria
+
 __all__ = [
+    "CategoriaIn",
+    "CategoriaJaUsada",
+    "CategoriaOut",
     "CategoriaRecorrencia",
+    "CategoriaUpdate",
     "CicloOut",
     "CiclosOut",
     "CompromissoIn",
@@ -31,15 +37,22 @@ __all__ = [
     "EstadoPagamentoFatura",
     "FluxoDaConta",
     "GastoDiario",
+    "GastoPorCategoria",
+    "LoteIn",
+    "LoteOut",
     "Movimento",
     "MovimentoOut",
     "PagamentoFaturaUpdate",
+    "ParaClassificarOut",
     "Proveniencia",
     "RecorrenciaOut",
     "RecorrenciaUpdate",
+    "ResumoDaTagOut",
     "ResumoFinanceiro",
     "StatusCompromisso",
     "StatusRecorrencia",
+    "TagOut",
+    "TagsUpdate",
     "TipoMovimento",
     "encontrar_duplicidades",
 ]
@@ -162,6 +175,11 @@ class DecisaoPagamentoFatura(str, Enum):
     DESCARTADO = "descartado"
 
 
+class CategoriaJaUsada(BaseModel):
+    categoria: str
+    vezes: int
+
+
 class MovimentoOut(BaseModel):
     """Um movimento já gravado, para listagem (`GET /movimentos`)."""
 
@@ -177,6 +195,98 @@ class MovimentoOut(BaseModel):
     )
     duplicado_possivel: bool = False
     pagamento_de_fatura: EstadoPagamentoFatura | None = None
+    categoria_propria: str | None = Field(
+        default=None,
+        description="Categoria do Mercúrio. Nula em receita ou despesa é para classificar.",
+    )
+    origem_da_categoria: OrigemDaCategoria | None = None
+    historico: list[CategoriaJaUsada] = Field(
+        default_factory=list,
+        description="Categorias que o dono já deu a este destinatário, só na fila para classificar.",
+    )
+    tags: list[str] = Field(default_factory=list)
+
+
+class CategoriaOut(BaseModel):
+    id: str
+    nome: str
+    icone: str = Field(description="Nome do ícone no lucide-react.")
+    cor: int = Field(description="Tom da cor, de 0 a 359.")
+
+
+class CategoriaIn(BaseModel):
+    """Categoria criada pelo dono. O ícone é validado só pelo formato: o
+    painel mostra um ícone neutro para nome que não conhece."""
+
+    nome: str = Field(min_length=1, max_length=60)
+    icone: str = Field(pattern=r"^[A-Za-z0-9]{1,40}$")
+    cor: int = Field(ge=0, le=359)
+
+    @field_validator("nome")
+    @classmethod
+    def nome_sem_espacos_nas_pontas(cls, nome: str) -> str:
+        if not nome.strip():
+            raise ValueError("nome vazio")
+        return nome.strip()
+
+
+class TagsUpdate(BaseModel):
+    tags: list[str] = Field(max_length=20)
+
+    @field_validator("tags")
+    @classmethod
+    def tags_curtas(cls, tags: list[str]) -> list[str]:
+        if any(len(tag.strip()) > 60 for tag in tags):
+            raise ValueError("tag com mais de 60 caracteres")
+        return tags
+
+
+class LoteIn(BaseModel):
+    """A mesma categoria, a mesma tag ou as duas para vários movimentos."""
+
+    ids: list[int] = Field(min_length=1, max_length=500)
+    categoria: str | None = None
+    tag: str | None = Field(default=None, min_length=1, max_length=60)
+
+    @model_validator(mode="after")
+    def alguma_marca(self) -> LoteIn:
+        if self.categoria is None and self.tag is None:
+            raise ValueError("informe categoria ou tag")
+        return self
+
+
+class LoteOut(BaseModel):
+    alterados: int
+
+
+class TagOut(BaseModel):
+    id: int
+    nome: str
+    gasto: Decimal = Field(description="Despesas marcadas, sem pagamento de fatura.")
+    quantidade: int
+    primeira_data: date | None
+    ultima_data: date | None
+
+
+class GastoPorCategoria(BaseModel):
+    categoria: str | None
+    total: Decimal
+
+
+class ResumoDaTagOut(TagOut):
+    por_categoria: list[GastoPorCategoria]
+
+
+class CategoriaUpdate(BaseModel):
+    """A escolha do dono para um movimento. `todos_do_destinatario` vira
+    regra e alcança os antigos dele que o Mercúrio classificou sozinho."""
+
+    categoria: str
+    todos_do_destinatario: bool = False
+
+
+class ParaClassificarOut(BaseModel):
+    total: int
 
 
 class PagamentoFaturaUpdate(BaseModel):

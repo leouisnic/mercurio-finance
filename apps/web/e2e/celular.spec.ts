@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 test.use({ viewport: { width: 390, height: 844 } });
 
 test("no celular a navegação fica embaixo e nada passa da largura da tela", async ({ page }) => {
-  for (const caminho of ["/", "/movimentos", "/recorrencias"]) {
+  for (const caminho of ["/", "/movimentos", "/movimentos/classificar", "/movimentos/tags", "/recorrencias"]) {
     await page.goto(caminho);
     const navegacao = page.getByRole("navigation", { name: "Navegação principal" });
     await expect(navegacao).toHaveCount(1);
@@ -31,4 +31,13 @@ test("o formulário de renomear cabe na largura do celular", async ({ page }) =>
     expect(caixa).not.toBeNull();
     expect(caixa!.x + caixa!.width).toBeLessThanOrEqual(390);
   }
+});
+
+test("no celular as páginas de Movimentos viram abas", async ({ page }) => {
+  await page.goto("/movimentos");
+
+  const abas = page.getByRole("navigation", { name: "Páginas de Movimentos" });
+  await abas.getByRole("link", { name: /Para classificar/ }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Para classificar" })).toBeVisible();
+  await expect(abas.getByRole("link", { name: /Para classificar/ })).toHaveAttribute("aria-current", "page");
 });
