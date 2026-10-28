@@ -146,10 +146,11 @@ function estaEm(caminho: string, href: string): boolean {
 }
 
 /** As páginas de dentro de Movimentos, só os títulos recuados, à vista
- *  enquanto se está em Movimentos. A principal é o próprio item. */
+ *  enquanto se está em Movimentos. A principal é o próprio item, e a aberta
+ *  ganha fundo de superfície dentro do bloco tingido. */
 function Submenu({ caminho, paraClassificar }: { caminho: string; paraClassificar: number | null }) {
   return (
-    <div className="flex flex-col gap-0.5 pt-0.5 pb-1">
+    <div className="flex flex-col gap-0.5 px-1 pt-0.5 pb-1">
       {SUBPAGINAS.slice(1).map((pagina) => {
         const ativa = caminho === pagina.href;
         return (
@@ -157,8 +158,8 @@ function Submenu({ caminho, paraClassificar }: { caminho: string; paraClassifica
             key={pagina.href}
             href={pagina.href}
             aria-current={ativa ? "page" : undefined}
-            className={`flex items-center justify-between gap-2 rounded-[9px] py-2 pr-2.5 pl-[38px] text-[13px] ${
-              ativa ? "text-marca-escura font-semibold" : "text-tinta-2 hover:bg-superficie font-medium"
+            className={`flex items-center justify-between gap-2 rounded-[9px] py-2 pr-2.5 pl-[34px] text-[13px] ${
+              ativa ? "bg-superficie text-marca-escura font-semibold" : "text-tinta-2 hover:bg-superficie font-medium"
             }`}
           >
             {pagina.rotulo}
@@ -188,7 +189,14 @@ export function BarraLateral({ paraClassificar = null }: { paraClassificar?: num
 
         <div className="flex flex-col gap-0.5">
           {ITENS.map((item) => (
-            <div key={item.href} className="flex flex-col">
+            <div
+              key={item.href}
+              // Aberto, o item e as páginas de dentro dele formam um bloco
+              // tingido, para o submenu não se confundir com os itens principais.
+              className={`flex flex-col ${
+                item.href === "/movimentos" && estaEm(caminho, item.href) ? "bg-marca-suave rounded-[11px]" : ""
+              }`}
+            >
               <Item item={item} ativo={estaEm(caminho, item.href)} />
               {item.href === "/movimentos" && estaEm(caminho, item.href) && (
                 <Submenu caminho={caminho} paraClassificar={paraClassificar} />

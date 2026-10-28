@@ -30,6 +30,8 @@ PARES = [
     ("marca", "superficie", TEXTO),
     ("marca", "marca-clara", TEXTO),
     ("marca-escura", "marca-clara", TEXTO),
+    ("tinta-2", "marca-suave", TEXTO),
+    ("marca-escura", "superficie", TEXTO),
     ("sobre-cor", "marca", TEXTO),
     ("sobre-cor", "positivo", TEXTO),
     ("sobre-cor", "alerta-forte", TEXTO),

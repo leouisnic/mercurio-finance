@@ -47,6 +47,26 @@ Gatilho: a leva de categorias próprias publicada.
 
 Por quê: A tela de Tags ficou só com a lista e o total. O dono quer: orçamento por tag (criar a tag antes, com teto, e acompanhar gasto contra o teto e o ritmo); evolução do gasto da tag no tempo; criar, renomear, apagar (os movimentos ficam, só perdem a tag) e arquivar tag; maiores gastos e divisão por categoria num card de análise; e o impacto da tag no orçamento, calculado sem IA: quanto ela tirou de cada ciclo em que caiu, quanto esses ciclos passaram do gasto típico e em quantos ciclos o rombo se recupera no ritmo de sobra. Junto, o padrão de detalhe dos gráficos na identidade do Mercúrio (no lugar da dica do navegador), valor curto com R$ em cima de cada barra com gasto, e as cores do gasto por dia: dia sem gasto em dourado, dentro da cota em índigo, acima da cota em vermelho. Tudo por mockup antes do código.
 
+## Modo viagem
+
+Estado: adiada
+
+Adiada em: 2026-10-28
+
+Gatilho: a leva Tags e gráficos publicada, porque o modo viagem é uma tag com período. A ativação pela localização espera também o bot do Telegram ou o painel publicado com autenticação.
+
+Por quê: Ligar o modo viagem com uma tag faz todo movimento que chegar no período ganhar essa tag sozinho, e o Início mostra quanto a viagem já custou contra o teto. Para lembrar de ligar: a tag de viagem criada antes, com data de ida, faz o Início perguntar no dia "começou a viagem?". No Mobills existia e o dono não usava, por isso o lembrete importa mais que o botão. A localização tem que vir do celular do dono: a Pluggy não informa local da compra (conferido na documentação de transações: o `merchant` traz nome, razão social, CNPJ, CNAE e categoria, e exige plano Pro; não há cidade nem coordenada). Página web não lê localização em segundo plano. Caminhos que funcionam pelo celular: compartilhar a localização em tempo real com o bot do Telegram, que recebe as atualizações enquanto ela está ligada e pergunta se é viagem ao sair da cidade de sempre; ou uma automação do próprio celular (Atalhos no iPhone, ou equivalente no Android) que, ao sair de um lugar, chama o Mercúrio. Os dois exigem o Mercúrio alcançável do celular, com a autenticação do painel e o token da API (B03) prontos antes.
+
+## Análise dos gastos
+
+Estado: adiada
+
+Adiada em: 2026-10-28
+
+Gatilho: a leva Tags e gráficos publicada; decidir antes se fica dentro da Movimentos redesenhada ou vira página própria.
+
+Por quê: O dono gostava da análise do Mobills: onde gasta mais, percentuais por categoria e uma leitura escrita do período. Com as categorias próprias publicadas, dá para calcular sem IA: participação de cada categoria no ciclo e no mês, variação contra a média dos últimos ciclos, maiores aumentos e quedas, estabelecimentos e pessoas que mais receberam, fixo contra variável, quanto sobrou da renda, e frases montadas a partir desses números ("Alimentação foi 31% do gasto, 18% acima da sua média"). Texto escrito por IA seria um passo depois, e mandaria dado financeiro para um serviço externo: decisão de privacidade do dono antes. Sobrepõe a Movimentos redesenhada (para onde foi por categoria, entrou, gastou, guardou e sobrou).
+
 ## Movimentos redesenhada
 
 Estado: adiada

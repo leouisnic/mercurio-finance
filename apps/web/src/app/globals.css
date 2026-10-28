@@ -28,6 +28,8 @@
   --color-marca: oklch(36% 0.12 278);
   --color-marca-escura: oklch(30% 0.11 278);
   --color-marca-clara: oklch(93% 0.03 278);
+  /* Fundo do grupo de um item do menu com as páginas de dentro dele. */
+  --color-marca-suave: oklch(96.5% 0.015 278);
 
   /* Texto sobre um preenchimento de cor cheia (botão, contador). */
   --color-sobre-cor: oklch(100% 0 0);
@@ -87,6 +89,7 @@
   --color-marca: oklch(76% 0.1 278);
   --color-marca-escura: oklch(88% 0.06 278);
   --color-marca-clara: oklch(32% 0.06 278);
+  --color-marca-suave: oklch(26% 0.04 278);
 
   --color-sobre-cor: oklch(17% 0.02 278);
 
