@@ -26,13 +26,42 @@ const BANCOS: { padrao: RegExp; nome: string; classe: string; logo: string }[] =
   },
 ];
 
-/** Uma conta como o painel precisa dela para se identificar. */
-export type ContaIdentificavel = { nome: string; apelido?: string | null };
+/** Uma conta como o painel precisa dela para se identificar.
+ *  `bancoDaConexao` é o banco herdado de outra conta da mesma conexão. */
+export type ContaIdentificavel = {
+  nome: string;
+  apelido?: string | null;
+  bancoDaConexao?: string | null;
+};
 
-function banco({ nome, apelido }: ContaIdentificavel) {
+function banco({ nome, apelido, bancoDaConexao }: ContaIdentificavel) {
   // O apelido também é procurado: quem chama a conta de "Cartão Nubank"
   // espera o roxo do Nubank, não o cinza.
-  return BANCOS.find(({ padrao }) => padrao.test(apelido ?? "") || padrao.test(nome));
+  return (
+    BANCOS.find(({ padrao }) => padrao.test(apelido ?? "") || padrao.test(nome)) ??
+    BANCOS.find(({ nome: nomeDoBanco }) => nomeDoBanco === bancoDaConexao)
+  );
+}
+
+/**
+ * A Pluggy manda o cartão da Nubank só como "gold". Conta e cartão que vêm da
+ * mesma conexão são do mesmo banco, então a conta sem banco reconhecido
+ * herda o da vizinha.
+ */
+export function herdarBancoDaConexao<T extends ContaIdentificavel & { itemId: string | null }>(
+  contas: T[],
+): T[] {
+  const porConexao = new Map<string, string>();
+  for (const conta of contas) {
+    const reconhecido = banco({ nome: conta.nome, apelido: conta.apelido });
+    if (conta.itemId && reconhecido) {
+      porConexao.set(conta.itemId, reconhecido.nome);
+    }
+  }
+  return contas.map((conta) => ({
+    ...conta,
+    bancoDaConexao: conta.itemId ? (porConexao.get(conta.itemId) ?? null) : null,
+  }));
 }
 
 export function nomeDaConta(conta: ContaIdentificavel): string {

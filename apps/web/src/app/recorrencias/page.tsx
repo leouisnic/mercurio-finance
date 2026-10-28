@@ -1,110 +1,81 @@
-import { buscarRecorrencias } from "../buscar-recorrencias";
+import { buscarRecorrencias, type Recorrencia, type StatusRecorrencia } from "../buscar-recorrencias";
 import { buscarResumo } from "../buscar-resumo";
-import { BlocoIndisponivel, FaixaDeFalha, FalhaTotal } from "../indisponivel";
-import { CartaoPendente, LinhaDecidida } from "./cartao";
+import { FaixaDeFalha, FalhaTotal } from "../indisponivel";
+import { Info } from "../info";
+import { AbasDeRecorrencias, type Aba } from "./abas";
+import { CartaoDecidido, CartaoPendente } from "./cartao";
 
-function Secao({
-  titulo,
-  descricao,
-  children,
-}: {
-  titulo: string;
-  descricao?: string;
-  children: React.ReactNode;
-}) {
+const ABAS: { chave: StatusRecorrencia; rotulo: string; vazio: string }[] = [
+  { chave: "pendente", rotulo: "Para decidir", vazio: "Nada esperando decisão." },
+  { chave: "aprovada", rotulo: "Contas fixas", vazio: "Nenhuma conta fixa." },
+  { chave: "parcelamento", rotulo: "Parcelamentos", vazio: "Nenhum parcelamento." },
+  { chave: "encerrada", rotulo: "Encerradas", vazio: "Nenhuma encerrada." },
+  { chave: "rejeitada", rotulo: "Não é recorrência", vazio: "Nenhuma." },
+];
+
+function Titulo() {
   return (
-    <section aria-label={titulo} className="flex flex-col gap-3">
-      <div className="flex flex-col gap-0.5">
-        <h2 className="text-tinta-3 text-xs font-semibold tracking-[0.06em] uppercase">{titulo}</h2>
-        {descricao && <span className="text-tinta-3 text-[12px]">{descricao}</span>}
-      </div>
-      {children}
-    </section>
+    <header className="flex items-center gap-1">
+      <h1 className="text-[23px] font-bold tracking-[-0.2px]">Recorrências</h1>
+      <Info
+        sobre="recorrências"
+        texto="Cobranças que se repetem no extrato. Você decide se é conta fixa, parcelamento, se já acabou ou se não é recorrência."
+      />
+    </header>
   );
 }
 
 export default async function Recorrencias() {
-  const [pendentes, aprovadas, rejeitadas, resumo] = await Promise.all([
-    buscarRecorrencias("pendente"),
-    buscarRecorrencias("aprovada"),
-    buscarRecorrencias("rejeitada"),
-    buscarResumo(),
-  ]);
+  const [recorrencias, resumo] = await Promise.all([buscarRecorrencias(), buscarResumo()]);
 
-  if (pendentes === null) {
+  if (recorrencias === null) {
     return (
       <>
-        <header className="flex flex-col gap-[3px]">
-          <h1 className="text-[23px] font-bold tracking-[-0.2px]">Recorrências</h1>
-        </header>
+        <Titulo />
         <FalhaTotal />
       </>
     );
   }
 
   const contaPor = new Map((resumo?.contas ?? []).map((conta) => [conta.id, conta]));
-  // Lista parcial pareceria completa: se um dos dois status falhou, a seção
-  // inteira fica indisponível em vez de mostrar só metade.
-  const decididas = aprovadas && rejeitadas ? [...aprovadas, ...rejeitadas] : null;
-  const falhas = [
-    decididas === null && "recorrências já decididas",
-    resumo === null && "nomes das contas",
-  ].filter((parte): parte is string => typeof parte === "string");
+  const porEstado = (status: StatusRecorrencia): Recorrencia[] =>
+    recorrencias.filter((recorrencia) => recorrencia.status === status);
 
-  return (
-    <>
-      <header className="flex flex-col gap-[3px]">
-        <h1 className="text-[23px] font-bold tracking-[-0.2px]">Recorrências</h1>
-        <span className="text-tinta-3 text-[13px]">
-          A detecção sugere, você decide. Uma cobrança mensal de mesmo valor tanto pode ser
-          assinatura quanto parcelamento com prazo, e só quem viveu o gasto sabe a diferença.
-        </span>
-      </header>
-
-      <FaixaDeFalha partes={falhas} />
-
-      <Secao
-        titulo="Esperando decisão"
-        descricao={
-          pendentes.length > 0
-            ? "Aprovar já classificando é uma ação só. Rejeitar é definitivo: a detecção não devolve a recorrência para esta fila."
-            : undefined
-        }
-      >
-        {pendentes.length === 0 ? (
-          <p className="bg-superficie border-borda text-tinta-3 rounded-2xl border px-[22px] py-8 text-center text-[13px]">
-            Nenhuma candidata esperando. A detecção roda a cada sincronização.
-          </p>
+  const abas: Aba[] = ABAS.map(({ chave, rotulo, vazio }) => {
+    const lista = porEstado(chave);
+    return {
+      chave,
+      rotulo,
+      quantidade: lista.length,
+      pede_atencao: chave === "pendente",
+      conteudo:
+        lista.length === 0 ? (
+          <p className="text-tinta-2 text-sm">{vazio}</p>
         ) : (
-          <div className="flex flex-col gap-3">
-            {pendentes.map((recorrencia) => (
+          lista.map((recorrencia) =>
+            chave === "pendente" ? (
               <CartaoPendente
                 key={recorrencia.id}
                 recorrencia={recorrencia}
                 conta={contaPor.get(recorrencia.contaId)}
               />
-            ))}
-          </div>
-        )}
-      </Secao>
-
-      {decididas === null && (
-        <BlocoIndisponivel titulo="Já decididas" rotulo="Já decididas" />
-      )}
-
-      {decididas && decididas.length > 0 && (
-        <Secao titulo="Já decididas" descricao="Dá para voltar atrás a qualquer momento.">
-          <div className="bg-superficie border-borda flex flex-col overflow-hidden rounded-2xl border">
-            {decididas.map((recorrencia) => (
-              <LinhaDecidida
+            ) : (
+              <CartaoDecidido
                 key={recorrencia.id}
                 recorrencia={recorrencia}
                 conta={contaPor.get(recorrencia.contaId)}
               />
-            ))}
-          </div>
-        </Secao>
-      )}
+            ),
+          )
+        ),
+    };
+  });
+
+  return (
+    <>
+      <Titulo />
+      <FaixaDeFalha partes={resumo === null ? ["nomes das contas"] : []} />
+      <AbasDeRecorrencias abas={abas} />
     </>
   );
 }

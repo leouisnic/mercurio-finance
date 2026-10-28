@@ -3,21 +3,42 @@
 import { type FormEvent, useState, useTransition } from "react";
 import { SeloDoBanco, nomeDaConta } from "../banco";
 import type { Conta } from "../buscar-resumo";
-import { CATEGORIAS, ROTULO_DA_CATEGORIA, type Recorrencia } from "../buscar-recorrencias";
+import { CATEGORIAS, ROTULO_DA_CATEGORIA, type Recorrencia, type StatusRecorrencia } from "../buscar-recorrencias";
 import { decidirRecorrencia } from "../acoes";
-import { diaEMes, moeda } from "../formato";
+import { comoData, diaEMes, moeda } from "../formato";
+
+/**
+ * A Pluggy descreve como "Transferência enviada|Nome": o que importa para
+ * reconhecer a cobrança é o nome, e o tipo vira contexto.
+ */
+export function partesDaDescricao(descricao: string): { nome: string; tipo: string | null } {
+  const [tipo, ...resto] = descricao.split("|");
+  const nome = resto.join("|").trim();
+  return nome ? { nome, tipo: tipo.trim() } : { nome: descricao, tipo: null };
+}
+
+function mesesEntre(de: string, ate: string): number {
+  const inicio = comoData(de);
+  const fim = comoData(ate);
+  return (fim.getFullYear() - inicio.getFullYear()) * 12 + fim.getMonth() - inicio.getMonth();
+}
 
 function Identificacao({ recorrencia, conta }: { recorrencia: Recorrencia; conta?: Conta }) {
+  const { nome, tipo } = partesDaDescricao(recorrencia.descricao);
+  // "no Nubank", "no cartão Nubank": o apelido já diz o que é e entra como está.
+  const onde = conta
+    ? (conta.apelido ?? `${conta.tipo === "CREDIT" ? "cartão " : ""}${nomeDaConta(conta)}`)
+    : recorrencia.contaId;
+  const principal = recorrencia.apelido ? nome : tipo;
   return (
-    <div className="flex min-w-0 items-center gap-2.5">
-      {conta && <SeloDoBanco conta={conta} tamanho={26} />}
+    <div className="flex min-w-0 items-center gap-3">
+      {conta && <SeloDoBanco conta={conta} tamanho={36} />}
       <span className="flex min-w-0 flex-col leading-tight">
-        <span className="truncate text-[13.5px] font-semibold" title={recorrencia.descricao}>
-          {recorrencia.apelido ?? recorrencia.descricao}
+        <span className="truncate text-base font-semibold" title={recorrencia.descricao}>
+          {recorrencia.apelido ?? nome}
         </span>
-        <span className="text-tinta-3 truncate text-[10.5px]">
-          {recorrencia.apelido ? `${recorrencia.descricao} · ` : ""}
-          {conta ? nomeDaConta(conta) : recorrencia.contaId}
+        <span className="text-tinta-2 truncate text-[13px]">
+          {principal ? `${principal} ${conta ? "no" : "em"} ${onde}` : onde}
         </span>
       </span>
     </div>
@@ -32,7 +53,7 @@ function Identificacao({ recorrencia, conta }: { recorrencia: Recorrencia; conta
  * ação o React chama `form.reset()`, e o `<select>` volta à primeira opção
  * mesmo controlado. Depois de uma falha, a categoria escolhida sumiria da
  * tela e o reenvio iria sem ela. O botão clicado vai no `FormData` como
- * `submitter`, que é o que diz se é aprovar ou rejeitar.
+ * `submitter`, que é o que diz qual decisão foi tomada.
  */
 function useDecisao() {
   const [erro, setErro] = useState<string | null>(null);
@@ -51,154 +72,209 @@ function useDecisao() {
 
 function ErroDaDecisao({ erro }: { erro: string | null }) {
   return erro ? (
-    <p role="alert" className="bg-alerta-fundo text-alerta rounded-[9px] px-3 py-2 text-[12.5px]">
+    <p role="alert" className="bg-alerta-fundo text-alerta rounded-[9px] px-3 py-2 text-[13px]">
       {erro}
     </p>
   ) : null;
 }
 
-function Historico({ recorrencia }: { recorrencia: Recorrencia }) {
+const BOTAO =
+  "h-10 cursor-pointer rounded-[10px] border px-3.5 text-sm font-semibold disabled:cursor-wait disabled:opacity-60";
+const NEUTRO = `${BOTAO} border-borda bg-superficie text-tinta-2 hover:bg-superficie-2`;
+
+/** As quatro decisões. Parcelamento abre o campo de parcelas antes de enviar. */
+function Decisoes({ enviando, recorrencia }: { enviando: boolean; recorrencia: Recorrencia }) {
+  const [parcelando, setParcelando] = useState(false);
+  const campo = `parcelas-${recorrencia.id}`;
+
   return (
-    <span className="text-tinta-3 text-[11.5px]">
-      {recorrencia.ocorrencias} cobranças, de {diaEMes(recorrencia.primeiraData)} a{" "}
-      {diaEMes(recorrencia.ultimaData)}
-    </span>
+    <>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="submit"
+          name="status"
+          value="aprovada"
+          disabled={enviando}
+          className={`${BOTAO} bg-positivo border-positivo text-white`}
+        >
+          Conta fixa
+        </button>
+        <button
+          type="button"
+          aria-expanded={parcelando}
+          onClick={() => setParcelando((atual) => !atual)}
+          className={parcelando ? `${BOTAO} border-marca bg-marca-clara text-marca` : NEUTRO}
+        >
+          Parcelamento
+        </button>
+        <button type="submit" name="status" value="encerrada" disabled={enviando} className={NEUTRO}>
+          Encerrada
+        </button>
+        <button type="submit" name="status" value="rejeitada" disabled={enviando} className={NEUTRO}>
+          Não é recorrência
+        </button>
+      </div>
+      {parcelando && (
+        <div className="bg-superficie-2 border-borda-sutil flex flex-wrap items-center gap-2.5 rounded-xl border p-3 text-sm">
+          <label htmlFor={campo}>Parcelas que faltam</label>
+          <input
+            id={campo}
+            name="parcelas"
+            type="number"
+            min={1}
+            max={120}
+            required
+            defaultValue={1}
+            className="border-borda bg-superficie h-10 w-20 rounded-[9px] border px-3 text-[15px]"
+          />
+          <button
+            type="submit"
+            name="status"
+            value="parcelamento"
+            disabled={enviando}
+            className={`${BOTAO} bg-positivo border-positivo text-white`}
+          >
+            Confirmar
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 
-/** Uma candidata na fila: identificação, histórico e a decisão. */
-export function CartaoPendente({
-  recorrencia,
-  conta,
-}: {
-  recorrencia: Recorrencia;
-  conta?: Conta;
-}) {
-  const campo = `recorrencia-${recorrencia.id}`;
+/** Uma candidata para decidir: quem cobra, quanto, há quanto tempo. */
+export function CartaoPendente({ recorrencia, conta }: { recorrencia: Recorrencia; conta?: Conta }) {
   const { erro, enviando, enviar } = useDecisao();
 
   return (
-    <form
-      onSubmit={enviar}
-      className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border p-5"
-    >
+    <form onSubmit={enviar} className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border p-4">
       <input type="hidden" name="id" value={recorrencia.id} />
-
       <div className="flex flex-wrap items-start justify-between gap-3">
         <Identificacao recorrencia={recorrencia} conta={conta} />
-        <span className="flex flex-col items-end">
-          <span className="num text-gasto text-[19px] font-semibold">
-            {moeda(recorrencia.valorMedio)}
+        <span className="flex flex-col sm:items-end">
+          <span className="num text-gasto text-xl font-bold">{moeda(recorrencia.valorMedio)}</span>
+          <span className="text-tinta-2 text-[13px]">
+            {recorrencia.ocorrencias} cobranças, de {diaEMes(recorrencia.primeiraData)} a{" "}
+            {diaEMes(recorrencia.ultimaData)}
           </span>
-          <Historico recorrencia={recorrencia} />
         </span>
       </div>
-
-      <div className="flex flex-wrap items-end gap-2.5">
-        <label className="flex min-w-[180px] flex-1 flex-col gap-1">
-          <span className="text-tinta-3 text-[11px] font-semibold tracking-[0.04em] uppercase">
-            Apelido
-          </span>
-          <input
-            type="text"
-            name="apelido"
-            id={`${campo}-apelido`}
-            defaultValue={recorrencia.apelido ?? ""}
-            placeholder="Como você chama isso"
-            maxLength={100}
-            className="border-borda bg-superficie focus:border-marca rounded-[9px] border px-3 py-2 text-[13px] outline-none"
-          />
-        </label>
-
-        <label className="flex min-w-[150px] flex-col gap-1">
-          <span className="text-tinta-3 text-[11px] font-semibold tracking-[0.04em] uppercase">
-            Categoria
-          </span>
-          <select
-            name="categoria"
-            id={`${campo}-categoria`}
-            defaultValue={recorrencia.categoria ?? ""}
-            className="border-borda bg-superficie focus:border-marca rounded-[9px] border px-3 py-2 text-[13px] outline-none"
-          >
-            <option value="">Sem categoria</option>
-            {CATEGORIAS.map((opcao) => (
-              <option key={opcao} value={opcao}>
-                {ROTULO_DA_CATEGORIA[opcao]}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={enviando}
-            name="status"
-            value="aprovada"
-            className="bg-positivo cursor-pointer rounded-[9px] disabled:cursor-wait disabled:opacity-60 px-4 py-2 text-[13px] font-semibold text-white"
-          >
-            Aprovar
-          </button>
-          <button
-            type="submit"
-            disabled={enviando}
-            name="status"
-            value="rejeitada"
-            title="A detecção não devolve esta recorrência para a fila depois de rejeitada"
-            className="border-borda text-tinta-2 hover:bg-superficie-2 cursor-pointer rounded-[9px] disabled:cursor-wait disabled:opacity-60 border px-4 py-2 text-[13px] font-semibold"
-          >
-            Rejeitar
-          </button>
-        </div>
-      </div>
+      <Decisoes enviando={enviando} recorrencia={recorrencia} />
       <ErroDaDecisao erro={erro} />
     </form>
   );
 }
 
-/** Uma já decidida: mostra o que ficou e permite voltar atrás. */
-export function LinhaDecidida({
-  recorrencia,
-  conta,
-}: {
-  recorrencia: Recorrencia;
-  conta?: Conta;
-}) {
-  const aprovada = recorrencia.status === "aprovada";
+const ESTADO: Record<Exclude<StatusRecorrencia, "pendente">, { rotulo: string; classe: string }> = {
+  aprovada: { rotulo: "Conta fixa", classe: "bg-positivo-fundo text-positivo" },
+  parcelamento: { rotulo: "Parcelamento", classe: "bg-marca-clara text-marca" },
+  encerrada: { rotulo: "Encerrada", classe: "bg-borda-sutil text-tinta-2" },
+  rejeitada: { rotulo: "Não é recorrência", classe: "bg-fixa-fundo text-fixa" },
+};
+
+function detalheDaDecidida(recorrencia: Recorrencia): string {
+  if (recorrencia.status === "encerrada" || recorrencia.status === "rejeitada") {
+    return `última em ${diaEMes(recorrencia.ultimaData)}`;
+  }
+  return `todo dia ${Number(recorrencia.ultimaData.slice(8, 10))}`;
+}
+
+/** Uma já decidida: o estado à vista e o caminho para mudar. */
+export function CartaoDecidido({ recorrencia, conta }: { recorrencia: Recorrencia; conta?: Conta }) {
   const { erro, enviando, enviar } = useDecisao();
+  const [mudando, setMudando] = useState(false);
+  const estado = ESTADO[recorrencia.status as Exclude<StatusRecorrencia, "pendente">];
+  const campo = `recorrencia-${recorrencia.id}`;
+  const faltam =
+    recorrencia.status === "parcelamento" && recorrencia.fimPrevisto
+      ? Math.max(mesesEntre(recorrencia.ultimaData, recorrencia.fimPrevisto), 0)
+      : null;
+  const total = faltam === null ? null : recorrencia.ocorrencias + faltam;
 
   return (
-    <form
-      onSubmit={enviar}
-      className="border-borda-sutil flex flex-wrap items-center justify-between gap-3 border-b px-[22px] py-3 last:border-b-0"
-    >
+    <form onSubmit={enviar} className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border p-4">
       <input type="hidden" name="id" value={recorrencia.id} />
-      <Identificacao recorrencia={recorrencia} conta={conta} />
-
-      <div className="flex flex-wrap items-center gap-3">
-        {recorrencia.categoria && (
-          <span className="bg-marca-clara text-marca-escura rounded-full px-2.5 py-1 text-[10.5px] font-semibold">
-            {ROTULO_DA_CATEGORIA[recorrencia.categoria]}
-          </span>
-        )}
-        <span className="num text-tinta-2 text-[13px] font-semibold">
-          {moeda(recorrencia.valorMedio)}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <Identificacao recorrencia={recorrencia} conta={conta} />
+        <span className="flex flex-col sm:items-end">
+          <span className="num text-tinta text-xl font-bold">{moeda(recorrencia.valorMedio)}</span>
+          <span className="text-tinta-2 text-[13px]">{detalheDaDecidida(recorrencia)}</span>
         </span>
-        <button
-          type="submit"
-          disabled={enviando}
-          name="status"
-          value={aprovada ? "rejeitada" : "aprovada"}
-          className="border-borda text-tinta-2 hover:bg-superficie-2 cursor-pointer rounded-[9px] disabled:cursor-wait disabled:opacity-60 border px-3 py-1.5 text-[12px]"
-        >
-          {aprovada ? "Rejeitar" : "Aprovar"}
-        </button>
       </div>
-      {erro && (
-        <div className="basis-full">
-          <ErroDaDecisao erro={erro} />
+
+      {total !== null && recorrencia.fimPrevisto && (
+        <div className="flex flex-col gap-1.5">
+          <div
+            role="meter"
+            aria-label={`Parcelas pagas de ${recorrencia.apelido ?? partesDaDescricao(recorrencia.descricao).nome}`}
+            aria-valuenow={recorrencia.ocorrencias}
+            aria-valuemin={0}
+            aria-valuemax={total}
+            className="bg-marca-clara h-2.5 overflow-hidden rounded-full"
+          >
+            <div
+              style={{ width: `${(recorrencia.ocorrencias / total) * 100}%` }}
+              className="bg-marca h-full rounded-full"
+            />
+          </div>
+          <p className="text-tinta-2 flex justify-between gap-3 text-sm font-semibold">
+            <span>
+              {recorrencia.ocorrencias} de {total} pagas
+            </span>
+            <span>
+              termina em {recorrencia.fimPrevisto.slice(5, 7)}/{recorrencia.fimPrevisto.slice(0, 4)}
+            </span>
+          </p>
         </div>
       )}
+
+      <div className="flex flex-wrap items-center justify-between gap-2.5">
+        <span className={`${estado.classe} rounded-full px-3 py-1 text-[13px] font-bold`}>{estado.rotulo}</span>
+        <button
+          type="button"
+          aria-expanded={mudando}
+          onClick={() => setMudando((atual) => !atual)}
+          className={`${NEUTRO} text-marca`}
+        >
+          {mudando ? "Fechar" : "Mudar"}
+        </button>
+      </div>
+
+      {mudando && (
+        <div className="border-borda-sutil flex flex-col gap-3 border-t pt-3.5">
+          <div className="flex flex-wrap gap-2.5">
+            <label className="flex min-w-[200px] flex-1 flex-col gap-1 text-[13px]">
+              <span className="text-tinta-2 font-semibold">Apelido</span>
+              <input
+                type="text"
+                name="apelido"
+                id={`${campo}-apelido`}
+                defaultValue={recorrencia.apelido ?? ""}
+                maxLength={100}
+                className="border-borda bg-superficie h-10 rounded-[9px] border px-3 text-sm"
+              />
+            </label>
+            <label className="flex min-w-[170px] flex-col gap-1 text-[13px]">
+              <span className="text-tinta-2 font-semibold">Categoria</span>
+              <select
+                name="categoria"
+                id={`${campo}-categoria`}
+                defaultValue={recorrencia.categoria ?? ""}
+                className="border-borda bg-superficie h-10 rounded-[9px] border px-3 text-sm"
+              >
+                <option value="">Sem categoria</option>
+                {CATEGORIAS.map((opcao) => (
+                  <option key={opcao} value={opcao}>
+                    {ROTULO_DA_CATEGORIA[opcao]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <Decisoes enviando={enviando} recorrencia={recorrencia} />
+        </div>
+      )}
+      <ErroDaDecisao erro={erro} />
     </form>
   );
 }

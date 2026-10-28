@@ -1,7 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import type { Conta } from "./buscar-resumo";
-import type { Recorrencia } from "./buscar-recorrencias";
 import { ProvedorDeDicas } from "./info";
 
 // Cada tela é renderizada com as buscas falhando, como `buscarJson` faz
@@ -51,22 +50,11 @@ const CONTA: Conta = {
   disponivel: null,
   bandeira: null,
   final: null,
+  itemId: null,
   fechamento: null,
   vencimento: null,
 };
 
-const PENDENTE: Recorrencia = {
-  id: 1,
-  contaId: "conta-a",
-  descricao: "Assinatura streaming",
-  apelido: null,
-  categoria: null,
-  valorMedio: 65,
-  ocorrencias: 3,
-  primeiraData: "2026-06-10",
-  ultimaData: "2026-08-10",
-  status: "pendente",
-};
 
 beforeEach(() => {
   for (const busca of Object.values(buscas)) {
@@ -158,26 +146,13 @@ test("Início sem o dinheiro livre mostra indisponível, nunca zero", async () =
   semZero();
 });
 
-test("Recorrências com as decididas falhando não mostra metade da lista", async () => {
-  buscas.buscarRecorrencias.mockImplementation(async (status: string) =>
-    status === "pendente" ? [PENDENTE] : status === "aprovada" ? [] : null,
-  );
-
-  render(await Recorrencias());
-
-  expect(screen.getByRole("alert").textContent).toMatch(/recorrências já decididas/);
-  expect(
-    within(screen.getByRole("region", { name: "Já decididas" })).getByText("Indisponível"),
-  ).toBeDefined();
-});
-
 test("com a API toda fora, as três telas mostram a faixa e nenhum zero", async () => {
   for (const tela of [
     await Inicio(),
     await Movimentos({ searchParams: Promise.resolve({}), params: Promise.resolve({}) }),
     await Recorrencias(),
   ]) {
-    const { unmount } = render(tela);
+    const { unmount } = render(<ProvedorDeDicas>{tela}</ProvedorDeDicas>);
     expect(screen.getByRole("alert").textContent).toMatch(/A API não respondeu/);
     expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeDefined();
     semZero();

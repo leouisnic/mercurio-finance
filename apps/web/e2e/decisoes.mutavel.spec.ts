@@ -26,25 +26,30 @@ test.afterAll(() => {
   restaurarBaseFicticia();
 });
 
-test("aprovar já classificando grava na API e tira a candidata da fila", async ({
+test("decidir como parcelamento grava o fim na API e muda a candidata de aba", async ({
   page,
   request,
 }) => {
   await page.goto("/recorrencias");
-  const fila = page.getByRole("region", { name: "Esperando decisão" });
-  await fila.getByLabel("Categoria").selectOption("assinatura");
+  const fila = page.getByRole("tabpanel", { name: /Para decidir/ });
 
-  await fila.getByRole("button", { name: "Aprovar" }).click();
+  await fila.getByRole("button", { name: "Parcelamento" }).click();
+  await fila.getByLabel("Parcelas que faltam").fill("3");
+  await fila.getByRole("button", { name: "Confirmar" }).click();
 
-  await expect(fila.getByText("Nenhuma candidata esperando", { exact: false })).toBeVisible();
-  const decididas = page.getByRole("region", { name: "Já decididas" });
-  await expect(decididas.getByText("Assinatura streaming")).toBeVisible();
-  await expect(decididas.getByRole("button", { name: "Rejeitar" })).toBeVisible();
+  await expect(fila.getByText("Nada esperando decisão.")).toBeVisible();
+  await page.getByRole("tab", { name: /Parcelamentos/ }).click();
+  const parcelamentos = page.getByRole("tabpanel", { name: /Parcelamentos/ });
+  await expect(parcelamentos.getByText("Assinatura streaming")).toBeVisible();
+  await expect(parcelamentos.getByText("3 de 6 pagas")).toBeVisible();
 
-  const aprovadas = await (await request.get(`${API}/recorrencias?status=aprovada`)).json();
-  expect(aprovadas).toEqual([
-    expect.objectContaining({ descricao: "Assinatura streaming", categoria: "assinatura" }),
-  ]);
+  const [gravada] = await (await request.get(`${API}/recorrencias?status=parcelamento`)).json();
+  // Três parcelas depois da última cobrança vista, mês a mês.
+  const ultima = new Date(`${gravada.ultima_data}T00:00:00`);
+  const esperado = new Date(ultima.getFullYear(), ultima.getMonth() + 3, ultima.getDate());
+  expect(gravada.fim_previsto).toBe(
+    `${esperado.getFullYear()}-${String(esperado.getMonth() + 1).padStart(2, "0")}-${String(esperado.getDate()).padStart(2, "0")}`,
+  );
 });
 
 test("renomear a conta vale depois de recarregar e volta ao nome do banco", async ({ page }) => {

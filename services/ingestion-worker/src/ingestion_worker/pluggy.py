@@ -195,6 +195,9 @@ def mapear_conta(conta: dict) -> dict:
         ),
         "bandeira": dados_credito.get("brand") if conta["type"] == "CREDIT" else None,
         "final": conta.get("number") if conta["type"] == "CREDIT" else None,
+        # Contas da mesma conexão são do mesmo banco; o cartão da Nubank chega
+        # só como "gold" e descobre o banco pela conta corrente vizinha.
+        "item_id": conta.get("itemId"),
         "fechamento": dados_credito.get("balanceCloseDate"),
         "vencimento": dados_credito.get("balanceDueDate"),
     }

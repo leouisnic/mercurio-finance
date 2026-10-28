@@ -1,4 +1,5 @@
 import { buscarJson, paraNumero, paraNumeroOuNull } from "./api";
+import { herdarBancoDaConexao } from "./banco";
 
 export type Conta = {
   id: string;
@@ -10,6 +11,10 @@ export type Conta = {
   disponivel: number | null;
   bandeira: string | null;
   final: string | null;
+  /** Conexão bancária de origem; nula até a primeira sincronização com ela. */
+  itemId: string | null;
+  /** Banco herdado de outra conta da mesma conexão, ver `herdarBancoDaConexao`. */
+  bancoDaConexao?: string | null;
   /** Datas da fatura em aberto. Nulas para conta corrente. */
   fechamento: string | null;
   vencimento: string | null;
@@ -30,6 +35,7 @@ type RespostaApiConta = {
   disponivel: string | null;
   bandeira: string | null;
   final: string | null;
+  item_id?: string | null;
   fechamento: string | null;
   vencimento: string | null;
 };
@@ -48,18 +54,21 @@ export async function buscarResumo(): Promise<ResumoFinanceiro | null> {
 
   return {
     atualizadoEm: corpo.atualizado_em,
-    contas: corpo.contas.map((conta) => ({
-      id: conta.id,
-      nome: conta.nome,
-      apelido: conta.apelido,
-      tipo: conta.tipo,
-      saldo: paraNumero(conta.saldo),
-      limite: paraNumeroOuNull(conta.limite),
-      disponivel: paraNumeroOuNull(conta.disponivel),
-      bandeira: conta.bandeira,
-      final: conta.final,
-      fechamento: conta.fechamento,
-      vencimento: conta.vencimento,
-    })),
+    contas: herdarBancoDaConexao(
+      corpo.contas.map((conta) => ({
+        id: conta.id,
+        nome: conta.nome,
+        apelido: conta.apelido,
+        tipo: conta.tipo,
+        saldo: paraNumero(conta.saldo),
+        limite: paraNumeroOuNull(conta.limite),
+        disponivel: paraNumeroOuNull(conta.disponivel),
+        bandeira: conta.bandeira,
+        final: conta.final,
+        itemId: conta.item_id ?? null,
+        fechamento: conta.fechamento,
+        vencimento: conta.vencimento,
+      })),
+    ),
   };
 }

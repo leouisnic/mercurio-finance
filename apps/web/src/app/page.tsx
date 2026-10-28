@@ -37,12 +37,12 @@ export default async function Inicio() {
 
   return (
     <>
-      <header className="flex flex-wrap items-start justify-between gap-3">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-[23px] font-bold tracking-[-0.2px]">Início</h1>
-        <div className="flex items-start gap-2.5">
+        <div className="flex items-center gap-2.5">
           {resumo?.atualizadoEm && (
             <span
-              className={`${tomDaSincronizacao(resumo.atualizadoEm, agora)} rounded-[10px] px-3.5 py-2 text-[12.5px] font-semibold`}
+              className={`${tomDaSincronizacao(resumo.atualizadoEm, agora)} inline-flex h-10 items-center rounded-[10px] px-3.5 text-[13px] font-semibold whitespace-nowrap`}
             >
               Sincronizado {tempoDesde(resumo.atualizadoEm, agora)}
             </span>

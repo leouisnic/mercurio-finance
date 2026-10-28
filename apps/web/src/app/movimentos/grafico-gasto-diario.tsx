@@ -39,7 +39,7 @@ export function GraficoGastoDiario({
       className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border px-[22px] py-5"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-tinta-3 text-xs font-semibold tracking-[0.06em] uppercase">{titulo}</h2>
+        <h2 className="text-sm font-bold">{titulo}</h2>
         <span className="num text-tinta-2 text-[13px]">total no período: {moeda(total)}</span>
       </div>
 
@@ -59,7 +59,7 @@ export function GraficoGastoDiario({
                 className={`w-full rounded-t-[5px] ${valor > 0 ? "bg-gasto-forte" : "bg-gasto-fundo-fraco"}`}
               />
               <span
-                className={`text-[10.5px] ${valor > 0 ? "text-gasto font-semibold" : "text-tinta-3"}`}
+                className={`text-[13px] ${valor > 0 ? "text-gasto font-semibold" : "text-tinta-3"}`}
               >
                 {dia.slice(8, 10)}
               </span>

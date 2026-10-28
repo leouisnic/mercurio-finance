@@ -144,3 +144,11 @@ def test_compromisso_entra_so_de_hoje_em_diante() -> None:
 
     assert conta.nome == "Seguro"
     assert conta.data_prevista == date(2026, 10, 11)
+
+
+def test_parcelamento_depois_da_ultima_parcela_nao_entra() -> None:
+    parcela = RecorrenciaAprovada("Parcela", D("84.42"), date(2026, 9, 12), fim_previsto=date(2026, 9, 12))
+    ainda_vem = RecorrenciaAprovada("Parcela", D("84.42"), date(2026, 9, 12), fim_previsto=date(2026, 10, 12))
+
+    assert _pendentes([parcela]) == []
+    assert [conta.data_prevista for conta in _pendentes([ainda_vem])] == [date(2026, 10, 12)]

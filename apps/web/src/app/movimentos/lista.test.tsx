@@ -15,6 +15,7 @@ const CONTAS: Conta[] = [
     disponivel: null,
     bandeira: null,
     final: null,
+    itemId: null,
     fechamento: null,
     vencimento: null,
   },
@@ -91,7 +92,7 @@ test("possível duplicidade informa que o valor continua no total", () => {
 test("a conta aparece com o nome do banco, não com o nome cru da Pluggy", () => {
   render(<Lista movimentos={[movimento({})]} contas={CONTAS} />);
 
-  expect(screen.getByText("Nubank · Conta")).toBeDefined();
+  expect(screen.getByText("Conta Nubank")).toBeDefined();
 });
 
 test("recorte sem movimento diz isso em vez de mostrar tabela vazia", () => {

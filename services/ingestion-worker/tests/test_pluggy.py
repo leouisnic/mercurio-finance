@@ -273,6 +273,7 @@ def test_mapear_conta_corrente() -> None:
         "disponivel": None,
         "bandeira": None,
         "final": None,
+        "item_id": None,
         "fechamento": None,
         "vencimento": None,
     }
@@ -307,6 +308,7 @@ def test_mapear_conta_cartao_de_credito() -> None:
         "disponivel": 9.96,
         "bandeira": "MASTERCARD",
         "final": "1234",
+        "item_id": None,
         "fechamento": "2026-09-08",
         "vencimento": "2026-09-15",
     }
@@ -331,3 +333,11 @@ def test_mapear_conta_cartao_sem_bandeira_informada() -> None:
     assert resultado["final"] is None
     assert resultado["fechamento"] is None
     assert resultado["vencimento"] is None
+
+
+def test_conta_guarda_a_conexao_de_origem() -> None:
+    conta = pluggy.mapear_conta(
+        {"id": "c1", "itemId": "item-a", "name": "gold", "type": "CREDIT", "balance": 10, "creditData": {}}
+    )
+
+    assert conta["item_id"] == "item-a"

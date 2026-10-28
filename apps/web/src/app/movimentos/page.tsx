@@ -86,7 +86,7 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
     resumo === null && "nomes das contas",
   ].filter((parte): parte is string => typeof parte === "string");
 
-  const tituloDoGrafico = `Gasto por dia · Ciclo ${ciclo.numero} (${diaEMes(ciclo.inicio)} a ${diaEMes(ciclo.fim)})`;
+  const tituloDoGrafico = `Gasto por dia no Ciclo ${ciclo.numero}, de ${diaEMes(ciclo.inicio)} a ${diaEMes(ciclo.fim)}`;
   const gastoPorConta =
     fluxosVisiveis === null ? (
       <BlocoIndisponivel titulo="Gasto por conta no período" rotulo="Gasto por conta no período" />
@@ -115,7 +115,7 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
       />
 
       {totalEmRevisao > 0 && (
-        <p role="status" className="bg-gasto-fundo text-gasto rounded-xl px-4 py-3 text-xs">
+        <p role="status" className="bg-gasto-fundo text-gasto rounded-xl px-4 py-3 text-[13px]">
           O total inclui {totalEmRevisao.toLocaleString("pt-BR", {
             style: "currency",
             currency: "BRL",
@@ -157,7 +157,7 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
       <nav aria-label="Paginação dos movimentos" className="flex justify-end gap-2">
         {pagina > 1 && (
           <Link
-            className="border-borda bg-superficie rounded-lg border px-3 py-2 text-xs"
+            className="border-borda bg-superficie rounded-lg border px-3 py-2 text-[13px]"
             href={{
               pathname: "/movimentos",
               query: {
@@ -173,7 +173,7 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
         )}
         {(movimentos?.length ?? 0) === limite && (
           <Link
-            className="border-borda bg-superficie rounded-lg border px-3 py-2 text-xs"
+            className="border-borda bg-superficie rounded-lg border px-3 py-2 text-[13px]"
             href={{
               pathname: "/movimentos",
               query: {

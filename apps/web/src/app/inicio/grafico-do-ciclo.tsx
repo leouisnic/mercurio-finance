@@ -1,6 +1,4 @@
-"use client";
-
-import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { ChartColumn } from "lucide-react";
 import { comoData, diaEMes, moeda } from "../formato";
 import { Info } from "../info";
 
@@ -15,6 +13,24 @@ function diasDoCiclo(inicio: string, fim: string): string[] {
   }
   return dias;
 }
+
+/**
+ * Topo da escala do gráfico. Um dia muito acima dos outros (o aluguel pago no
+ * débito, uma compra grande) achataria todas as barras e a cota contra o
+ * chão; quando o maior passa de 2,5 vezes o segundo maior (ou a cota), ele é
+ * cortado no teto e ganha o valor escrito.
+ */
+export function tetoDaEscala(valores: number[], cota: number): number {
+  const ordenados = [...valores].sort((a, b) => b - a);
+  const maior = ordenados[0] ?? 0;
+  const base = Math.max(ordenados[1] ?? 0, cota);
+  if (base > 0 && maior > base * 2.5) {
+    return base * 1.25;
+  }
+  return Math.max(maior, cota, 1) * 1.1;
+}
+
+const CORTE = "repeating-linear-gradient(135deg, var(--color-superficie) 0 3px, transparent 3px 6px)";
 
 /**
  * Gasto de cada dia do ciclo contra a cota. Os dias que ainda não chegaram
@@ -34,116 +50,125 @@ export function GraficoDoCiclo({
   gastos: { data: string; total: number }[];
 }) {
   const porDia = new Map(gastos.map((gasto) => [gasto.data, gasto.total]));
+  const cotaVisivel = Math.max(cota, 0);
   const dados: Dia[] = diasDoCiclo(inicio, fim).map((data) => {
     const futuro = data > hoje;
     return {
       data,
       rotulo: data === hoje ? "hoje" : data.slice(8, 10),
-      valor: futuro ? Math.max(cota, 0) : (porDia.get(data) ?? 0),
+      valor: futuro ? cotaVisivel : (porDia.get(data) ?? 0),
       futuro,
     };
   });
   const passados = dados.filter((dia) => !dia.futuro);
+  const teto = tetoDaEscala(
+    passados.map((dia) => dia.valor),
+    cotaVisivel,
+  );
+  const algumCortado = passados.some((dia) => dia.valor > teto);
+  const alturaDaCota = (cotaVisivel / teto) * 100;
 
   return (
     <section
       aria-label="Gasto por dia e cota"
-      className="bg-superficie border-borda flex flex-col gap-3 rounded-2xl border px-5 py-4"
+      className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border p-4"
     >
-      <div className="flex items-center gap-1">
-        <h2 className="text-tinta-3 text-xs font-semibold tracking-[0.06em] uppercase">Gasto por dia e cota</h2>
+      <div className="flex items-center gap-2.5">
+        <span className="bg-marca-clara text-marca grid size-[30px] shrink-0 place-items-center rounded-[9px]">
+          <ChartColumn size={18} strokeWidth={2} aria-hidden />
+        </span>
+        <h2 className="text-sm font-bold">Gasto por dia</h2>
         <Info
-          sobre="gasto por dia e cota"
+          sobre="gasto por dia"
           texto="Quanto saiu em cada dia do ciclo, sem contas fixas e fatura. A linha tracejada é a cota do dia."
         />
       </div>
 
-      <div aria-hidden className="h-[180px]">
-        <ResponsiveContainer width="100%" height="100%">
-          {/* Sem a camada de teclado do Recharts: o gráfico fica escondido de
-              leitor de tela, e a tabela abaixo é o equivalente acessível. */}
-          <BarChart
-            data={dados}
-            margin={{ top: 18, right: 4, bottom: 0, left: 4 }}
-            barCategoryGap="22%"
-            accessibilityLayer={false}
-          >
-            <XAxis
-              dataKey="rotulo"
-              tickLine={false}
-              axisLine={{ stroke: "var(--color-borda)" }}
-              tick={({ x, y, payload }) => (
-                <text
-                  x={x}
-                  y={Number(y) + 12}
-                  textAnchor="middle"
-                  fontSize={11}
-                  fontWeight={payload.value === "hoje" ? 600 : 400}
-                  fill={payload.value === "hoje" ? "var(--color-marca)" : "var(--color-tinta-3)"}
-                >
-                  {payload.value}
-                </text>
-              )}
-              interval={0}
-            />
-            <YAxis hide domain={[0, (maior: number) => Math.max(maior, cota) * 1.15]} />
-            <Tooltip
-              cursor={{ fill: "var(--color-superficie-2)" }}
-              formatter={(valor, _nome, item) => [
-                moeda(Number(valor)),
-                (item.payload as Dia).futuro ? "cota" : "gasto",
-              ]}
-              labelFormatter={(_rotulo, itens) => {
-                const dia = itens[0]?.payload as Dia | undefined;
-                return dia ? diaEMes(dia.data) : "";
-              }}
-              contentStyle={{ borderRadius: 8, fontSize: 12 }}
-            />
-            <Bar dataKey="valor" radius={[4, 4, 0, 0]} isAnimationActive={false}>
-              {dados.map((dia) => (
-                <Cell
-                  key={dia.data}
-                  fill={
-                    dia.futuro
-                      ? "transparent"
-                      : dia.valor > cota
-                        ? "var(--color-alerta-forte)"
-                        : "var(--color-tinta-4)"
-                  }
-                  stroke={dia.futuro ? "var(--color-tinta-4)" : undefined}
-                  strokeDasharray={dia.futuro ? "3 3" : undefined}
-                />
-              ))}
-            </Bar>
-            <ReferenceLine
-              y={cota}
-              stroke="var(--color-tinta-2)"
-              strokeWidth={2}
-              strokeDasharray="6 4"
-              label={{
-                value: `cota ${moeda(cota)}`,
-                position: "insideTopRight",
-                fontSize: 11,
-                fill: "var(--color-tinta-2)",
-              }}
-            />
-          </BarChart>
-        </ResponsiveContainer>
+      <span className="bg-marca-clara text-marca self-start rounded-full px-3 py-1 text-[13px] font-bold">
+        Cota do dia <span className="num">{moeda(cota)}</span>
+      </span>
+
+      <div aria-hidden className="relative pt-[26px]">
+        <div className="relative grid h-[170px] gap-1" style={{ gridTemplateColumns: `repeat(${dados.length}, minmax(0, 1fr))` }}>
+          <div
+            className="border-marca pointer-events-none absolute inset-x-0 z-10 border-t-2 border-dashed"
+            style={{ bottom: `${alturaDaCota}%` }}
+          />
+          {dados.map((dia) => {
+            const cortado = !dia.futuro && dia.valor > teto;
+            const altura = (Math.min(dia.valor, teto) / teto) * 100;
+            const passou = !dia.futuro && dia.valor > cotaVisivel;
+            return (
+              <div
+                key={dia.data}
+                title={dia.futuro ? undefined : `${diaEMes(dia.data)}: ${moeda(dia.valor)}`}
+                className="border-borda flex items-end justify-center border-b"
+              >
+                {dia.futuro ? (
+                  <span
+                    className="border-tinta-4 block w-[70%] max-w-[30px] rounded-t border-[1.5px] border-b-0 border-dashed"
+                    style={{ height: `${alturaDaCota}%` }}
+                  />
+                ) : (
+                  <span
+                    className={`relative block w-[70%] max-w-[30px] rounded-t ${passou ? "bg-alerta-forte" : "bg-tinta-4"}`}
+                    style={{ height: `${Math.max(altura, 1.5)}%` }}
+                  >
+                    {cortado ? (
+                      <>
+                        <span className="num text-alerta absolute -top-[22px] left-0 text-xs font-bold whitespace-nowrap">
+                          {moeda(dia.valor)}
+                        </span>
+                        <span className="absolute inset-x-[-3px] top-3.5 h-2" style={{ background: CORTE }} />
+                      </>
+                    ) : (
+                      passou && (
+                        <span className="num text-tinta-2 absolute -top-5 left-1/2 -translate-x-1/2 text-xs font-semibold whitespace-nowrap max-sm:hidden">
+                          {Math.round(dia.valor)}
+                        </span>
+                      )
+                    )}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-1.5 grid gap-1" style={{ gridTemplateColumns: `repeat(${dados.length}, minmax(0, 1fr))` }}>
+          {dados.map((dia, indice) => (
+            <span
+              key={dia.data}
+              className={`text-center text-xs ${dia.rotulo === "hoje" ? "text-marca font-bold" : "text-tinta-3"} ${
+                dia.rotulo === "hoje" || indice % 3 === 0 ? "" : "max-sm:invisible"
+              }`}
+            >
+              {dia.rotulo}
+            </span>
+          ))}
+        </div>
       </div>
 
-      <div className="text-tinta-2 flex flex-wrap gap-4 text-xs" aria-hidden>
+      <div className="text-tinta-2 flex flex-wrap gap-x-[18px] gap-y-1.5 text-sm" aria-hidden>
         <span className="flex items-center gap-1.5">
-          <i className="bg-tinta-4 inline-block size-[9px] rounded-[3px]" />
-          gasto do dia
+          <i className="bg-tinta-4 inline-block size-[11px] rounded-[3px]" />
+          Dentro da cota
         </span>
         <span className="flex items-center gap-1.5">
-          <i className="bg-alerta-forte inline-block size-[9px] rounded-[3px]" />
-          passou da cota
+          <i className="bg-alerta-forte inline-block size-[11px] rounded-[3px]" />
+          Passou da cota
         </span>
-        <span className="flex items-center gap-1.5">
-          <i className="border-tinta-2 inline-block w-[18px] border-t-2 border-dashed" />
-          cota do dia
-        </span>
+        {algumCortado && (
+          <span className="flex items-center gap-1.5">
+            <i
+              className="inline-block size-[11px] rounded-[3px]"
+              style={{
+                background:
+                  "repeating-linear-gradient(135deg, var(--color-alerta-forte) 0 3px, var(--color-superficie) 3px 5px)",
+              }}
+            />
+            Fora da escala, valor escrito
+          </span>
+        )}
       </div>
 
       <table className="sr-only">

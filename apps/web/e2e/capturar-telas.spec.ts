@@ -26,7 +26,7 @@ test("gera capturas públicas com a base fictícia do e2e", async ({ page }) => 
 
   await page.goto("/recorrencias");
   await expect(page.getByRole("heading", { level: 1, name: "Recorrências" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Esperando decisão" })).toBeVisible();
+  await expect(page.getByRole("tabpanel", { name: /Para decidir/ })).toBeVisible();
   await page.screenshot({
     path: path.join(pastaDeCapturas, "recorrencias.png"),
     fullPage: true,

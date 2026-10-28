@@ -4,6 +4,7 @@ import { expect, test } from "vitest";
 import type { ContaFixa, DinheiroLivre } from "../buscar-dinheiro-livre";
 import { ProvedorDeDicas } from "../info";
 import { ComposicaoDoSaldo } from "./composicao-do-saldo";
+import { GraficoDoCiclo, tetoDaEscala } from "./grafico-do-ciclo";
 import { HojeDaParaGastar } from "./hoje-da-para-gastar";
 import { LinhaDoTempo } from "./linha-do-tempo";
 
@@ -128,4 +129,49 @@ test("a linha do tempo usa o nome de quem paga e cai no dia quando não há nome
   );
   expect(screen.getByText(/do Ciclo do dia 5/)).toBeDefined();
   expect(screen.getByText(/para o próximo pagamento/)).toBeDefined();
+});
+
+test("um dia muito acima dos outros é cortado no teto, e a escala segue os demais", () => {
+  // 1.720 é mais de 2,5 vezes o segundo maior (310): o teto fica em 310 vezes 1,25.
+  expect(tetoDaEscala([1720, 38.5, 310, 132.4], 42.3)).toBeCloseTo(387.5);
+  // Sem dia fora do comum, o teto acompanha o maior com folga.
+  expect(tetoDaEscala([120, 80, 60], 42.3)).toBeCloseTo(132);
+  // Ciclo sem gasto ainda mostra a cota na altura certa.
+  expect(tetoDaEscala([], 42.3)).toBeCloseTo(46.53);
+});
+
+test("o dia fora da escala mostra o valor escrito e a legenda explica o corte", () => {
+  montar(
+    <GraficoDoCiclo
+      inicio="2026-10-15"
+      fim="2026-10-20"
+      hoje="2026-10-18"
+      cota={42.3}
+      gastos={[
+        { data: "2026-10-15", total: 1720 },
+        { data: "2026-10-16", total: 38.5 },
+        { data: "2026-10-17", total: 310 },
+      ]}
+    />,
+  );
+
+  const grafico = screen.getByRole("region", { name: "Gasto por dia e cota" });
+  expect(within(grafico).getByText("Cota do dia")).toBeDefined();
+  expect(grafico.textContent).toMatch(/R\$\s1\.720,00/);
+  expect(within(grafico).getByText("Fora da escala, valor escrito")).toBeDefined();
+  expect(within(grafico).getByText(/^R\$\s1\.720,00, acima da cota$/)).toBeDefined();
+});
+
+test("sem dia fora da escala, a legenda não fala de corte", () => {
+  montar(
+    <GraficoDoCiclo
+      inicio="2026-10-15"
+      fim="2026-10-17"
+      hoje="2026-10-16"
+      cota={42.3}
+      gastos={[{ data: "2026-10-15", total: 60 }]}
+    />,
+  );
+
+  expect(screen.queryByText("Fora da escala, valor escrito")).toBeNull();
 });

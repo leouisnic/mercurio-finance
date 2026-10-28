@@ -44,6 +44,7 @@ class ContaORM(Base):
     disponivel: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     bandeira: Mapped[str | None] = mapped_column(String(30), nullable=True)
     final: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    item_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     # Datas da fatura em aberto, como a Pluggy informa em
     # `creditData.balanceCloseDate`/`balanceDueDate`. Nulas para conta corrente.
     fechamento: Mapped[date | None] = mapped_column(Date, nullable=True)
@@ -115,6 +116,7 @@ class RecorrenciaORM(Base):
     primeira_data: Mapped[date] = mapped_column(Date)
     ultima_data: Mapped[date] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(20), default="pendente", index=True)
+    fim_previsto: Mapped[date | None] = mapped_column(Date, nullable=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     atualizado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

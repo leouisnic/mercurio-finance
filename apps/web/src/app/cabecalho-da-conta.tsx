@@ -1,23 +1,9 @@
 "use client";
 
-import { type FormEvent, useState, useTransition } from "react";
+import { type FormEvent, type ReactNode, useState, useTransition } from "react";
 import { renomearConta } from "./acoes";
 import { SeloDoBanco, nomeDaConta } from "./banco";
 import type { Conta } from "./buscar-resumo";
-
-type Tom = "saldo" | "fatura";
-
-function Selo({ tom }: { tom: Tom }) {
-  const classe =
-    tom === "saldo" ? "bg-positivo-fundo text-positivo" : "bg-gasto-fundo text-gasto";
-  return (
-    <span
-      className={`${classe} rounded-full px-2.5 py-1 text-[10px] font-bold tracking-[0.04em]`}
-    >
-      {tom === "saldo" ? "SALDO" : "FATURA"}
-    </span>
-  );
-}
 
 function Lapis() {
   return (
@@ -47,7 +33,16 @@ const BOTAO =
  * recorrência: o React reinicia o formulário ao fim de toda ação, inclusive
  * a que falhou, e o nome digitado tem de sobreviver ao erro.
  */
-export function CabecalhoDaConta({ conta, tom }: { conta: Conta; tom: Tom }) {
+export function CabecalhoDaConta({
+  conta,
+  subtitulo,
+  direita,
+}: {
+  conta: Conta;
+  subtitulo: string;
+  /** O selo de saldo na conta corrente, o logo da bandeira no cartão. */
+  direita?: ReactNode;
+}) {
   const [editando, setEditando] = useState(false);
   const [texto, setTexto] = useState(conta.apelido ?? "");
   const [erro, setErro] = useState<string | null>(null);
@@ -85,7 +80,7 @@ export function CabecalhoDaConta({ conta, tom }: { conta: Conta; tom: Tom }) {
               {/* Nome longo trunca em vez de quebrar o card em duas linhas: a
                   Pluggy devolve coisas como "Nu Pagamentos S.A. - Instituição
                   de Pagamento (Conta Pré-paga)". */}
-              <span className="min-w-0 truncate text-[14.5px] font-semibold" title={conta.nome}>
+              <span className="min-w-0 truncate text-base font-semibold" title={conta.nome}>
                 {nome}
               </span>
               <button
@@ -100,12 +95,10 @@ export function CabecalhoDaConta({ conta, tom }: { conta: Conta; tom: Tom }) {
                 <Lapis />
               </button>
             </span>
-            <span className="text-tinta-3 text-xs">
-              {tom === "saldo" ? "Conta corrente" : "Cartão de crédito"}
-            </span>
+            <span className="text-tinta-2 truncate text-[13px]">{subtitulo}</span>
           </span>
         </div>
-        <Selo tom={tom} />
+        {direita}
       </div>
     );
   }
@@ -120,7 +113,7 @@ export function CabecalhoDaConta({ conta, tom }: { conta: Conta; tom: Tom }) {
           className="flex min-w-0 flex-1 flex-col gap-2"
         >
           <input type="hidden" name="conta_id" value={conta.id} />
-          <label htmlFor={campo} className="text-tinta-3 text-xs">
+          <label htmlFor={campo} className="text-tinta-3 text-[13px]">
             Apelido da conta
           </label>
           <div className="flex flex-wrap gap-1.5">
@@ -155,7 +148,7 @@ export function CabecalhoDaConta({ conta, tom }: { conta: Conta; tom: Tom }) {
               name="limpar"
               value="1"
               disabled={salvando}
-              className="text-marca cursor-pointer self-start text-left text-xs hover:underline"
+              className="text-marca cursor-pointer self-start text-left text-[13px] hover:underline"
             >
               Voltar ao nome do banco: {conta.nome}
             </button>

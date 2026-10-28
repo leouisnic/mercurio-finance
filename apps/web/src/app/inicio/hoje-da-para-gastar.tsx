@@ -17,15 +17,13 @@ export function HojeDaParaGastar({ dinheiro }: { dinheiro: DinheiroLivre }) {
   return (
     <section
       aria-label="Hoje dá para gastar"
-      className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border p-5"
+      className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border p-4"
     >
       <div className="flex items-center gap-2">
-        <span className="bg-positivo-fundo text-positivo grid size-8 place-items-center rounded-[9px]">
+        <span className="bg-positivo-fundo text-positivo grid size-[30px] place-items-center rounded-[9px]">
           <Wallet size={18} aria-hidden />
         </span>
-        <h2 className="text-tinta-3 text-xs font-semibold tracking-[0.06em] uppercase">
-          Hoje dá para gastar
-        </h2>
+        <h2 className="text-sm font-bold">Hoje dá para gastar</h2>
         <Info
           sobre="hoje dá para gastar"
           texto="Cota do dia mais o cofrinho, menos o que você já gastou hoje."
@@ -33,7 +31,7 @@ export function HojeDaParaGastar({ dinheiro }: { dinheiro: DinheiroLivre }) {
       </div>
 
       <span
-        className={`text-[44px] leading-none font-bold tracking-[-1px] sm:text-[50px] ${estourou ? "text-alerta" : "text-positivo"}`}
+        className={`text-[36px] leading-none font-bold tracking-[-0.8px] sm:text-[40px] ${estourou ? "text-alerta" : "text-positivo"}`}
       >
         {estourou ? `- ${moeda(-hojeDisponivel)}` : moeda(hojeDisponivel)}
       </span>
@@ -57,36 +55,39 @@ export function HojeDaParaGastar({ dinheiro }: { dinheiro: DinheiroLivre }) {
             className={`h-full rounded-full ${estourou ? "bg-alerta-forte" : "bg-marca"}`}
           />
         </div>
-        <div className="text-tinta-3 flex justify-between text-xs">
+        <div className="text-tinta-2 flex justify-between text-[13px]">
           <span>gasto hoje {moeda(gastoHoje)}</span>
           <span>de {moeda(Math.max(podiaHoje, 0))}</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5">
-        <div className="bg-superficie-2 border-borda-sutil flex flex-col gap-0.5 rounded-xl border px-3 py-2.5">
-          <span className="text-tinta-3 flex items-center gap-1.5 text-xs">
-            <CalendarDays size={14} aria-hidden />
-            Cota do dia
-            <Info
-              sobre="cota do dia"
-              texto="Livre do ciclo dividido pelos dias do ciclo. Muda quando entra dinheiro ou surge conta fixa nova."
-            />
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        <div className="bg-superficie-2 border-borda-sutil flex items-center gap-3 rounded-xl border p-3">
+          <span className="bg-borda-sutil text-tinta-2 grid size-[30px] shrink-0 place-items-center rounded-[9px]">
+            <CalendarDays size={18} strokeWidth={2} aria-hidden />
           </span>
-          <b className="num text-[17px]">{moeda(cotaDoDia)}</b>
+          <span className="flex flex-col">
+            <span className="text-tinta-2 flex items-center gap-1 text-[13px]">
+              Cota do dia
+              <Info
+                sobre="cota do dia"
+                texto="Livre do ciclo dividido pelos dias do ciclo. Muda quando entra dinheiro ou surge conta fixa nova."
+              />
+            </span>
+            <b className="num text-base">{moeda(cotaDoDia)}</b>
+          </span>
         </div>
-        <div className="bg-superficie-2 border-borda-sutil flex flex-col gap-0.5 rounded-xl border px-3 py-2.5">
-          <span className="text-tinta-3 flex items-center gap-1.5 text-xs">
-            <PiggyBank size={14} aria-hidden />
-            Cofrinho
-            <Info
-              sobre="cofrinho"
-              texto="O que sobrou ou faltou das cotas dos dias anteriores deste ciclo."
-            />
+        <div className="bg-superficie-2 border-borda-sutil flex items-center gap-3 rounded-xl border p-3">
+          <span className="bg-marca-clara text-marca grid size-[30px] shrink-0 place-items-center rounded-[9px]">
+            <PiggyBank size={18} strokeWidth={2} aria-hidden />
           </span>
-          <b className={`num text-[17px] ${cofrinho < 0 ? "text-alerta" : "text-marca"}`}>
-            {comSinal(cofrinho)}
-          </b>
+          <span className="flex flex-col">
+            <span className="text-tinta-2 flex items-center gap-1 text-[13px]">
+              Cofrinho
+              <Info sobre="cofrinho" texto="O que sobrou ou faltou das cotas dos dias anteriores deste ciclo." />
+            </span>
+            <b className={`num text-base ${cofrinho < 0 ? "text-alerta" : "text-marca"}`}>{comSinal(cofrinho)}</b>
+          </span>
         </div>
       </div>
     </section>

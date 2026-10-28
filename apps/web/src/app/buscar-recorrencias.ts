@@ -11,7 +11,8 @@ export const CATEGORIAS = [
 ] as const;
 
 export type Categoria = (typeof CATEGORIAS)[number];
-export type StatusRecorrencia = "pendente" | "aprovada" | "rejeitada";
+/** `aprovada` é conta fixa; `rejeitada` é "não é recorrência". */
+export type StatusRecorrencia = "pendente" | "aprovada" | "parcelamento" | "encerrada" | "rejeitada";
 
 export const ROTULO_DA_CATEGORIA: Record<Categoria, string> = {
   saude: "Saúde",
@@ -34,6 +35,8 @@ export type Recorrencia = {
   primeiraData: string;
   ultimaData: string;
   status: StatusRecorrencia;
+  /** Data da última parcela; só para parcelamento. */
+  fimPrevisto: string | null;
 };
 
 type Linha = {
@@ -47,6 +50,7 @@ type Linha = {
   primeira_data: string;
   ultima_data: string;
   status: StatusRecorrencia;
+  fim_previsto?: string | null;
 };
 
 /**
@@ -70,6 +74,7 @@ export async function buscarRecorrencias(
       primeiraData: linha.primeira_data,
       ultimaData: linha.ultima_data,
       status: linha.status,
+      fimPrevisto: linha.fim_previsto ?? null,
     })) ?? null
   );
 }

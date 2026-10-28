@@ -12,13 +12,13 @@ function LinhaDaContaFixa({ conta }: { conta: ContaFixa }) {
   const data = comoData(conta.dataPrevista);
   return (
     <li className="grid grid-cols-[auto_1fr_auto] items-center gap-2.5 text-[13.5px]">
-      <span className="bg-fixa-fundo text-fixa w-[42px] rounded-lg py-1 text-center text-[11px] leading-tight font-semibold">
+      <span className="bg-fixa-fundo text-fixa w-[42px] rounded-lg py-1 text-center text-[13px] leading-tight font-semibold">
         {DIA_DA_SEMANA.format(data).replace(".", "")}
         <b className="block text-[15px]">{data.getDate()}</b>
       </span>
       <span className="min-w-0">
         <span className="block truncate">{conta.nome}</span>
-        <small className={`block text-[11.5px] ${conta.atrasada ? "text-alerta font-semibold" : "text-tinta-3"}`}>
+        <small className={`block text-[13px] ${conta.atrasada ? "text-alerta font-semibold" : "text-tinta-3"}`}>
           {conta.atrasada
             ? `atrasada, prevista para ${diaEMes(conta.dataPrevista)}`
             : conta.origem === "recorrencia"
@@ -76,10 +76,10 @@ export function ComposicaoDoSaldo({
   return (
     <section
       aria-label="Saldo nas contas"
-      className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border p-5"
+      className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border p-4"
     >
       <div className="flex items-center gap-1">
-        <h2 className="text-tinta-3 text-xs font-semibold tracking-[0.06em] uppercase">
+        <h2 className="text-sm font-bold">
           Saldo nas contas: <span className="num">{moeda(dinheiro.saldoContas)}</span>
         </h2>
         <Info sobre="saldo nas contas" texto="Soma dos saldos das contas correntes na última sincronização." />
@@ -102,8 +102,8 @@ export function ComposicaoDoSaldo({
       <dl className="grid grid-cols-2 gap-x-3.5 gap-y-2.5 lg:grid-cols-4">
         {partes.map((parte) => (
           <div key={parte.rotulo} className="flex flex-col gap-0.5">
-            <dt className="text-tinta-2 flex items-center gap-1 text-xs">
-              <i aria-hidden className={`${parte.cor} inline-block size-[9px] rounded-[3px]`} />
+            <dt className="text-tinta-2 flex items-center gap-1 text-[13px]">
+              <i aria-hidden className={`${parte.cor} inline-block size-[11px] rounded-[3px]`} />
               {parte.rotulo}
               <Info sobre={parte.rotulo.toLowerCase()} texto={parte.dica} />
             </dt>
@@ -115,7 +115,7 @@ export function ComposicaoDoSaldo({
       </dl>
 
       <div className="border-borda-sutil flex flex-col gap-2 border-t pt-3">
-        <h3 className="text-tinta-3 text-xs font-semibold tracking-[0.06em] uppercase">
+        <h3 className="text-sm font-bold">
           Contas fixas até o pagamento
         </h3>
         {visiveis.length === 0 ? (
@@ -133,8 +133,8 @@ export function ComposicaoDoSaldo({
           </ul>
         )}
         {escondidas.length > 0 && (
-          <p className="text-tinta-2 text-xs">
-            + {escondidas.length} {escondidas.length === 1 ? "conta" : "contas"} ·{" "}
+          <p className="text-tinta-2 text-[13px]">
+            + {escondidas.length} {escondidas.length === 1 ? "conta" : "contas"} somando{" "}
             <span className="num">{moeda(escondidas.reduce((soma, conta) => soma + conta.valor, 0))}</span>
           </p>
         )}

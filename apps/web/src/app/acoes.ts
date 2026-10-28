@@ -50,8 +50,9 @@ export async function decidirRecorrencia(dados: FormData): Promise<ResultadoDaAc
   const apelido = String(dados.get("apelido") ?? "").trim();
   const categoria = String(dados.get("categoria") ?? "");
   const status = String(dados.get("status") ?? "");
+  const parcelas = Number(dados.get("parcelas") ?? "");
 
-  const alteracoes: Record<string, string | null> = {};
+  const alteracoes: Record<string, string | number | null> = {};
   if (apelido) {
     alteracoes.apelido = apelido;
   }
@@ -60,6 +61,9 @@ export async function decidirRecorrencia(dados: FormData): Promise<ResultadoDaAc
   }
   if (status) {
     alteracoes.status = status;
+  }
+  if (status === "parcelamento") {
+    alteracoes.parcelas_restantes = parcelas;
   }
 
   const motivo = await enviar(`/recorrencias/${encodeURIComponent(id)}`, {

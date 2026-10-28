@@ -119,7 +119,7 @@ export function BarraLateral() {
         </span>
         <span className="flex flex-col leading-tight">
           <span className="text-[17px] font-bold tracking-[0.1px]">Vértice</span>
-          <span className="text-tinta-3 text-[10.5px]">por Mercúrio</span>
+          <span className="text-tinta-3 text-[13px]">por Mercúrio</span>
         </span>
       </Link>
 

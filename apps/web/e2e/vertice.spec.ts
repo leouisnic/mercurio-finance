@@ -22,7 +22,7 @@ test("Início mostra o dinheiro livre calculado pelo finance-api de verdade", as
 
   const contas = page.getByRole("region", { name: "Contas conectadas" });
   await expect(contas.getByText("Conta A (fictícia)")).toBeVisible();
-  await expect(contas.getByText("R$ 2.898,40")).toBeVisible();
+  await expect(contas.getByText("R$ 2.898,40", { exact: true })).toBeVisible();
 });
 
 test("o ícone de informação explica o número ao tocar", async ({ page }) => {
@@ -42,9 +42,9 @@ test("Movimentos filtra por ciclo com as datas que o finance-api calcula", async
   // três ciclos têm intervalo de verdade, calculado com dia útil.
   const filtroDeCiclo = page.getByRole("navigation", { name: "Ciclo" });
   await expect(filtroDeCiclo.getByRole("link")).toHaveCount(3);
-  // Formato "Ciclo N · DD/MM a DD/MM".
+  // Formato "Ciclo N de DD/MM a DD/MM".
   for (const rotulo of await filtroDeCiclo.getByRole("link").allInnerTexts()) {
-    expect(rotulo).toMatch(/^Ciclo [12] · \d{2}\/\d{2} a \d{2}\/\d{2}$/);
+    expect(rotulo).toMatch(/^Ciclo [12] de \d{2}\/\d{2} a \d{2}\/\d{2}$/);
   }
 
   await expect(page.getByRole("region", { name: "Gasto por dia" })).toBeVisible();
@@ -63,7 +63,7 @@ test("escolher outro ciclo troca o recorte pela URL", async ({ page }) => {
 
   // O cabeçalho passa a descrever o mesmo intervalo do filtro escolhido.
   const [, inicio, fim] = rotulo.match(/(\d{2}\/\d{2}) a (\d{2}\/\d{2})/) ?? [];
-  await expect(page.getByText(`de ${inicio} a ${fim}`, { exact: false })).toBeVisible();
+  await expect(page.locator("header").getByText(`de ${inicio} a ${fim}`, { exact: false })).toBeVisible();
 });
 
 test("a navegação leva de uma tela para a outra", async ({ page }) => {
@@ -81,16 +81,17 @@ test("Recorrências mostra a fila de decisão vinda do finance-api", async ({ pa
 
   await expect(page.getByRole("heading", { level: 1, name: "Recorrências" })).toBeVisible();
 
-  // A base fictícia tem uma assinatura cobrada em tres meses seguidos, entao a
-  // deteccao rodada pelo seed sugere exatamente uma candidata.
-  const fila = page.getByRole("region", { name: "Esperando decisão" });
+  // A base fictícia tem uma assinatura cobrada em três meses seguidos, então a
+  // detecção rodada pelo seed sugere exatamente uma candidata.
+  await expect(page.getByRole("tab", { name: /Para decidir/ })).toHaveAttribute("aria-selected", "true");
+  const fila = page.getByRole("tabpanel", { name: /Para decidir/ });
   await expect(fila.getByText("Assinatura streaming")).toBeVisible();
   await expect(fila.getByText("R$ 65,00")).toBeVisible();
   await expect(fila.getByText("3 cobranças", { exact: false })).toBeVisible();
-  await expect(fila.getByRole("button", { name: "Aprovar" })).toBeVisible();
-  await expect(fila.getByRole("button", { name: "Rejeitar" })).toBeVisible();
-  await expect(fila.getByLabel("Categoria")).toHaveValue("");
+  for (const decisao of ["Conta fixa", "Parcelamento", "Encerrada", "Não é recorrência"]) {
+    await expect(fila.getByRole("button", { name: decisao })).toBeVisible();
+  }
 });
 
-// A decisão em si (aprovar, classificar) roda em decisoes.mutavel.spec.ts, no
+// A decisão em si roda em decisoes.mutavel.spec.ts, no
 // projeto que só começa depois deste e restaura a base a cada tentativa.

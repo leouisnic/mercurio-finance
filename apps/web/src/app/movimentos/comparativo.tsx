@@ -20,7 +20,7 @@ export function CicloContraAnterior({
       aria-label="Comparativo com o ciclo anterior"
       className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border px-[22px] py-5"
     >
-      <h2 className="text-tinta-3 text-xs font-semibold tracking-[0.06em] uppercase">
+      <h2 className="text-sm font-bold">
         Ciclo {numero} vs ciclo anterior
       </h2>
 
@@ -30,7 +30,7 @@ export function CicloContraAnterior({
         </span>
         {variacao !== null && (
           <span
-            className={`num rounded-full px-[7px] py-[3px] text-[11px] font-bold ${
+            className={`num rounded-full px-[7px] py-[3px] text-[13px] font-bold ${
               subiu ? "bg-gasto-fundo text-gasto" : "bg-positivo-fundo text-positivo"
             }`}
           >
@@ -39,7 +39,7 @@ export function CicloContraAnterior({
           </span>
         )}
       </div>
-      <span className="text-tinta-3 text-xs">Ciclo anterior: {moeda(anterior)}</span>
+      <span className="text-tinta-3 text-[13px]">Ciclo anterior: {moeda(anterior)}</span>
 
       <div className="mt-0.5 flex flex-col gap-[7px]">
         <div className="bg-borda-sutil h-1.5 overflow-hidden rounded-full">
@@ -68,7 +68,7 @@ export function GastoPorConta({ fluxos }: { fluxos: FluxoDaConta[] }) {
       aria-label="Gasto por conta no período"
       className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border px-[22px] py-5"
     >
-      <h2 className="text-tinta-3 text-xs font-semibold tracking-[0.06em] uppercase">
+      <h2 className="text-sm font-bold">
         Gasto por conta no período
       </h2>
 
@@ -80,7 +80,7 @@ export function GastoPorConta({ fluxos }: { fluxos: FluxoDaConta[] }) {
             <div key={fluxo.contaId} className="flex items-center gap-3">
               <SeloDoBanco conta={fluxo} tamanho={22} />
               <span className="w-[150px] shrink-0 truncate text-[12.5px]" title={fluxo.nome}>
-                {nomeDaConta(fluxo)} · {fluxo.tipo === "CREDIT" ? "Cartão" : "Conta"}
+                {fluxo.tipo === "CREDIT" ? "Cartão" : "Conta"} {nomeDaConta(fluxo)}
               </span>
               <div className="bg-borda-sutil h-2 grow overflow-hidden rounded-full">
                 <div
@@ -92,7 +92,7 @@ export function GastoPorConta({ fluxos }: { fluxos: FluxoDaConta[] }) {
                 {moeda(fluxo.saidas)}
               </span>
               {fluxo.emRevisao > 0 && (
-                <span className="text-gasto text-[10.5px]">
+                <span className="text-gasto text-[13px]">
                   {moeda(fluxo.emRevisao)} em revisão
                 </span>
               )}

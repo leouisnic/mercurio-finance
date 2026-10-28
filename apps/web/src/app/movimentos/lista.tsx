@@ -31,7 +31,7 @@ export function Lista({ movimentos, contas }: { movimentos: Movimento[]; contas:
         {["Data", "Descrição", "Conta", "Valor"].map((titulo) => (
           <span
             key={titulo}
-            className={`text-tinta-3 text-[11px] font-semibold tracking-[0.04em] uppercase ${titulo === "Valor" ? "text-right" : ""}`}
+            className={`text-tinta-3 text-[13px] font-semibold tracking-[0.04em] uppercase ${titulo === "Valor" ? "text-right" : ""}`}
           >
             {titulo}
           </span>
@@ -50,18 +50,18 @@ export function Lista({ movimentos, contas }: { movimentos: Movimento[]; contas:
               key={movimento.id}
               className={`${COLUNAS} border-borda-sutil items-center border-b py-3 last:border-b-0`}
             >
-              <span className="num text-tinta-2 text-xs">{diaEMes(movimento.data)}</span>
+              <span className="num text-tinta-2 text-[13px]">{diaEMes(movimento.data)}</span>
 
               <span className="flex min-w-0 flex-col">
                 <span className="truncate text-[13.5px]">{movimento.descricao}</span>
                 {movimento.pagamentoDeFatura !== null &&
                   movimento.pagamentoDeFatura !== "descartado" && (
-                    <span className="text-tinta-3 text-[10.5px]">
+                    <span className="text-tinta-3 text-[13px]">
                       pagamento de fatura, fora das somas de gasto
                     </span>
                   )}
                 {movimento.duplicadoPossivel && (
-                  <span className="text-gasto text-[10.5px]">
+                  <span className="text-gasto text-[13px]">
                     possível duplicidade, valor incluído no total
                   </span>
                 )}
@@ -71,7 +71,7 @@ export function Lista({ movimentos, contas }: { movimentos: Movimento[]; contas:
                 {conta && <SeloDoBanco conta={conta} tamanho={22} />}
                 <span className="text-tinta-2 truncate text-[12.5px]">
                   {conta
-                    ? `${nomeDaConta(conta)} · ${conta.tipo === "CREDIT" ? "Cartão" : "Conta"}`
+                    ? `${conta.tipo === "CREDIT" ? "Cartão" : "Conta"} ${nomeDaConta(conta)}`
                     : movimento.contaId}
                 </span>
               </span>

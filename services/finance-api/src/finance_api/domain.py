@@ -114,6 +114,10 @@ class Conta(BaseModel):
     disponivel: Decimal | None = None
     bandeira: str | None = None
     final: str | None = None
+    item_id: str | None = Field(
+        default=None,
+        description="Conexão bancária de origem: contas da mesma conexão são do mesmo banco.",
+    )
     fechamento: date | None = Field(
         default=None, description="Dia em que a fatura em aberto fecha. Só para CREDIT."
     )
@@ -206,6 +210,18 @@ class FluxoDaConta(BaseModel):
     em_revisao: Decimal = Field(
         description="Parcela das saídas marcada como possível duplicidade."
     )
+    fatura_paga: Decimal = Field(
+        default=Decimal(0),
+        description="Pagamento de fatura de cartão saído desta conta. Não é gasto.",
+    )
+    transferencias_entrada: Decimal = Field(
+        default=Decimal(0),
+        description="Dinheiro vindo de outra conta do titular, inclusive resgate.",
+    )
+    transferencias_saida: Decimal = Field(
+        default=Decimal(0),
+        description="Dinheiro enviado a outra conta do titular, inclusive aplicação.",
+    )
 
 
 class CicloOut(BaseModel):
@@ -259,8 +275,13 @@ class DinheiroLivreOut(BaseModel):
 
 
 class StatusRecorrencia(str, Enum):
+    """`aprovada` é conta fixa, sem fim; `parcelamento` tem fim previsto;
+    `encerrada` foi recorrente e parou; `rejeitada` nunca foi recorrência."""
+
     PENDENTE = "pendente"
     APROVADA = "aprovada"
+    PARCELAMENTO = "parcelamento"
+    ENCERRADA = "encerrada"
     REJEITADA = "rejeitada"
 
 
@@ -300,6 +321,9 @@ class RecorrenciaOut(BaseModel):
     primeira_data: date
     ultima_data: date
     status: StatusRecorrencia
+    fim_previsto: date | None = Field(
+        default=None, description="Data da última parcela. Só para parcelamento."
+    )
 
 
 class RecorrenciaUpdate(BaseModel):
@@ -309,6 +333,21 @@ class RecorrenciaUpdate(BaseModel):
     apelido: str | None = Field(default=None, min_length=1, max_length=100)
     categoria: CategoriaRecorrencia | None = None
     status: StatusRecorrencia | None = None
+    parcelas_restantes: int | None = Field(
+        default=None,
+        ge=1,
+        le=120,
+        description="Quantas parcelas ainda faltam. Obrigatório só para parcelamento.",
+    )
+
+    @model_validator(mode="after")
+    def parcelas_so_no_parcelamento(self) -> RecorrenciaUpdate:
+        e_parcelamento = self.status == StatusRecorrencia.PARCELAMENTO
+        if e_parcelamento and self.parcelas_restantes is None:
+            raise ValueError("parcelamento precisa de parcelas_restantes")
+        if self.parcelas_restantes is not None and not e_parcelamento:
+            raise ValueError("parcelas_restantes só vale para parcelamento")
+        return self
 
 
 class StatusCompromisso(str, Enum):

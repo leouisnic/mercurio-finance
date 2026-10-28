@@ -67,7 +67,7 @@ export function Filtros({
             href={url(chave, contaEscolhida, referencia)}
             ativo={chave === cicloEscolhido}
           >
-            Ciclo {ciclo.numero} · {diaEMes(ciclo.inicio)} a {diaEMes(ciclo.fim)}
+            Ciclo {ciclo.numero} de {diaEMes(ciclo.inicio)} a {diaEMes(ciclo.fim)}
           </Pilula>
         ))}
       </nav>
@@ -86,7 +86,7 @@ export function Filtros({
             ativo={contaEscolhida === conta.id}
           >
             <SeloDoBanco conta={conta} tamanho={16} />
-            {nomeDaConta(conta)} · {conta.tipo === "CREDIT" ? "Cartão" : "Conta"}
+            {conta.tipo === "CREDIT" ? "Cartão" : "Conta"} {nomeDaConta(conta)}
           </Pilula>
         ))}
       </nav>

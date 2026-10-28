@@ -52,10 +52,10 @@ export function BlocoIndisponivel({ titulo, rotulo }: { titulo: string; rotulo: 
       aria-label={rotulo}
       className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border px-[22px] py-5"
     >
-      <h2 className="text-tinta-3 text-xs font-semibold tracking-[0.06em] uppercase">{titulo}</h2>
+      <h2 className="text-sm font-bold">{titulo}</h2>
       <p className="text-tinta-2 flex flex-col gap-0.5 text-[15px] font-semibold">
         Indisponível
-        <span className="text-tinta-3 text-xs font-normal">A API não respondeu.</span>
+        <span className="text-tinta-3 text-[13px] font-normal">A API não respondeu.</span>
       </p>
     </section>
   );

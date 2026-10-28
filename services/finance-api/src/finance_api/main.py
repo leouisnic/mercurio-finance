@@ -95,6 +95,7 @@ def _recorrencia_out(recorrencia: RecorrenciaORM) -> RecorrenciaOut:
         primeira_data=recorrencia.primeira_data,
         ultima_data=recorrencia.ultima_data,
         status=recorrencia.status,
+        fim_previsto=recorrencia.fim_previsto,
     )
 
 
@@ -161,6 +162,7 @@ async def resumo(
                 disponivel=conta.disponivel,
                 bandeira=conta.bandeira,
                 final=conta.final,
+                item_id=conta.item_id,
                 fechamento=conta.fechamento,
                 vencimento=conta.vencimento,
             )
@@ -180,6 +182,7 @@ def _conta_out(conta: ContaORM) -> Conta:
         disponivel=conta.disponivel,
         bandeira=conta.bandeira,
         final=conta.final,
+        item_id=conta.item_id,
         fechamento=conta.fechamento,
         vencimento=conta.vencimento,
     )
@@ -294,8 +297,22 @@ async def fluxo_por_conta(
             entradas=entradas,
             saidas=saidas,
             em_revisao=em_revisao,
+            fatura_paga=fatura_paga,
+            transferencias_entrada=transferencias_entrada,
+            transferencias_saida=transferencias_saida,
         )
-        for conta_id, nome, apelido, tipo, entradas, saidas, em_revisao in linhas
+        for (
+            conta_id,
+            nome,
+            apelido,
+            tipo,
+            entradas,
+            saidas,
+            em_revisao,
+            fatura_paga,
+            transferencias_entrada,
+            transferencias_saida,
+        ) in linhas
     ]
 
 

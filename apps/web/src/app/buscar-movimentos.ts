@@ -26,6 +26,11 @@ export type FluxoDaConta = {
   entradas: number;
   saidas: number;
   emRevisao: number;
+  /** O que mexe no saldo sem ser gasto: fatura paga e transferência entre
+   *  contas do titular (inclui aplicação e resgate). */
+  faturaPaga?: number;
+  transferenciasEntrada?: number;
+  transferenciasSaida?: number;
 };
 
 export type Movimento = {
@@ -78,6 +83,9 @@ export async function buscarFluxoPorConta(
     entradas: string;
     saidas: string;
     em_revisao: string;
+    fatura_paga?: string;
+    transferencias_entrada?: string;
+    transferencias_saida?: string;
   };
   const corpo = await buscarJson<Linha[]>("/movimentos/por-conta", {
     data_inicio: inicio,
@@ -92,6 +100,9 @@ export async function buscarFluxoPorConta(
       entradas: paraNumero(linha.entradas),
       saidas: paraNumero(linha.saidas),
       emRevisao: paraNumero(linha.em_revisao),
+      faturaPaga: paraNumero(linha.fatura_paga ?? "0"),
+      transferenciasEntrada: paraNumero(linha.transferencias_entrada ?? "0"),
+      transferenciasSaida: paraNumero(linha.transferencias_saida ?? "0"),
     })) ?? null
   );
 }

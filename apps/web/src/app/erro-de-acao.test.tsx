@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import { CabecalhoDaConta } from "./cabecalho-da-conta";
 import type { Conta } from "./buscar-resumo";
-import { CartaoPendente } from "./recorrencias/cartao";
+import { CartaoDecidido } from "./recorrencias/cartao";
 
 // A ação devolve o erro como a de verdade faz quando a API responde 503.
 vi.mock("./acoes", () => ({
@@ -20,12 +20,13 @@ const CONTA: Conta = {
   disponivel: null,
   bandeira: null,
   final: null,
+  itemId: null,
   fechamento: null,
   vencimento: null,
 };
 
 test("renomear que falha mostra o erro e mantém o nome digitado", async () => {
-  render(<CabecalhoDaConta conta={CONTA} tom="saldo" />);
+  render(<CabecalhoDaConta conta={CONTA} subtitulo="Conta corrente" />);
   fireEvent.click(screen.getByRole("button", { name: "Renomear Conta A (fictícia)" }));
   fireEvent.change(screen.getByLabelText("Apelido da conta"), {
     target: { value: "Conta principal" },
@@ -43,27 +44,29 @@ test("renomear que falha mostra o erro e mantém o nome digitado", async () => {
 
 test("decisão que falha mostra o erro e mantém apelido e categoria", async () => {
   render(
-    <CartaoPendente
+    <CartaoDecidido
       recorrencia={{
         id: 7,
         contaId: "conta-a",
-        descricao: "NETFLIX.COM",
+        descricao: "Compra no débito|NETFLIX.COM",
         apelido: null,
         categoria: null,
         valorMedio: 65,
         ocorrencias: 3,
         primeiraData: "2026-06-10",
         ultimaData: "2026-08-10",
-        status: "pendente",
+        status: "aprovada",
+        fimPrevisto: null,
       }}
       conta={CONTA}
     />,
   );
+  fireEvent.click(screen.getByRole("button", { name: "Mudar" }));
   fireEvent.change(screen.getByLabelText("Apelido"), { target: { value: "Streaming" } });
   fireEvent.change(screen.getByLabelText("Categoria"), { target: { value: "assinatura" } });
 
   await act(async () => {
-    fireEvent.click(screen.getByRole("button", { name: "Aprovar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Conta fixa" }));
   });
 
   expect((await screen.findByRole("alert")).textContent).toMatch(/erro 503/);

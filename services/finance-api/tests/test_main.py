@@ -1166,3 +1166,174 @@ def test_dinheiro_livre_soma_exclui_fatura_e_conta_fixa(
         "2026-10-07": "450.00",
         "2026-10-09": "173.70",
     }
+
+
+def _recorrencia_gravada(sessao_de_teste_factory, descricao: str, ultima: date, status: str = "pendente") -> int:
+    async def gravar() -> int:
+        async with sessao_de_teste_factory() as sessao:
+            recorrencia = RecorrenciaORM(
+                conta_id="corrente",
+                descricao=descricao,
+                valor_medio=Decimal("84.42"),
+                ocorrencias=3,
+                primeira_data=date(2026, 7, ultima.day),
+                ultima_data=ultima,
+                status=status,
+            )
+            sessao.add(recorrencia)
+            await sessao.commit()
+            return recorrencia.id
+
+    return asyncio.run(gravar())
+
+
+def test_parcelamento_guarda_a_data_da_ultima_parcela(semear_contas, sessao_de_teste_factory) -> None:
+    """Última cobrança vista em 05/09 e faltam 4: 05/10, 05/11, 05/12 e 05/01."""
+    semear_contas([{"id": "corrente", "nome": "Conta fictícia", "tipo": "BANK", "saldo": 100}])
+    rid = _recorrencia_gravada(sessao_de_teste_factory, "Pix parcelado", date(2026, 9, 5))
+
+    corpo = client.patch(
+        f"/recorrencias/{rid}", json={"status": "parcelamento", "parcelas_restantes": 4}
+    ).json()
+
+    assert corpo["status"] == "parcelamento"
+    assert corpo["fim_previsto"] == "2027-01-05"
+
+
+def test_parcelamento_sem_parcelas_e_parcelas_sem_parcelamento_sao_recusados(
+    semear_contas, sessao_de_teste_factory
+) -> None:
+    semear_contas([{"id": "corrente", "nome": "Conta fictícia", "tipo": "BANK", "saldo": 100}])
+    rid = _recorrencia_gravada(sessao_de_teste_factory, "Pix parcelado", date(2026, 9, 5))
+
+    assert client.patch(f"/recorrencias/{rid}", json={"status": "parcelamento"}).status_code == 422
+    assert (
+        client.patch(
+            f"/recorrencias/{rid}", json={"status": "aprovada", "parcelas_restantes": 2}
+        ).status_code
+        == 422
+    )
+
+
+def test_encerrar_apaga_o_fim_do_parcelamento(semear_contas, sessao_de_teste_factory) -> None:
+    semear_contas([{"id": "corrente", "nome": "Conta fictícia", "tipo": "BANK", "saldo": 100}])
+    rid = _recorrencia_gravada(sessao_de_teste_factory, "Pix parcelado", date(2026, 9, 5))
+    client.patch(f"/recorrencias/{rid}", json={"status": "parcelamento", "parcelas_restantes": 4})
+
+    corpo = client.patch(f"/recorrencias/{rid}", json={"status": "encerrada"}).json()
+
+    assert corpo["status"] == "encerrada"
+    assert corpo["fim_previsto"] is None
+
+
+def test_resumo_devolve_a_conexao_de_cada_conta(semear_contas) -> None:
+    semear_contas(
+        [
+            {"id": "corrente", "nome": "Nu Pagamentos", "tipo": "BANK", "saldo": 10, "item_id": "item-a"},
+            {"id": "cartao", "nome": "gold", "tipo": "CREDIT", "saldo": 5, "item_id": "item-a"},
+        ]
+    )
+
+    contas = {conta["id"]: conta["item_id"] for conta in client.get("/resumo").json()["contas"]}
+
+    assert contas == {"corrente": "item-a", "cartao": "item-a"}
+
+
+def test_dinheiro_livre_ignora_encerrada_e_parcelamento_que_acabou(
+    semear_contas, semear_movimentos, sessao_de_teste_factory
+) -> None:
+    """Ciclo de dez dias, hoje no sexto, sem cartão. Só a internet ainda vem:
+    a encerrada parou, e o parcelamento terminou em setembro. O pagamento da
+    encerrada no ciclo não é gasto do dia a dia."""
+    semear_contas([{"id": "corrente", "nome": "Conta fictícia", "tipo": "BANK", "saldo": 1000}])
+    semear_movimentos(
+        processar_movimentos(
+            pd.DataFrame(
+                [
+                    _despesa("g1", "2026-10-06", 50.00, "Mercado"),
+                    _despesa("enc", "2026-10-07", 66.67, "Viagem"),
+                ]
+            )
+        ),
+        Proveniencia.PLUGGY.value,
+    )
+    _recorrencia_gravada(sessao_de_teste_factory, "Viagem", date(2026, 9, 12), "encerrada")
+    parcelado = _recorrencia_gravada(sessao_de_teste_factory, "Parcela", date(2026, 9, 11))
+    client.patch(f"/recorrencias/{parcelado}", json={"status": "parcelamento", "parcelas_restantes": 1})
+
+    # Com uma parcela restante, a última seria 11/10; a data vai para 11/09
+    # para o parcelamento já ter acabado neste ciclo.
+    async def encurtar() -> None:
+        async with sessao_de_teste_factory() as sessao:
+            await sessao.execute(
+                update(RecorrenciaORM)
+                .where(RecorrenciaORM.id == parcelado)
+                .values(fim_previsto=date(2026, 9, 11))
+            )
+            await sessao.commit()
+
+    asyncio.run(encurtar())
+    internet = _recorrencia_gravada(sessao_de_teste_factory, "Internet", date(2026, 9, 12))
+    client.patch(f"/recorrencias/{internet}", json={"status": "aprovada"})
+
+    corpo = client.get("/dinheiro-livre", params={"hoje": "2026-10-10"}).json()
+
+    assert [conta["nome"] for conta in corpo["contas_fixas"]] == ["Internet"]
+    assert {dia["data"]: dia["total"] for dia in corpo["gastos_por_dia"] if dia["total"] != "0"} == {
+        "2026-10-06": "50.00"
+    }
+
+
+def test_fluxo_por_conta_separa_fatura_e_transferencias_para_fechar_com_o_saldo(
+    semear_contas, semear_movimentos, sessao_de_teste_factory
+) -> None:
+    """Entrou 1.000 e veio 50 de outra conta; gastou 200, pagou 300 de fatura e
+    guardou 100. Variação: 1.000 + 50 - 200 - 300 - 100 = 450."""
+    semear_contas([{"id": "corrente", "nome": "Conta fictícia", "tipo": "BANK", "saldo": 0}])
+
+    def linha(identificador: str, valor: float, tipo: str, categoria_id: str) -> dict:
+        return {
+            "data": "2026-10-06",
+            "valor": valor,
+            "descricao": f"Movimento {identificador}",
+            "conta_id": "corrente",
+            "tipo": tipo,
+            "identificador_externo": identificador,
+            "categoria_id": categoria_id,
+        }
+
+    semear_movimentos(
+        processar_movimentos(
+            pd.DataFrame(
+                [
+                    linha("rec", 1000.00, "receita", "01000000"),
+                    linha("vem", 50.00, "aporte_titular", "04000000"),
+                    linha("gasto", 200.00, "despesa", "10000000"),
+                    linha("fatura", 300.00, "despesa", "05000000"),
+                    linha("guarda", 100.00, "retirada_titular", "03000000"),
+                ]
+            )
+        ),
+        Proveniencia.PLUGGY.value,
+    )
+
+    async def marcar_fatura() -> None:
+        async with sessao_de_teste_factory() as sessao:
+            await sessao.execute(
+                update(MovimentoORM)
+                .where(MovimentoORM.identificador_externo == "fatura")
+                .values(pagamento_de_fatura="detectado")
+            )
+            await sessao.commit()
+
+    asyncio.run(marcar_fatura())
+
+    (fluxo,) = client.get(
+        "/movimentos/por-conta", params={"data_inicio": "2026-10-01", "data_fim": "2026-10-31"}
+    ).json()
+
+    assert fluxo["entradas"] == "1000.00"
+    assert fluxo["saidas"] == "200.00"
+    assert fluxo["fatura_paga"] == "300.00"
+    assert fluxo["transferencias_entrada"] == "50.00"
+    assert fluxo["transferencias_saida"] == "100.00"

@@ -31,9 +31,12 @@ class ContaFixa:
 
 @dataclass(frozen=True)
 class RecorrenciaAprovada:
+    """Conta fixa ou parcelamento; parcelamento tem `fim_previsto`."""
+
     nome: str
     valor: Decimal
     ultima_data: date
+    fim_previsto: date | None = None
 
 
 @dataclass(frozen=True)
@@ -87,7 +90,8 @@ def contas_fixas_pendentes(
     pendentes = []
     for recorrencia in recorrencias:
         prevista = somar_meses(recorrencia.ultima_data, 1)
-        if inicio <= prevista <= fim:
+        acabou = recorrencia.fim_previsto is not None and prevista > recorrencia.fim_previsto
+        if inicio <= prevista <= fim and not acabou:
             pendentes.append(
                 ContaFixa(recorrencia.nome, recorrencia.valor, prevista, "recorrencia", prevista < hoje)
             )

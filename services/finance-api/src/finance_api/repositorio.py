@@ -20,6 +20,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
+from finance_api.compromissos import somar_meses
 from finance_api.dinheiro_livre import CompromissoAtivo, RecorrenciaAprovada
 from finance_api.models import CompromissoORM, ContaORM, MovimentoORM, RecorrenciaORM
 from finance_api.recorrencias import LancamentoObservado, RecorrenciaCandidata
@@ -91,6 +92,7 @@ async def upsert_contas(sessao: AsyncSession, contas: list[dict]) -> None:
             "disponivel": _decimal_ou_none(conta.get("disponivel")),
             "bandeira": conta.get("bandeira"),
             "final": conta.get("final"),
+            "item_id": conta.get("item_id"),
             "fechamento": _como_data(conta.get("fechamento")),
             "vencimento": _como_data(conta.get("vencimento")),
         }
@@ -108,6 +110,7 @@ async def upsert_contas(sessao: AsyncSession, contas: list[dict]) -> None:
             "disponivel": instrucao.excluded.disponivel,
             "bandeira": instrucao.excluded.bandeira,
             "final": instrucao.excluded.final,
+            "item_id": instrucao.excluded.item_id,
             "fechamento": instrucao.excluded.fechamento,
             "vencimento": instrucao.excluded.vencimento,
             # `onupdate` do ORM não vale aqui: ON CONFLICT DO UPDATE é SQL
@@ -260,57 +263,47 @@ async def agregar_fluxo_por_conta(
     *,
     data_inicio: date,
     data_fim: date,
-) -> list[tuple[str, str, str | None, str, Decimal, Decimal, Decimal]]:
+) -> list[tuple]:
     """Entradas e saídas de cada conta no intervalo (inclusive nas duas
-    pontas), como `(conta_id, nome, apelido, tipo, entradas, saidas, em_revisao)`.
+    pontas), como `(conta_id, nome, apelido, tipo, entradas, saidas,
+    em_revisao, fatura_paga, transferencias_entrada, transferencias_saida)`.
 
-    Entrada é `receita`, saída é `despesa`; transferência entre contas próprias
-    (`aporte_titular`/`retirada_titular`) fica fora dos dois, porque não é
-    dinheiro entrando nem saindo do conjunto. Pagamento de fatura sai das
-    despesas pelo mesmo motivo, ver `_nao_e_pagamento_de_fatura`.
+    Entrada é `receita` e saída é `despesa`, sem o pagamento de fatura: é o
+    gasto de verdade, ver `_nao_e_pagamento_de_fatura`. O que move o próprio
+    dinheiro vem à parte, porque não é gasto mas mexe no saldo da conta:
+    fatura paga e transferência entre contas do titular (`aporte_titular` e
+    `retirada_titular`, que incluem aplicação e resgate). Somando tudo, a
+    variação do ciclo bate com a do saldo.
 
     Toda conta aparece, mesmo sem movimento no período: o painel mostra um
     card por conta e uma conta parada continua existindo. Daí o LEFT JOIN
     com a condição de data dentro do `ON`, e não no `WHERE`.
     """
 
-    def soma_de(tipo: str):
+    def soma_onde(*condicoes):
         # O cast é o que mantém o zero como "0.00" e não como "0": sem tipo
         # explícito o coalesce de uma soma vazia volta inteiro.
         return cast(
             func.coalesce(
-                func.sum(case((MovimentoORM.tipo == tipo, MovimentoORM.valor), else_=0)),
+                func.sum(case((and_(*condicoes), MovimentoORM.valor), else_=0)),
                 0,
             ),
             Numeric(12, 2),
         )
 
+    e_despesa = MovimentoORM.tipo == "despesa"
     consulta = (
         select(
             ContaORM.id,
             ContaORM.nome,
             ContaORM.apelido,
             ContaORM.tipo,
-            soma_de("receita"),
-            soma_de("despesa"),
-            cast(
-                func.coalesce(
-                    func.sum(
-                        case(
-                            (
-                                and_(
-                                    MovimentoORM.tipo == "despesa",
-                                    MovimentoORM.duplicado_possivel.is_(True),
-                                ),
-                                MovimentoORM.valor,
-                            ),
-                            else_=0,
-                        )
-                    ),
-                    0,
-                ),
-                Numeric(12, 2),
-            ),
+            soma_onde(MovimentoORM.tipo == "receita"),
+            soma_onde(e_despesa, _nao_e_pagamento_de_fatura()),
+            soma_onde(e_despesa, _nao_e_pagamento_de_fatura(), MovimentoORM.duplicado_possivel.is_(True)),
+            soma_onde(e_despesa, MovimentoORM.pagamento_de_fatura.in_(("detectado", "confirmado"))),
+            soma_onde(MovimentoORM.tipo == "aporte_titular"),
+            soma_onde(MovimentoORM.tipo == "retirada_titular"),
         )
         .select_from(ContaORM)
         .outerjoin(
@@ -319,7 +312,6 @@ async def agregar_fluxo_por_conta(
                 MovimentoORM.conta_id == ContaORM.id,
                 MovimentoORM.data >= data_inicio,
                 MovimentoORM.data <= data_fim,
-                _nao_e_pagamento_de_fatura(),
             ),
         )
         .group_by(ContaORM.id, ContaORM.nome, ContaORM.apelido, ContaORM.tipo)
@@ -347,16 +339,20 @@ async def entradas_do_dinheiro_livre(
     )
 
     aprovadas = (
-        await sessao.execute(select(RecorrenciaORM).where(RecorrenciaORM.status == "aprovada"))
+        await sessao.execute(
+            select(RecorrenciaORM).where(RecorrenciaORM.status.in_(("aprovada", "parcelamento")))
+        )
     ).scalars().all()
     ativos = (
         await sessao.execute(select(CompromissoORM).where(CompromissoORM.status == "ativo"))
     ).scalars().all()
 
+    # Encerrada entra aqui também: o pagamento dela no ciclo já era conta fixa
+    # quando saiu, não gasto do dia a dia.
     e_conta_fixa = (
         select(RecorrenciaORM.id)
         .where(
-            RecorrenciaORM.status == "aprovada",
+            RecorrenciaORM.status.in_(("aprovada", "parcelamento", "encerrada")),
             RecorrenciaORM.conta_id == MovimentoORM.conta_id,
             RecorrenciaORM.descricao == MovimentoORM.descricao,
         )
@@ -380,7 +376,12 @@ async def entradas_do_dinheiro_livre(
         saldos.get("BANK") or zero,
         saldos.get("CREDIT") or zero,
         [
-            RecorrenciaAprovada(recorrencia.apelido or recorrencia.descricao, recorrencia.valor_medio, recorrencia.ultima_data)
+            RecorrenciaAprovada(
+                recorrencia.apelido or recorrencia.descricao,
+                recorrencia.valor_medio,
+                recorrencia.ultima_data,
+                recorrencia.fim_previsto,
+            )
             for recorrencia in aprovadas
         ],
         [
@@ -605,11 +606,23 @@ async def atualizar_recorrencia(
     sessao: AsyncSession, recorrencia_id: int, campos: dict
 ) -> RecorrenciaORM | None:
     """Muda status e/ou classificação (apelido, categoria) de uma
-    recorrência. Devolve None se o id não existe."""
+    recorrência. Devolve None se o id não existe.
+
+    Parcelamento guarda a data da última parcela: a próxima cobrança é um mês
+    depois da última vista, e cada parcela que falta soma um mês. Qualquer
+    outro estado apaga essa data.
+    """
     recorrencia = await sessao.get(RecorrenciaORM, recorrencia_id)
     if recorrencia is None:
         return None
 
+    parcelas_restantes = campos.pop("parcelas_restantes", None)
+    if "status" in campos:
+        recorrencia.fim_previsto = (
+            somar_meses(recorrencia.ultima_data, parcelas_restantes)
+            if campos["status"] == "parcelamento"
+            else None
+        )
     for nome, valor in campos.items():
         setattr(recorrencia, nome, valor)
     await sessao.commit()
