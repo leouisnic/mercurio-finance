@@ -13,11 +13,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, timedelta
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 
+from finance_api.centavos import centavos as _centavos
 from finance_api.compromissos import parcelas, somar_meses
-
-CENTAVO = Decimal("0.01")
 
 
 @dataclass(frozen=True)
@@ -62,10 +61,6 @@ class DinheiroLivre:
     gasto_hoje: Decimal
     hoje_disponivel: Decimal
     gastos_por_dia: dict[date, Decimal]
-
-
-def _centavos(valor: Decimal) -> Decimal:
-    return valor.quantize(CENTAVO, rounding=ROUND_HALF_UP)
 
 
 def contas_fixas_pendentes(

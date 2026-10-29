@@ -57,8 +57,8 @@ async def _limpar_movimentos() -> None:
         await sessao.execute(delete(MovimentoORM))
         await sessao.execute(delete(RegraDeCategoriaORM))
         await sessao.execute(delete(TagORM))
-        # As 19 da migração têm ordem de 0 a 18; acima disso é categoria criada num teste.
-        await sessao.execute(delete(CategoriaORM).where(CategoriaORM.ordem > 18))
+        # As 20 das migrações têm ordem de 0 a 19; acima disso é categoria criada num teste.
+        await sessao.execute(delete(CategoriaORM).where(CategoriaORM.ordem > 19))
         await sessao.execute(delete(RecorrenciaORM))
         await sessao.execute(delete(CompromissoORM))
         await sessao.execute(delete(ContaORM))

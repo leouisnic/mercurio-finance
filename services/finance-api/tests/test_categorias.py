@@ -116,6 +116,8 @@ def test_transferencia_propria_e_fatura_nao_levam_categoria() -> None:
 def test_traducao_usa_o_prefixo_mais_longo() -> None:
     assert traduzir_da_pluggy("18020000") == "farmacia"
     assert traduzir_da_pluggy("18040000") == "saude"
+    assert traduzir_da_pluggy("12020000") == "hospedagem"
+    assert traduzir_da_pluggy("12010000") == "viagem"
     assert traduzir_da_pluggy("03060000") == "investimento-e-reserva"
     assert traduzir_da_pluggy("03020000") is None
     assert traduzir_da_pluggy(None) is None
@@ -138,7 +140,7 @@ def test_toda_categoria_usada_no_codigo_existe_na_tabela() -> None:
     errado aqui quebraria a chave estrangeira só na sincronização."""
     existentes = {categoria["id"] for categoria in client.get("/categorias").json()}
 
-    assert len(existentes) == 19
+    assert len(existentes) == 20
     assert set(TRADUCAO_DA_PLUGGY.values()) <= existentes
     assert set(DO_MOBILLS.values()) <= existentes
 
@@ -374,7 +376,7 @@ def test_tag_soma_so_as_despesas_marcadas_e_divide_por_categoria(gravar) -> None
     assert viagem["quantidade"] == 3
     assert (viagem["primeira_data"], viagem["ultima_data"]) == ("2026-10-02", "2026-10-04")
     assert [(item["categoria"], item["total"]) for item in resumo["por_categoria"]] == [
-        ("viagem", "1450.00"),
+        ("hospedagem", "1450.00"),
         ("alimentacao", "186.40"),
     ]
     assert _por_descricao_e_data()[("Pousada Exemplo", "2026-10-02")]["tags"] == [

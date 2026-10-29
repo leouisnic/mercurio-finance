@@ -96,6 +96,15 @@ o tom; claridade e croma vêm do tema, para o contraste do ícone continuar
 medido. Marcar vários de uma vez dá a mesma categoria só a eles, sem criar
 regra.
 
+## Arredondamento
+
+Dinheiro é calculado com `Decimal` e arredondado uma vez, no fim, para o
+centavo, com o meio centavo para cima (`finance_api/centavos.py`); um teste
+reprova arredondamento feito fora dele. Na tela todo valor em dinheiro aparece
+com centavos. A única exceção é o rótulo em cima da barra de um gráfico, que
+não tem espaço e mostra o real ("R$ 147"); o detalhe ao tocar mostra com
+centavos. Percentual aparece inteiro.
+
 ## Tags
 
 Tag agrupa movimentos, como uma viagem ou uma reforma, e não muda nenhum
@@ -103,6 +112,15 @@ outro número. Um movimento pode ter várias tags, e o nome da tag é único sem
 distinção de caixa. O gasto de uma tag soma só as despesas marcadas, sem
 pagamento de fatura, como o gasto por dia; a divisão é pela categoria do
 Mercúrio.
+
+A tag pode ter ícone e cor, teto e período, todos opcionais, e pode ser
+arquivada. Apagar a tag não apaga movimento: ele só perde a marca.
+
+O impacto de uma tag olha o ciclo em que ela mais gastou. Típico é a média do
+gasto dos 3 ciclos anteriores que têm dado; rombo é quanto o ciclo da tag passou
+desse típico; recupera em é o rombo dividido pela sobra média desses ciclos
+(entrou menos gastou), arredondado para cima. Sem ciclo anterior com dado não há
+impacto, e sem sobra não há previsão de recuperação.
 
 ## Compromissos
 

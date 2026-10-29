@@ -41,3 +41,25 @@ test("no celular as páginas de Movimentos viram abas", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1, name: "Para classificar" })).toBeVisible();
   await expect(abas.getByRole("link", { name: /Para classificar/ })).toHaveAttribute("aria-current", "page");
 });
+
+test("no celular os balões de marcar vários cabem na tela", async ({ page }) => {
+  await page.goto("/movimentos?ciclo=atual&referencia=2026-08-10");
+  const lista = page.getByRole("region", { name: "Movimentos" });
+  await lista.getByRole("button", { name: "Selecionar" }).click();
+  await lista.getByRole("checkbox", { name: "Selecionar Mercado" }).check();
+  const acoes = page.getByRole("region", { name: "Ações nos selecionados" });
+
+  for (const [botao, balao] of [
+    ["Marcar com tag", "Tag para 1 movimento"],
+    ["Categoria", "Categoria para 1 movimento"],
+  ]) {
+    await acoes.getByRole("button", { name: botao }).click();
+    const caixa = await page.getByRole("dialog", { name: balao }).boundingBox();
+    expect(caixa).not.toBeNull();
+    expect(caixa!.x).toBeGreaterThanOrEqual(0);
+    expect(caixa!.y).toBeGreaterThanOrEqual(0);
+    expect(caixa!.x + caixa!.width).toBeLessThanOrEqual(390);
+    expect(caixa!.y + caixa!.height).toBeLessThanOrEqual(844);
+    await page.keyboard.press("Escape");
+  }
+});

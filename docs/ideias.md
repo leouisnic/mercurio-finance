@@ -39,13 +39,23 @@ Por quê: A Pluggy classifica com modelo próprio, não com a categoria do app d
 
 ## Tags e gráficos
 
-Estado: adiada
+Estado: virou leva (`docs/specs/2026-10-28-tags-e-graficos.md`)
 
 Adiada em: 2026-10-28
 
 Gatilho: a leva de categorias próprias publicada.
 
 Por quê: A tela de Tags ficou só com a lista e o total. O dono quer: orçamento por tag (criar a tag antes, com teto, e acompanhar gasto contra o teto e o ritmo); evolução do gasto da tag no tempo; criar, renomear, apagar (os movimentos ficam, só perdem a tag) e arquivar tag; maiores gastos e divisão por categoria num card de análise; e o impacto da tag no orçamento, calculado sem IA: quanto ela tirou de cada ciclo em que caiu, quanto esses ciclos passaram do gasto típico e em quantos ciclos o rombo se recupera no ritmo de sobra. Junto, o padrão de detalhe dos gráficos na identidade do Mercúrio (no lugar da dica do navegador), valor curto com R$ em cima de cada barra com gasto, e as cores do gasto por dia: dia sem gasto em dourado, dentro da cota em índigo, acima da cota em vermelho. Tudo por mockup antes do código.
+
+## Anel de progresso com ícone
+
+Estado: adiada
+
+Adiada em: 2026-10-28
+
+Gatilho: a meta por categoria da Movimentos redesenhada, ou outro lugar que mostre quanto de um limite já foi usado.
+
+Por quê: Na rodada de cartões de tag, o dono gostou do anel em volta do ícone que enche conforme o teto é usado e fica vermelho quando passa, mesmo escolhendo outro formato para as tags. Candidato natural: meta por categoria, caixinha com meta e orçamento de tag em lugar pequeno, como o Início.
 
 ## Modo viagem
 
@@ -65,7 +75,7 @@ Adiada em: 2026-10-28
 
 Gatilho: a leva Tags e gráficos publicada; decidir antes se fica dentro da Movimentos redesenhada ou vira página própria.
 
-Por quê: O dono gostava da análise do Mobills: onde gasta mais, percentuais por categoria e uma leitura escrita do período. Com as categorias próprias publicadas, dá para calcular sem IA: participação de cada categoria no ciclo e no mês, variação contra a média dos últimos ciclos, maiores aumentos e quedas, estabelecimentos e pessoas que mais receberam, fixo contra variável, quanto sobrou da renda, e frases montadas a partir desses números ("Alimentação foi 31% do gasto, 18% acima da sua média"). Texto escrito por IA seria um passo depois, e mandaria dado financeiro para um serviço externo: decisão de privacidade do dono antes. Sobrepõe a Movimentos redesenhada (para onde foi por categoria, entrou, gastou, guardou e sobrou).
+Por quê: O dono gostava da análise do Mobills: onde gasta mais, percentuais por categoria e uma leitura escrita do período. Com as categorias próprias publicadas, dá para calcular sem IA: participação de cada categoria no ciclo e no mês, variação contra a média dos últimos ciclos, maiores aumentos e quedas, estabelecimentos e pessoas que mais receberam, fixo contra variável, quanto sobrou da renda, e frases montadas a partir desses números ("Alimentação foi 31% do gasto, 18% acima da sua média"). Texto escrito por IA seria um passo depois, e mandaria dado financeiro para um serviço externo: decisão de privacidade do dono antes. Sobrepõe a Movimentos redesenhada (para onde foi por categoria, entrou, gastou, guardou e sobrou). O dono reconhece um padrão próprio: gasta mais na sexta, no fim de semana, nos feriados e nos dias de pagamento. A análise deve medir isso (gasto médio por dia da semana, feriado contra dia comum, dia de pagamento contra o resto do ciclo) e o gráfico de gasto por dia pode marcar esses dias no eixo, para o padrão aparecer sem precisar procurar; os feriados já estão no calendário de `finance_api/ciclo.py`.
 
 ## Movimentos redesenhada
 
@@ -75,7 +85,7 @@ Adiada em: 2026-10-27
 
 Gatilho: a leva Tags e gráficos publicada.
 
-Por quê: Escolhido na rodada de opções: para onde foi por categoria, com a média dos últimos ciclos e uma meta sugerida pela média e editável (absorve a ideia de limite por categoria); ritmo do ciclo contra o anterior num cartão compacto; entradas e saídas por ciclo refeitas como entrou, gastou, guardou e sobrou, com o investido fora do gasto (absorve o resumo do ciclo fechado); e o fluxo do que entrou até cada destino, com o guardado à vista. Recusado: maiores destinos. Depois das categorias, o dono pediu também: filtros de ciclo e conta e os cards mais bem organizados. O padrão de detalhe dos gráficos foi para a leva Tags e gráficos. Referências: Monarch (fluxo de caixa e categorias) e caderno de educação financeira do Banco Central.
+Por quê: Escolhido na rodada de opções: para onde foi por categoria, com a média dos últimos ciclos e uma meta sugerida pela média e editável (absorve a ideia de limite por categoria); ritmo do ciclo contra o anterior num cartão compacto; entradas e saídas por ciclo refeitas como entrou, gastou, guardou e sobrou, com o investido fora do gasto (absorve o resumo do ciclo fechado); e o fluxo do que entrou até cada destino, com o guardado à vista. Recusado: maiores destinos. Depois das categorias, o dono pediu também: filtros de ciclo e conta e os cards mais bem organizados. Os ciclos ainda aparecem como "Ciclo 1" e "Ciclo 2" nos filtros: devem levar o nome de quem paga, como no Início e na tag aberta. O padrão de detalhe dos gráficos foi para a leva Tags e gráficos. Referências: Monarch (fluxo de caixa e categorias) e caderno de educação financeira do Banco Central.
 
 ## Planejamento
 
@@ -135,7 +145,7 @@ Adiada em: 2026-10-27
 
 Gatilho: as metas por categoria da Movimentos em construção, que precisam de um lugar para configurar.
 
-Por quê: Reúne o que é cadastro: recorrências (saem do menu principal), compromissos, nomes das contas e dos pagadores, limites por categoria e notificações. Depois das categorias próprias, também editar e apagar categoria (apagar pergunta para onde vão os movimentos) e ver e desfazer as regras por destinatário. Fecha a navegação de quatro páginas (Início, Movimentos, Planejamento, Ajustes) decidida na spec do Início.
+Por quê: Reúne o que é cadastro: recorrências (saem do menu principal), compromissos, nomes das contas e dos pagadores, limites por categoria e notificações. Depois das categorias próprias, também editar e apagar categoria (apagar pergunta para onde vão os movimentos) e ver e desfazer as regras por destinatário. E ocultar uma conta que o dono não usa mais (decidido em 2026-10-29: por enquanto fica como está, porque com saldo zero não muda nenhuma soma; quando entrar, vale para o sistema todo) (por exemplo a conta corrente de um banco do qual ele só usa o cartão): a Pluggy conecta o banco inteiro, então não dá para tirar só a conta corrente sem desconectar o cartão junto. Ocultar tira a conta das telas e dos filtros e guarda o histórico; o que pede cuidado é o saldo dela no dinheiro livre (só some sem perda se estiver zerado) e as transferências antigas entre ela e as outras contas, que continuam marcadas como movimentação própria. Fecha a navegação de quatro páginas (Início, Movimentos, Planejamento, Ajustes) decidida na spec do Início.
 
 ## Aviso no Telegram
 

@@ -1,5 +1,6 @@
 import { buscarJson, paraNumero } from "./api";
 import type { Ciclo } from "./buscar-movimentos";
+import type { GastoDoDetalhe } from "./buscar-movimentos";
 
 export type ContaFixa = {
   nome: string;
@@ -25,7 +26,7 @@ export type DinheiroLivre = {
   cofrinho: number;
   gastoHoje: number;
   hojeDisponivel: number;
-  gastosPorDia: { data: string; total: number }[];
+  gastosPorDia: { data: string; total: number; maiores: GastoDoDetalhe[] }[];
 };
 
 type Resposta = {
@@ -50,7 +51,7 @@ type Resposta = {
   cofrinho: string;
   gasto_hoje: string;
   hoje_disponivel: string;
-  gastos_por_dia: { data: string; total: string }[];
+  gastos_por_dia: { data: string; total: string; maiores?: { descricao: string; valor: string }[] }[];
 };
 
 /** Quanto dá para gastar até a véspera do próximo pagamento. A conta é da
@@ -82,6 +83,10 @@ export async function buscarDinheiroLivre(hoje: string): Promise<DinheiroLivre |
     cofrinho: paraNumero(corpo.cofrinho),
     gastoHoje: paraNumero(corpo.gasto_hoje),
     hojeDisponivel: paraNumero(corpo.hoje_disponivel),
-    gastosPorDia: corpo.gastos_por_dia.map((dia) => ({ data: dia.data, total: paraNumero(dia.total) })),
+    gastosPorDia: corpo.gastos_por_dia.map((dia) => ({
+      data: dia.data,
+      total: paraNumero(dia.total),
+      maiores: (dia.maiores ?? []).map((item) => ({ descricao: item.descricao, valor: paraNumero(item.valor) })),
+    })),
   };
 }

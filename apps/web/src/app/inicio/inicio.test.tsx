@@ -158,8 +158,18 @@ test("o dia fora da escala mostra o valor escrito e a legenda explica o corte", 
   const grafico = screen.getByRole("region", { name: "Gasto por dia e cota" });
   expect(within(grafico).getByText("Cota do dia")).toBeDefined();
   expect(grafico.textContent).toMatch(/R\$\s1\.720,00/);
-  expect(within(grafico).getByText("Fora da escala, valor escrito")).toBeDefined();
+  expect(within(grafico).getByText("Fora da escala")).toBeDefined();
   expect(within(grafico).getByText(/^R\$\s1\.720,00, acima da cota$/)).toBeDefined();
+  // O valor curto em cima da barra, com moeda.
+  expect(within(grafico).getByText("R$ 1.720").className).toContain("alerta");
+  expect(within(grafico).getByText("R$ 39").className).not.toContain("alerta");
+  // A cor da barra: vermelha acima da cota, índigo dentro, dourada sem gasto.
+  expect(within(grafico).getByText("R$ 1.720").parentElement?.className).toContain("bg-alerta-forte");
+  expect(within(grafico).getByText("R$ 39").parentElement?.className).toContain("bg-marca");
+  expect(within(grafico).getByRole("button", { name: /18\/10/ }).innerHTML).toContain("bg-caixinha");
+  // Dia sem gasto em dourado; os dias que ainda vêm não têm barra.
+  expect(within(grafico).getByText("Sem gasto")).toBeDefined();
+  expect(within(grafico).queryByRole("button", { name: /19\/10/ })).toBeNull();
 });
 
 test("sem dia fora da escala, a legenda não fala de corte", () => {
@@ -173,5 +183,5 @@ test("sem dia fora da escala, a legenda não fala de corte", () => {
     />,
   );
 
-  expect(screen.queryByText("Fora da escala, valor escrito")).toBeNull();
+  expect(screen.queryByText("Fora da escala")).toBeNull();
 });

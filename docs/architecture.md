@@ -68,7 +68,8 @@ Os principais grupos de endpoints são:
 - resumo das contas, e o apelido editável de cada uma;
 - movimentos, gastos diários e fluxo por conta;
 - categorias, correção da categoria de um movimento e fila para classificar;
-- tags, resumo por tag e marcação de vários movimentos de uma vez;
+- tags (criar, editar, arquivar, apagar), resumo e impacto por tag, e marcação de vários
+  movimentos de uma vez;
 - ciclos de pagamento;
 - recorrências e compromissos;
 - sincronização assíncrona por Redis e RQ.

@@ -38,6 +38,7 @@ __all__ = [
     "FluxoDaConta",
     "GastoDiario",
     "GastoPorCategoria",
+    "ImpactoOut",
     "LoteIn",
     "LoteOut",
     "Movimento",
@@ -51,7 +52,9 @@ __all__ = [
     "ResumoFinanceiro",
     "StatusCompromisso",
     "StatusRecorrencia",
+    "TagIn",
     "TagOut",
+    "TagUpdate",
     "TagsUpdate",
     "TipoMovimento",
     "encontrar_duplicidades",
@@ -259,9 +262,60 @@ class LoteOut(BaseModel):
     alterados: int
 
 
+class CicloOut(BaseModel):
+    """Um ciclo de pagamento já resolvido em datas. Quem calcula é
+    `finance_api.ciclo`; o painel só consome."""
+
+    numero: int
+    inicio: date
+    fim: date
+
+
+class TagIn(BaseModel):
+    """Tag criada antes de ter movimento, com teto e período opcionais."""
+
+    nome: str = Field(min_length=1, max_length=60)
+    icone: str = Field(default="Tag", pattern=r"^[A-Za-z0-9]{1,40}$")
+    cor: int = Field(default=278, ge=0, le=359)
+    teto: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
+    inicio: date | None = None
+    fim: date | None = None
+
+    @field_validator("nome")
+    @classmethod
+    def nome_sem_espacos_nas_pontas(cls, nome: str) -> str:
+        if not nome.strip():
+            raise ValueError("nome vazio")
+        return nome.strip()
+
+    @model_validator(mode="after")
+    def periodo_em_ordem(self) -> TagIn:
+        if self.inicio and self.fim and self.fim < self.inicio:
+            raise ValueError("o fim do período vem antes do início")
+        return self
+
+
+class TagUpdate(BaseModel):
+    """Campo ausente fica como está; `teto`, `inicio` e `fim` em `null` apagam."""
+
+    nome: str | None = Field(default=None, min_length=1, max_length=60)
+    icone: str | None = Field(default=None, pattern=r"^[A-Za-z0-9]{1,40}$")
+    cor: int | None = Field(default=None, ge=0, le=359)
+    teto: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
+    inicio: date | None = None
+    fim: date | None = None
+    arquivada: bool | None = None
+
+
 class TagOut(BaseModel):
     id: int
     nome: str
+    icone: str
+    cor: int
+    teto: Decimal | None
+    inicio: date | None
+    fim: date | None
+    arquivada: bool
     gasto: Decimal = Field(description="Despesas marcadas, sem pagamento de fatura.")
     quantidade: int
     primeira_data: date | None
@@ -273,8 +327,55 @@ class GastoPorCategoria(BaseModel):
     total: Decimal
 
 
+class GastoMarcado(BaseModel):
+    data: date
+    descricao: str
+    valor: Decimal
+
+
+class TotalDoDia(BaseModel):
+    data: date
+    total: Decimal
+
+
+class CategoriaPrincipal(BaseModel):
+    categoria: str
+    total: Decimal
+    tipico_por_ciclo: Decimal | None = Field(
+        description="Média do gasto nessa categoria nos ciclos de comparação."
+    )
+
+
+class BarraDoCicloOut(BaseModel):
+    ciclo: CicloOut
+    gasto_sem_a_tag: Decimal
+    gasto_da_tag: Decimal
+
+
+class ImpactoOut(BaseModel):
+    """Ver `finance_api.tags`: típico é a média dos ciclos anteriores, rombo é
+    quanto o ciclo da tag passou dele, e recupera em divide o rombo pela sobra
+    média desses ciclos."""
+
+    ciclo: CicloOut
+    gasto: Decimal
+    tipico: Decimal
+    rombo: Decimal
+    rombo_da_tag: Decimal = Field(description="O rombo limitado ao que a tag gastou no ciclo.")
+    sobra_media: Decimal
+    ciclos_para_recuperar: int | None
+    barras: list[BarraDoCicloOut]
+
+
 class ResumoDaTagOut(TagOut):
     por_categoria: list[GastoPorCategoria]
+    dias: int
+    por_dia: Decimal
+    maiores: list[GastoMarcado]
+    dia_mais_caro: TotalDoDia | None
+    acumulado: list[TotalDoDia]
+    categoria_principal: CategoriaPrincipal | None
+    impacto: ImpactoOut | None
 
 
 class CategoriaUpdate(BaseModel):
@@ -296,12 +397,20 @@ class PagamentoFaturaUpdate(BaseModel):
     estado: DecisaoPagamentoFatura
 
 
+class GastoDoDetalhe(BaseModel):
+    """Um dos maiores gastos do dia, para o detalhe do gráfico."""
+
+    descricao: str
+    valor: Decimal
+
+
 class GastoDiario(BaseModel):
     """Soma das despesas (`tipo == despesa`) de um dia. Pagamento de fatura
     fica fora, para não contar o mesmo gasto duas vezes."""
 
     data: date
     total: Decimal
+    maiores: list[GastoDoDetalhe] = Field(default_factory=list)
     em_revisao: Decimal = Field(
         description="Parcela do total marcada como possível duplicidade."
     )
@@ -334,15 +443,6 @@ class FluxoDaConta(BaseModel):
     )
 
 
-class CicloOut(BaseModel):
-    """Um ciclo de pagamento já resolvido em datas. Quem calcula é
-    `finance_api.ciclo`; o painel só consome."""
-
-    numero: int
-    inicio: date
-    fim: date
-
-
 class CiclosOut(BaseModel):
     atual: CicloOut
     anterior: CicloOut
@@ -360,6 +460,7 @@ class ContaFixaOut(BaseModel):
 class GastoDoDiaOut(BaseModel):
     data: date
     total: Decimal
+    maiores: list[GastoDoDetalhe] = Field(default_factory=list)
 
 
 class DinheiroLivreOut(BaseModel):

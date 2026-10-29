@@ -12,6 +12,12 @@ export const SUBPAGINAS = [
   { href: "/movimentos/tags", rotulo: "Tags" },
 ] as const;
 
+/** A página principal só vale no endereço exato; as outras, também nas de
+ *  dentro delas, como uma tag aberta em Tags. */
+export function estaNaPagina(caminho: string, href: string): boolean {
+  return href === "/movimentos" ? caminho === href : caminho === href || caminho.startsWith(`${href}/`);
+}
+
 export function ContaParaClassificar({ total }: { total: number | null }) {
   if (!total) {
     return null;
@@ -28,14 +34,14 @@ export function AbasDeMovimentos({ paraClassificar }: { paraClassificar: number 
   return (
     <nav aria-label="Páginas de Movimentos" className="border-borda flex gap-1 border-b md:hidden">
       {SUBPAGINAS.map((pagina) => {
-        const ativa = caminho === pagina.href;
+        const ativa = estaNaPagina(caminho, pagina.href);
         return (
           <Link
             key={pagina.href}
             href={pagina.href}
             aria-current={ativa ? "page" : undefined}
             className={`-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] ${
-              ativa ? "border-marca text-marca font-bold" : "text-tinta-2 border-transparent"
+              ativa ? "border-marca text-marca font-bold" : "text-tinta-2 hover:text-marca hover:border-borda border-transparent"
             }`}
           >
             {pagina.rotulo}

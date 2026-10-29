@@ -54,6 +54,7 @@ TRADUCAO_DA_PLUGGY = {
     "10": "supermercado",
     "11": "alimentacao",
     "12": "viagem",
+    "1202": "hospedagem",
     "13": "presentes-e-doacoes",
     "14": "lazer",
     "15": "taxas-e-tarifas",

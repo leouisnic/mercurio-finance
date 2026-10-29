@@ -69,7 +69,7 @@ export default async function Inicio() {
                 {paraClassificar === 1 ? "1 movimento" : `${paraClassificar} movimentos`} para
                 classificar
               </span>
-              <Link href="/movimentos/classificar" className="underline">
+              <Link href="/movimentos/classificar" className="rounded-md px-1 underline hover:bg-aviso-borda/40">
                 Classificar
               </Link>
             </div>

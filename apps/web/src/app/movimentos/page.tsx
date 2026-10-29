@@ -9,6 +9,7 @@ import {
   type Ciclo,
 } from "../buscar-movimentos";
 import Link from "next/link";
+import { buscarDinheiroLivre } from "../buscar-dinheiro-livre";
 import { buscarResumo } from "../buscar-resumo";
 import { diaEMes } from "../formato";
 import { dataDeHoje } from "../hoje";
@@ -24,7 +25,9 @@ const CICLOS = ["anterior", "atual", "seguinte"] as const;
 type ChaveDeCiclo = (typeof CICLOS)[number];
 
 function chaveValida(valor: string | undefined): ChaveDeCiclo {
-  return CICLOS.includes(valor as ChaveDeCiclo) ? (valor as ChaveDeCiclo) : "atual";
+  return CICLOS.includes(valor as ChaveDeCiclo)
+    ? (valor as ChaveDeCiclo)
+    : "atual";
 }
 
 function umParametro(valor: string | string[] | undefined): string | undefined {
@@ -37,9 +40,14 @@ function paginaValida(valor: string | undefined): number {
 }
 
 /** `null` quando a API falhou: ciclo sem dado não é ciclo sem gasto. */
-async function somaDoCiclo(ciclo: Ciclo, contaId: string | undefined): Promise<number | null> {
+async function somaDoCiclo(
+  ciclo: Ciclo,
+  contaId: string | undefined,
+): Promise<number | null> {
   const gastos = await buscarGastosDiarios(ciclo.inicio, ciclo.fim, contaId);
-  return gastos === null ? null : gastos.reduce((soma, gasto) => soma + gasto.total, 0);
+  return gastos === null
+    ? null
+    : gastos.reduce((soma, gasto) => soma + gasto.total, 0);
 }
 
 export default async function Movimentos(props: PageProps<"/movimentos">) {
@@ -57,13 +65,18 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
   const pagina = paginaValida(umParametro(parametros.pagina));
   const limite = 50;
 
-  const [ciclos, resumo] = await Promise.all([buscarCiclos(referencia), buscarResumo()]);
+  const [ciclos, resumo] = await Promise.all([
+    buscarCiclos(referencia),
+    buscarResumo(),
+  ]);
 
   if (ciclos === null) {
     return (
       <>
         <header className="flex flex-col gap-[3px]">
-          <h1 className="text-[23px] font-bold tracking-[-0.2px]">Movimentos</h1>
+          <h1 className="text-[23px] font-bold tracking-[-0.2px]">
+            Movimentos
+          </h1>
         </header>
         <AbasDeMovimentos paraClassificar={null} />
         <FalhaTotal />
@@ -76,24 +89,56 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
   // resposta: comparar sempre com o mesmo período tornaria o comparativo
   // errado ao navegar para outro ciclo.
   const anteriorAoEscolhido =
-    escolhido === "atual" ? ciclos.anterior : escolhido === "seguinte" ? ciclos.atual : null;
+    escolhido === "atual"
+      ? ciclos.anterior
+      : escolhido === "seguinte"
+        ? ciclos.atual
+        : null;
 
-  const [gastos, fluxos, movimentos, somaAnterior, categorias, paraClassificar, tags] = await Promise.all([
+  // A cota é a do dinheiro livre de hoje, que soma todas as contas: só vale
+  // para o ciclo de hoje e sem filtro de conta.
+  const hoje = dataDeHoje();
+  const comCota = !contaEscolhida && ciclo.inicio <= hoje && hoje <= ciclo.fim;
+  const [
+    gastos,
+    fluxos,
+    movimentos,
+    somaAnterior,
+    categorias,
+    paraClassificar,
+    tags,
+    dinheiro,
+  ] = await Promise.all([
     buscarGastosDiarios(ciclo.inicio, ciclo.fim, contaEscolhida),
     buscarFluxoPorConta(ciclo.inicio, ciclo.fim),
-    buscarMovimentos(ciclo.inicio, ciclo.fim, contaEscolhida, limite, (pagina - 1) * limite),
-    anteriorAoEscolhido ? somaDoCiclo(anteriorAoEscolhido, contaEscolhida) : Promise.resolve(null),
+    buscarMovimentos(
+      ciclo.inicio,
+      ciclo.fim,
+      contaEscolhida,
+      limite,
+      (pagina - 1) * limite,
+    ),
+    anteriorAoEscolhido
+      ? somaDoCiclo(anteriorAoEscolhido, contaEscolhida)
+      : Promise.resolve(null),
     buscarCategorias(),
-    buscarParaClassificar(dataDeHoje()),
+    buscarParaClassificar(hoje),
     buscarTags(),
+    comCota ? buscarDinheiroLivre(hoje) : Promise.resolve(null),
   ]);
 
-  const somaAtual = gastos?.reduce((soma, gasto) => soma + gasto.total, 0) ?? null;
-  const totalEmRevisao = gastos?.reduce((soma, gasto) => soma + gasto.emRevisao, 0) ?? 0;
+  const somaAtual =
+    gastos?.reduce((soma, gasto) => soma + gasto.total, 0) ?? null;
+  const totalEmRevisao =
+    gastos?.reduce((soma, gasto) => soma + gasto.emRevisao, 0) ?? 0;
   const contas = resumo?.contas ?? [];
   const fluxosVisiveis =
-    fluxos && contaEscolhida ? fluxos.filter((fluxo) => fluxo.contaId === contaEscolhida) : fluxos;
-  const comparativoFalhou = anteriorAoEscolhido !== null && (somaAtual === null || somaAnterior === null);
+    fluxos && contaEscolhida
+      ? fluxos.filter((fluxo) => fluxo.contaId === contaEscolhida)
+      : fluxos;
+  const comparativoFalhou =
+    anteriorAoEscolhido !== null &&
+    (somaAtual === null || somaAnterior === null);
 
   const falhas = [
     gastos === null && "gasto por dia",
@@ -107,7 +152,10 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
   const tituloDoGrafico = `Gasto por dia no Ciclo ${ciclo.numero}, de ${diaEMes(ciclo.inicio)} a ${diaEMes(ciclo.fim)}`;
   const gastoPorConta =
     fluxosVisiveis === null ? (
-      <BlocoIndisponivel titulo="Gasto por conta no período" rotulo="Gasto por conta no período" />
+      <BlocoIndisponivel
+        titulo="Gasto por conta no período"
+        rotulo="Gasto por conta no período"
+      />
     ) : (
       <GastoPorConta fluxos={fluxosVisiveis} />
     );
@@ -117,8 +165,8 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
       <header className="flex flex-col gap-[3px]">
         <h1 className="text-[23px] font-bold tracking-[-0.2px]">Movimentos</h1>
         <span className="text-tinta-3 text-[13px]">
-          O gráfico e os indicadores cobrem o ciclo selecionado, de {diaEMes(ciclo.inicio)} a{" "}
-          {diaEMes(ciclo.fim)}.
+          O gráfico e os indicadores cobrem o ciclo selecionado, de{" "}
+          {diaEMes(ciclo.inicio)} a {diaEMes(ciclo.fim)}.
         </span>
       </header>
 
@@ -135,11 +183,16 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
       />
 
       {totalEmRevisao > 0 && (
-        <p role="status" className="bg-gasto-fundo text-gasto rounded-xl px-4 py-3 text-[13px]">
-          O total inclui {totalEmRevisao.toLocaleString("pt-BR", {
+        <p
+          role="status"
+          className="bg-gasto-fundo text-gasto rounded-xl px-4 py-3 text-[13px]"
+        >
+          O total inclui{" "}
+          {totalEmRevisao.toLocaleString("pt-BR", {
             style: "currency",
             currency: "BRL",
-          })} em possíveis duplicidades aguardando revisão.
+          })}{" "}
+          em possíveis duplicidades aguardando revisão.
         </p>
       )}
 
@@ -151,6 +204,12 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
             gastos={gastos}
             inicio={ciclo.inicio}
             fim={ciclo.fim}
+            cota={
+              dinheiro && dinheiro.ciclo.inicio === ciclo.inicio
+                ? dinheiro.cotaDoDia
+                : null
+            }
+            hoje={comCota ? hoje : null}
             titulo={tituloDoGrafico}
           />
         )}
@@ -162,7 +221,11 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
             rotulo="Comparativo com o ciclo anterior"
           />
         ) : (
-          <CicloContraAnterior atual={somaAtual} anterior={somaAnterior} numero={ciclo.numero} />
+          <CicloContraAnterior
+            atual={somaAtual}
+            anterior={somaAnterior}
+            numero={ciclo.numero}
+          />
         )}
       </div>
 
@@ -177,11 +240,15 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
             contas={contas}
             categorias={categorias}
             tagsExistentes={(tags ?? []).map((tag) => tag.nome)}
+            tags={tags ?? []}
           />
         </>
       )}
 
-      <nav aria-label="Paginação dos movimentos" className="flex justify-end gap-2">
+      <nav
+        aria-label="Paginação dos movimentos"
+        className="flex justify-end gap-2"
+      >
         {pagina > 1 && (
           <Link
             className="border-borda bg-superficie rounded-lg border px-3 py-2 text-[13px]"

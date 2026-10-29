@@ -20,6 +20,7 @@ Nenhuma credencial, extrato real ou dado pessoal é usado neste módulo.
 """
 
 from datetime import date
+from decimal import Decimal
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from pydantic import ValidationError
@@ -28,15 +29,18 @@ from rq.job import Job
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from finance_api.categorias import chave_do_destinatario
+from finance_api.centavos import centavos
 from finance_api.ciclo import Ciclo, ciclo_anterior, ciclo_de, ciclo_seguinte
 from finance_api.compromissos import resumo_parcelas
 from finance_api.db import obter_sessao
 from finance_api.dinheiro_livre import calcular as calcular_dinheiro_livre
 from finance_api.dinheiro_livre import contas_fixas_pendentes
 from finance_api.domain import (
+    BarraDoCicloOut,
     CategoriaIn,
     CategoriaJaUsada,
     CategoriaOut,
+    CategoriaPrincipal,
     CategoriaUpdate,
     CicloOut,
     CiclosOut,
@@ -50,8 +54,11 @@ from finance_api.domain import (
     EstadoPagamentoFatura,
     FluxoDaConta,
     GastoDiario,
+    GastoDoDetalhe,
     GastoDoDiaOut,
+    GastoMarcado,
     GastoPorCategoria,
+    ImpactoOut,
     LoteIn,
     LoteOut,
     MovimentoOut,
@@ -63,28 +70,37 @@ from finance_api.domain import (
     ResumoFinanceiro,
     StatusCompromisso,
     StatusRecorrencia,
+    TagIn,
     TagOut,
     TagsUpdate,
+    TagUpdate,
+    TotalDoDia,
 )
 from finance_api.fila import conexao_redis, fila
 from finance_api.jobs import job_reimportar_seed, job_sincronizar_pluggy
-from finance_api.models import CompromissoORM, ContaORM, MovimentoORM, RecorrenciaORM
+from finance_api.models import CompromissoORM, ContaORM, MovimentoORM, RecorrenciaORM, TagORM
 from finance_api.repositorio import (
     CategoriaInvalida,
     PagamentoFaturaInvalido,
+    TagInvalida,
     agregar_despesas_por_dia,
     agregar_fluxo_por_conta,
+    apagar_tag,
     atualizar_compromisso,
     atualizar_conta,
     atualizar_recorrencia,
+    atualizar_tag,
     contar_para_classificar,
     corrigir_categoria,
     criar_categoria,
     criar_compromisso,
+    criar_tag,
     definir_pagamento_de_fatura,
     definir_tags,
     entradas_do_dinheiro_livre,
+    gasto_da_categoria,
     gasto_da_tag_por_categoria,
+    gastos_da_tag,
     historico_dos_destinatarios,
     listar_categorias,
     listar_compromissos,
@@ -93,11 +109,14 @@ from finance_api.repositorio import (
     listar_pagamentos_de_fatura,
     listar_recorrencias,
     listar_tags,
+    maiores_por_dia,
     marcar_em_lote,
     obter_compromisso,
     tags_dos_movimentos,
+    totais_dos_ciclos,
     ultima_sincronizacao,
 )
+from finance_api.tags import analisar, ciclos_do_impacto
 
 # A fila para classificar cobre seis ciclos, uns três meses: a média por
 # categoria usa os ciclos recentes, e movimento mais antigo sem categoria só
@@ -359,10 +378,20 @@ async def marcar_varios(
     return LoteOut(alterados=alterados)
 
 
-def _tag_out(linha: tuple) -> TagOut:
-    id_, nome, gasto, quantidade, primeira, ultima = linha
+def _tag_out(tag: TagORM, gasto=Decimal(0), quantidade=0, primeira=None, ultima=None) -> TagOut:
     return TagOut(
-        id=id_, nome=nome, gasto=gasto, quantidade=quantidade, primeira_data=primeira, ultima_data=ultima
+        id=tag.id,
+        nome=tag.nome,
+        icone=tag.icone,
+        cor=tag.cor,
+        teto=tag.teto,
+        inicio=tag.inicio,
+        fim=tag.fim,
+        arquivada=tag.arquivada,
+        gasto=gasto,
+        quantidade=quantidade,
+        primeira_data=primeira,
+        ultima_data=ultima,
     )
 
 
@@ -372,21 +401,108 @@ async def tags(
 ) -> list[TagOut]:
     """As tags com quanto se gastou em cada uma. A tag só agrupa: não muda
     nenhum outro número."""
-    return [_tag_out(linha) for linha in await listar_tags(sessao)]
+    return [_tag_out(*linha) for linha in await listar_tags(sessao)]
+
+
+@app.post("/tags", response_model=TagOut, status_code=201)
+async def nova_tag(
+    tag: TagIn,
+    sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
+) -> TagOut:
+    """Tag criada antes de ter movimento, com teto e período opcionais."""
+    try:
+        criada = await criar_tag(sessao, tag.model_dump())
+    except TagInvalida as erro:
+        raise HTTPException(status_code=422, detail=str(erro)) from erro
+    return _tag_out(criada)
+
+
+@app.patch("/tags/{tag_id}", response_model=TagOut)
+async def editar_tag(
+    tag_id: int,
+    alteracoes: TagUpdate,
+    sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
+) -> TagOut:
+    """Renomeia, troca a aparência, o teto ou o período, ou arquiva."""
+    try:
+        tag = await atualizar_tag(sessao, tag_id, alteracoes.model_dump(exclude_unset=True))
+    except TagInvalida as erro:
+        raise HTTPException(status_code=422, detail=str(erro)) from erro
+    if tag is None:
+        raise HTTPException(status_code=404, detail="tag não encontrada")
+    linha = next(linha for linha in await listar_tags(sessao) if linha[0].id == tag_id)
+    return _tag_out(*linha)
+
+
+@app.delete("/tags/{tag_id}", status_code=204)
+async def remover_tag(
+    tag_id: int,
+    sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
+) -> None:
+    """Os movimentos ficam; só perdem a tag."""
+    if not await apagar_tag(sessao, tag_id):
+        raise HTTPException(status_code=404, detail="tag não encontrada")
 
 
 @app.get("/tags/{tag_id}", response_model=ResumoDaTagOut)
 async def resumo_da_tag(
     tag_id: int,
+    hoje: date | None = None,
     sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
 ) -> ResumoDaTagOut:
-    linha = next((linha for linha in await listar_tags(sessao) if linha[0] == tag_id), None)
+    """Quanto a tag custou, onde pesou e o impacto no orçamento, como em
+    `finance_api.tags`. `hoje` existe para a demonstração e os testes."""
+    linha = next((linha for linha in await listar_tags(sessao) if linha[0].id == tag_id), None)
     if linha is None:
         raise HTTPException(status_code=404, detail="tag não encontrada")
+    dia = hoje or date.today()  # noqa: DTZ011 (ciclo é data civil, sem fuso)
+    gastos = await gastos_da_tag(sessao, tag_id)
+    ciclos = ciclos_do_impacto(gastos)
+    totais = await totais_dos_ciclos(sessao, ciclos[1] if ciclos else [])
+    analise = analisar(gastos, totais=totais, hoje=dia)
     por_categoria = await gasto_da_tag_por_categoria(sessao, tag_id)
+
+    principal = None
+    if analise.categoria_principal:
+        categoria, total = analise.categoria_principal
+        comparacao = [c for c in (ciclos[1] if ciclos else []) if c.fim < ciclos[0].inicio and c in totais]
+        tipico = None
+        if comparacao:
+            soma = await gasto_da_categoria(
+                sessao, categoria, inicio=comparacao[0].inicio, fim=comparacao[-1].fim
+            )
+            tipico = centavos(soma / len(comparacao))
+        principal = CategoriaPrincipal(categoria=categoria, total=total, tipico_por_ciclo=tipico)
+
+    impacto = analise.impacto
     return ResumoDaTagOut(
-        **_tag_out(linha).model_dump(),
+        **_tag_out(*linha).model_dump(),
         por_categoria=[GastoPorCategoria(categoria=c, total=t) for c, t in por_categoria],
+        dias=analise.dias,
+        por_dia=analise.por_dia,
+        maiores=[GastoMarcado(data=g.data, descricao=g.descricao, valor=g.valor) for g in analise.maiores],
+        dia_mais_caro=TotalDoDia(data=analise.dia_mais_caro[0], total=analise.dia_mais_caro[1])
+        if analise.dia_mais_caro
+        else None,
+        acumulado=[TotalDoDia(data=d, total=t) for d, t in analise.acumulado],
+        categoria_principal=principal,
+        impacto=ImpactoOut(
+            ciclo=_ciclo_out(impacto.ciclo),
+            gasto=impacto.gasto,
+            tipico=impacto.tipico,
+            rombo=impacto.rombo,
+            rombo_da_tag=impacto.rombo_da_tag,
+            sobra_media=impacto.sobra_media,
+            ciclos_para_recuperar=impacto.ciclos_para_recuperar,
+            barras=[
+                BarraDoCicloOut(
+                    ciclo=_ciclo_out(b.ciclo), gasto_sem_a_tag=b.gasto_sem_a_tag, gasto_da_tag=b.gasto_da_tag
+                )
+                for b in impacto.barras
+            ],
+        )
+        if impacto
+        else None,
     )
 
 
@@ -455,8 +571,14 @@ async def gastos_diarios(
     linhas = await agregar_despesas_por_dia(
         sessao, data_inicio=data_inicio, data_fim=data_fim, conta_id=conta_id
     )
+    maiores = await maiores_por_dia(sessao, inicio=data_inicio, fim=data_fim, conta_id=conta_id)
     return [
-        GastoDiario(data=data, total=total, em_revisao=em_revisao)
+        GastoDiario(
+            data=data,
+            total=total,
+            em_revisao=em_revisao,
+            maiores=[GastoDoDetalhe(descricao=d, valor=v) for d, v in maiores.get(data, [])],
+        )
         for data, total, em_revisao in linhas
     ]
 
@@ -531,6 +653,7 @@ async def dinheiro_livre(
     saldo, cartao, recorrencias, compromissos, gastos = await entradas_do_dinheiro_livre(
         sessao, inicio=ciclo.inicio, hoje=dia
     )
+    maiores = await maiores_por_dia(sessao, inicio=ciclo.inicio, fim=dia, sem_conta_fixa=True)
     resultado = calcular_dinheiro_livre(
         hoje=dia,
         inicio=ciclo.inicio,
@@ -558,7 +681,14 @@ async def dinheiro_livre(
         cofrinho=resultado.cofrinho,
         gasto_hoje=resultado.gasto_hoje,
         hoje_disponivel=resultado.hoje_disponivel,
-        gastos_por_dia=[GastoDoDiaOut(data=data, total=total) for data, total in resultado.gastos_por_dia.items()],
+        gastos_por_dia=[
+            GastoDoDiaOut(
+                data=data,
+                total=total,
+                maiores=[GastoDoDetalhe(descricao=d, valor=v) for d, v in maiores.get(data, [])],
+            )
+            for data, total in resultado.gastos_por_dia.items()
+        ],
     )
 
 

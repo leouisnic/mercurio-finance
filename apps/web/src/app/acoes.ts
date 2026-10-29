@@ -188,3 +188,59 @@ export async function criarCategoria(dados: {
     return { erro: "Não foi possível criar a categoria: a API não respondeu.", id: null };
   }
 }
+
+export type DadosDaTag = {
+  nome: string;
+  icone: string;
+  cor: number;
+  teto: number | null;
+  inicio: string | null;
+  fim: string | null;
+};
+
+/** Cria uma tag ou, com `id`, altera a que existe. */
+export async function salvarTag(dados: DadosDaTag, id?: number): Promise<ResultadoDaAcao> {
+  try {
+    const resposta = await fetch(`${FINANCE_API_URL}/tags${id ? `/${id}` : ""}`, {
+      method: id ? "PATCH" : "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify(dados),
+      cache: "no-store",
+    });
+    if (resposta.status === 422) {
+      return { erro: "Já existe uma tag com esse nome, ou o período termina antes de começar." };
+    }
+    if (!resposta.ok) {
+      return { erro: `Não foi possível salvar a tag: a API respondeu com erro ${resposta.status}.` };
+    }
+  } catch {
+    return { erro: "Não foi possível salvar a tag: a API não respondeu." };
+  }
+  recarregarMovimentos();
+  revalidatePath("/movimentos/tags");
+  return { erro: null };
+}
+
+export async function arquivarTag(id: number, arquivada: boolean): Promise<ResultadoDaAcao> {
+  const motivo = await enviar(`/tags/${id}`, {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ arquivada }),
+  });
+  if (motivo) {
+    return { erro: `Não foi possível ${arquivada ? "arquivar" : "desarquivar"} a tag: ${motivo}.` };
+  }
+  revalidatePath("/movimentos/tags");
+  return { erro: null };
+}
+
+/** Apaga a tag; os movimentos ficam, só perdem a marca. */
+export async function apagarTag(id: number): Promise<ResultadoDaAcao> {
+  const motivo = await enviar(`/tags/${id}`, { method: "DELETE" });
+  if (motivo) {
+    return { erro: `Não foi possível apagar a tag: ${motivo}.` };
+  }
+  recarregarMovimentos();
+  revalidatePath("/movimentos/tags");
+  return { erro: null };
+}

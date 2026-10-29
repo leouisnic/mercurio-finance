@@ -1,5 +1,6 @@
 import {
   Baby,
+  BedDouble,
   Beer,
   Bike,
   BookOpen,
@@ -38,6 +39,7 @@ import {
   ShoppingCart,
   Smartphone,
   Sparkles,
+  Tag,
   Ticket,
   Users,
   Utensils,
@@ -93,6 +95,8 @@ const ICONES: Record<string, LucideIcon> = {
   Leaf,
   Ticket,
   Camera,
+  Tag,
+  BedDouble,
 };
 
 export const ICONES_PARA_CRIAR = [
@@ -147,3 +151,6 @@ export function BolaDaCategoria({
     </span>
   );
 }
+
+/** Os ícones que uma tag pode ter: viagem, obra, festa, família, esporte. */
+export const ICONES_DE_TAG = ["Plane", "Hammer", "Gift", "PartyPopper", "Baby", "Dumbbell", "Car", "House", "Heart", "Briefcase", "Ticket", "Tag"];

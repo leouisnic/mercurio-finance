@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { ContaParaClassificar, SUBPAGINAS } from "./movimentos/abas";
+import { ContaParaClassificar, SUBPAGINAS, estaNaPagina } from "./movimentos/abas";
 import { SeletorDeTema } from "./tema";
 
 type Item = {
@@ -152,7 +152,7 @@ function Submenu({ caminho, paraClassificar }: { caminho: string; paraClassifica
   return (
     <div className="flex flex-col gap-0.5 px-1 pt-0.5 pb-1">
       {SUBPAGINAS.slice(1).map((pagina) => {
-        const ativa = caminho === pagina.href;
+        const ativa = estaNaPagina(caminho, pagina.href);
         return (
           <Link
             key={pagina.href}

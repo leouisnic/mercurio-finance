@@ -888,7 +888,11 @@ def test_duplicidade_possivel_conta_e_fica_sinalizada(
         if linha["conta_id"] == "conta-corrente"
     ]
 
-    assert dia == {"data": "2026-08-11", "total": "160.00", "em_revisao": "160.00"}
+    assert {chave: dia[chave] for chave in ("data", "total", "em_revisao")} == {
+        "data": "2026-08-11",
+        "total": "160.00",
+        "em_revisao": "160.00",
+    }
     assert conta["saidas"] == "160.00"
     assert conta["em_revisao"] == "160.00"
 

@@ -29,6 +29,8 @@ from finance_api.categorias import (
     decidir,
     sem_acento,
 )
+from finance_api.centavos import centavos
+from finance_api.ciclo import Ciclo
 from finance_api.compromissos import somar_meses
 from finance_api.dinheiro_livre import CompromissoAtivo, RecorrenciaAprovada
 from finance_api.models import (
@@ -42,6 +44,7 @@ from finance_api.models import (
     TagORM,
 )
 from finance_api.recorrencias import LancamentoObservado, RecorrenciaCandidata
+from finance_api.tags import GastoDaTag, TotaisDoCiclo
 
 # Quantos dias podem separar a saída da conta corrente da baixa no cartão.
 JANELA_PAGAMENTO_DE_FATURA_DIAS = 3
@@ -84,7 +87,7 @@ def _como_data(valor: object) -> object:
 def _decimal_ou_none(valor: object) -> Decimal | None:
     if valor is None or (isinstance(valor, float) and pd.isna(valor)):
         return None
-    return Decimal(str(valor)).quantize(Decimal("0.01"))
+    return centavos(Decimal(str(valor)))
 
 
 def _texto_ou_none(valor: object) -> str | None:
@@ -180,7 +183,7 @@ async def inserir_movimentos(
         {
             "conta_id": linha["conta_id"],
             "data": _como_data(linha["data"]),
-            "valor": Decimal(str(linha["valor"])).quantize(Decimal("0.01")),
+            "valor": centavos(Decimal(str(linha["valor"]))),
             "descricao": linha["descricao"],
             "tipo": linha["tipo"],
             "proveniencia": proveniencia,
@@ -201,6 +204,21 @@ async def inserir_movimentos(
     resultado = await sessao.execute(instrucao)
     await sessao.commit()
     return resultado.rowcount or 0
+
+
+def _e_conta_fixa():
+    """Despesa da mesma conta e descrição de uma recorrência aprovada, a chave
+    que a detecção usa. Encerrada entra também: o pagamento dela no ciclo já era
+    conta fixa quando saiu, não gasto do dia a dia."""
+    return (
+        select(RecorrenciaORM.id)
+        .where(
+            RecorrenciaORM.status.in_(("aprovada", "parcelamento", "encerrada")),
+            RecorrenciaORM.conta_id == MovimentoORM.conta_id,
+            RecorrenciaORM.descricao == MovimentoORM.descricao,
+        )
+        .exists()
+    )
 
 
 def _para_classificar():
@@ -388,17 +406,7 @@ async def entradas_do_dinheiro_livre(
         await sessao.execute(select(CompromissoORM).where(CompromissoORM.status == "ativo"))
     ).scalars().all()
 
-    # Encerrada entra aqui também: o pagamento dela no ciclo já era conta fixa
-    # quando saiu, não gasto do dia a dia.
-    e_conta_fixa = (
-        select(RecorrenciaORM.id)
-        .where(
-            RecorrenciaORM.status.in_(("aprovada", "parcelamento", "encerrada")),
-            RecorrenciaORM.conta_id == MovimentoORM.conta_id,
-            RecorrenciaORM.descricao == MovimentoORM.descricao,
-        )
-        .exists()
-    )
+    e_conta_fixa = _e_conta_fixa()
     gastos = (
         await sessao.execute(
             select(MovimentoORM.data, func.sum(MovimentoORM.valor))
@@ -1008,13 +1016,12 @@ def _gasto():
     )
 
 
-async def listar_tags(sessao: AsyncSession) -> list[tuple]:
-    """Cada tag como `(id, nome, gasto, quantidade, primeira_data,
-    ultima_data)`, a de movimento mais recente primeiro."""
+async def listar_tags(sessao: AsyncSession) -> list[tuple[TagORM, Decimal, int, date | None, date | None]]:
+    """Cada tag com `(tag, gasto, quantidade, primeira_data, ultima_data)`,
+    a de movimento mais recente primeiro."""
     resultado = await sessao.execute(
         select(
-            TagORM.id,
-            TagORM.nome,
+            TagORM,
             _gasto(),
             func.count(MovimentoORM.id),
             func.min(MovimentoORM.data),
@@ -1023,7 +1030,7 @@ async def listar_tags(sessao: AsyncSession) -> list[tuple]:
         .select_from(TagORM)
         .outerjoin(MovimentoTagORM, MovimentoTagORM.tag_id == TagORM.id)
         .outerjoin(MovimentoORM, MovimentoORM.id == MovimentoTagORM.movimento_id)
-        .group_by(TagORM.id, TagORM.nome)
+        .group_by(TagORM.id)
         .order_by(func.max(MovimentoORM.data).desc().nulls_last(), TagORM.nome)
     )
     return [tuple(linha) for linha in resultado.all()]
@@ -1042,3 +1049,130 @@ async def gasto_da_tag_por_categoria(
         .order_by(_gasto().desc())
     )
     return [(categoria, total) for categoria, total in resultado.all()]
+
+
+class TagInvalida(ValueError):
+    """Nome de tag que já existe."""
+
+
+async def _nome_livre(sessao: AsyncSession, nome: str, menos_id: int | None = None) -> None:
+    consulta = select(TagORM.id).where(func.lower(TagORM.nome) == nome.strip().lower())
+    if menos_id is not None:
+        consulta = consulta.where(TagORM.id != menos_id)
+    if await sessao.scalar(consulta) is not None:
+        raise TagInvalida(f"já existe a tag {nome.strip()}")
+
+
+async def criar_tag(sessao: AsyncSession, campos: dict) -> TagORM:
+    await _nome_livre(sessao, campos["nome"])
+    tag = TagORM(**{**campos, "nome": campos["nome"].strip()})
+    sessao.add(tag)
+    await sessao.commit()
+    await sessao.refresh(tag)
+    return tag
+
+
+async def atualizar_tag(sessao: AsyncSession, tag_id: int, campos: dict) -> TagORM | None:
+    tag = await sessao.get(TagORM, tag_id)
+    if tag is None:
+        return None
+    if "nome" in campos:
+        await _nome_livre(sessao, campos["nome"], menos_id=tag_id)
+        campos["nome"] = campos["nome"].strip()
+    for nome, valor in campos.items():
+        setattr(tag, nome, valor)
+    await sessao.commit()
+    await sessao.refresh(tag)
+    return tag
+
+
+async def apagar_tag(sessao: AsyncSession, tag_id: int) -> bool:
+    """Apaga a tag; os movimentos ficam, só perdem a marca (a ligação cai em
+    cascata)."""
+    tag = await sessao.get(TagORM, tag_id)
+    if tag is None:
+        return False
+    await sessao.delete(tag)
+    await sessao.commit()
+    return True
+
+
+async def gastos_da_tag(sessao: AsyncSession, tag_id: int) -> list[GastoDaTag]:
+    """As despesas marcadas com a tag, sem pagamento de fatura."""
+    resultado = await sessao.execute(
+        select(MovimentoORM.data, MovimentoORM.valor, MovimentoORM.descricao, MovimentoORM.categoria_propria)
+        .join(MovimentoTagORM, MovimentoTagORM.movimento_id == MovimentoORM.id)
+        .where(
+            MovimentoTagORM.tag_id == tag_id,
+            MovimentoORM.tipo == "despesa",
+            _nao_e_pagamento_de_fatura(),
+        )
+    )
+    return [GastoDaTag(*linha) for linha in resultado.all()]
+
+
+async def totais_dos_ciclos(sessao: AsyncSession, ciclos: list[Ciclo]) -> dict[Ciclo, TotaisDoCiclo]:
+    """Gasto e entrada de cada ciclo, sem fatura nem transferência entre contas
+    do dono. Ciclo sem nenhum movimento fica de fora: é anterior ao histórico."""
+    if not ciclos:
+        return {}
+    inicio, fim = min(c.inicio for c in ciclos), max(c.fim for c in ciclos)
+    resultado = await sessao.execute(
+        select(
+            MovimentoORM.data,
+            func.sum(case((and_(MovimentoORM.tipo == "despesa", _nao_e_pagamento_de_fatura()), MovimentoORM.valor), else_=0)),
+            func.sum(case((MovimentoORM.tipo == "receita", MovimentoORM.valor), else_=0)),
+        )
+        .where(MovimentoORM.data >= inicio, MovimentoORM.data <= fim)
+        .group_by(MovimentoORM.data)
+    )
+    gasto: dict[Ciclo, Decimal] = {}
+    entrou: dict[Ciclo, Decimal] = {}
+    for dia, despesas, receitas in resultado.all():
+        for ciclo in ciclos:
+            if ciclo.contem(dia):
+                gasto[ciclo] = gasto.get(ciclo, Decimal(0)) + despesas
+                entrou[ciclo] = entrou.get(ciclo, Decimal(0)) + receitas
+    return {ciclo: TotaisDoCiclo(gasto[ciclo], entrou[ciclo]) for ciclo in gasto}
+
+
+async def maiores_por_dia(
+    sessao: AsyncSession,
+    *,
+    inicio: date,
+    fim: date,
+    conta_id: str | None = None,
+    sem_conta_fixa: bool = False,
+    quantos: int = 3,
+) -> dict[date, list[tuple[str, Decimal]]]:
+    """Os maiores gastos de cada dia, para o detalhe do gráfico. Usa o mesmo
+    filtro da barra: sem fatura e, no Início, sem conta fixa."""
+    consulta = select(MovimentoORM.data, MovimentoORM.descricao, MovimentoORM.valor).where(
+        MovimentoORM.tipo == "despesa",
+        MovimentoORM.data >= inicio,
+        MovimentoORM.data <= fim,
+        _nao_e_pagamento_de_fatura(),
+    )
+    if conta_id is not None:
+        consulta = consulta.where(MovimentoORM.conta_id == conta_id)
+    if sem_conta_fixa:
+        consulta = consulta.where(~_e_conta_fixa())
+    por_dia: dict[date, list[tuple[str, Decimal]]] = {}
+    for dia, descricao, valor in (await sessao.execute(consulta)).all():
+        por_dia.setdefault(dia, []).append((descricao, valor))
+    return {
+        dia: sorted(itens, key=lambda item: -item[1])[:quantos] for dia, itens in por_dia.items()
+    }
+
+
+async def gasto_da_categoria(sessao: AsyncSession, categoria: str, *, inicio: date, fim: date) -> Decimal:
+    """Despesas de uma categoria do Mercúrio no intervalo, sem fatura."""
+    return await sessao.scalar(
+        select(func.coalesce(func.sum(MovimentoORM.valor), 0)).where(
+            MovimentoORM.categoria_propria == categoria,
+            MovimentoORM.tipo == "despesa",
+            MovimentoORM.data >= inicio,
+            MovimentoORM.data <= fim,
+            _nao_e_pagamento_de_fatura(),
+        )
+    ) or Decimal(0)

@@ -20,6 +20,8 @@ from datetime import date
 from decimal import Decimal
 from itertools import pairwise
 
+from finance_api.centavos import centavos
+
 # Três ocorrências: com duas, qualquer par de compras parecidas com ~1 mês
 # de intervalo viraria "recorrência" (falso positivo fácil demais).
 MINIMO_OCORRENCIAS = 3
@@ -113,7 +115,7 @@ def detectar_recorrencias(
             continue
 
         valores = [item.valor for item in sequencia]
-        media = (sum(valores) / len(valores)).quantize(Decimal("0.01"))
+        media = centavos(sum(valores) / len(valores))
         candidatas.append(
             RecorrenciaCandidata(
                 conta_id=conta_id,

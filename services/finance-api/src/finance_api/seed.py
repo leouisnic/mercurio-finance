@@ -47,8 +47,8 @@ async def semear(*, limpar_teste: bool = False) -> None:
                     "tags RESTART IDENTITY CASCADE"
                 )
             )
-            # As 19 da migração têm ordem de 0 a 18; acima disso foi criada no e2e.
-            await sessao.execute(text("DELETE FROM categorias WHERE ordem > 18"))
+            # As 20 das migrações têm ordem de 0 a 19; acima disso foi criada no e2e.
+            await sessao.execute(text("DELETE FROM categorias WHERE ordem > 19"))
             await sessao.commit()
         await upsert_contas(sessao, seed_contas_ficticias())
         inseridos = await inserir_movimentos(

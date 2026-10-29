@@ -114,7 +114,22 @@ test("marcar dois e aplicar uma tag manda os dois para a API e limpa a seleção
     <Lista
       movimentos={[movimento({ id: 1, descricao: "Pousada" }), movimento({ id: 2, descricao: "Restaurante" })]}
       contas={CONTAS}
-      tagsExistentes={["viagem Exemplo"]}
+      tags={[
+        {
+          id: 1,
+          nome: "viagem Exemplo",
+          icone: "Plane",
+          cor: 220,
+          teto: null,
+          inicio: null,
+          fim: null,
+          arquivada: false,
+          gasto: 0,
+          quantidade: 0,
+          primeiraData: null,
+          ultimaData: null,
+        },
+      ]}
     />,
   );
 
@@ -122,7 +137,8 @@ test("marcar dois e aplicar uma tag manda os dois para a API e limpa a seleção
   fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar Restaurante" }));
   expect(screen.getByText("2 selecionados")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Marcar com tag" }));
-  fireEvent.change(screen.getByLabelText("Nome da tag"), { target: { value: "viagem Exemplo" } });
+  // A tag existente aparece com ícone, como na escolha de categoria.
+  fireEvent.click(await screen.findByRole("radio", { name: "viagem Exemplo" }));
   fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
 
   await waitFor(() => expect(marcarVarios).toHaveBeenCalledWith([1, 2], { tag: "viagem Exemplo" }));
@@ -154,4 +170,17 @@ test("categoria para vários usa a mesma lista com ícones e manda a escolhida",
   fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
 
   await waitFor(() => expect(marcarVarios).toHaveBeenCalledWith([1, 2], { categoria: "viagem" }));
+});
+
+test("a busca de tag que não acha nada oferece criar", async () => {
+  marcarVarios.mockResolvedValue({ erro: null });
+  render(<Lista movimentos={[movimento({ id: 1, descricao: "Pousada" })]} contas={CONTAS} tags={[]} />);
+
+  fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar Pousada" }));
+  fireEvent.click(screen.getByRole("button", { name: "Marcar com tag" }));
+  fireEvent.change(await screen.findByLabelText("Buscar ou criar tag"), { target: { value: "viagem Nova" } });
+  fireEvent.click(screen.getByRole("button", { name: 'Criar "viagem Nova"' }));
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+
+  await waitFor(() => expect(marcarVarios).toHaveBeenCalledWith([1], { tag: "viagem Nova" }));
 });

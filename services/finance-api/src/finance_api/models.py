@@ -119,6 +119,14 @@ class TagORM(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nome: Mapped[str] = mapped_column(String(60))
+    # Como na categoria: nome do ícone no `lucide-react` e só o tom da cor.
+    icone: Mapped[str] = mapped_column(String(40), server_default="Tag")
+    cor: Mapped[int] = mapped_column(Integer, server_default="278")
+    teto: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    # Período da tag, opcional; é o que o modo viagem vai usar para marcar sozinho.
+    inicio: Mapped[date | None] = mapped_column(Date, nullable=True)
+    fim: Mapped[date | None] = mapped_column(Date, nullable=True)
+    arquivada: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
 
 class MovimentoTagORM(Base):

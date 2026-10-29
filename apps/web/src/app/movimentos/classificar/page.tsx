@@ -1,4 +1,8 @@
-import { buscarCategorias, buscarMovimentos, buscarTags } from "../../buscar-movimentos";
+import {
+  buscarCategorias,
+  buscarMovimentos,
+  buscarTags,
+} from "../../buscar-movimentos";
 import { buscarResumo } from "../../buscar-resumo";
 import { dataDeHoje } from "../../hoje";
 import { BlocoIndisponivel, FaixaDeFalha } from "../../indisponivel";
@@ -9,7 +13,15 @@ import { Lista } from "../lista";
  *  hoje: não depende do ciclo que se está olhando. */
 export default async function ParaClassificar() {
   const [movimentos, categorias, resumo, tags] = await Promise.all([
-    buscarMovimentos(undefined, undefined, undefined, 200, 0, true, dataDeHoje()),
+    buscarMovimentos(
+      undefined,
+      undefined,
+      undefined,
+      200,
+      0,
+      true,
+      dataDeHoje(),
+    ),
     buscarCategorias(),
     buscarResumo(),
     buscarTags(),
@@ -23,10 +35,13 @@ export default async function ParaClassificar() {
   return (
     <>
       <header className="flex flex-col gap-[3px]">
-        <h1 className="text-[23px] font-bold tracking-[-0.2px]">Para classificar</h1>
+        <h1 className="text-[23px] font-bold tracking-[-0.2px]">
+          Para classificar
+        </h1>
         <span className="text-tinta-3 text-[13px]">
-          Os dos últimos seis ciclos: Pix para quem já recebeu por coisas diferentes, e o que a
-          Pluggy não soube dizer. As categorias que o destinatário já teve aparecem primeiro.
+          Os dos últimos seis ciclos: Pix para quem já recebeu por coisas
+          diferentes, e o que a Pluggy não soube dizer. As categorias que o
+          destinatário já teve aparecem primeiro.
         </span>
       </header>
       <AbasDeMovimentos paraClassificar={movimentos?.length ?? null} />
@@ -39,6 +54,7 @@ export default async function ParaClassificar() {
           contas={resumo?.contas ?? []}
           categorias={categorias}
           tagsExistentes={(tags ?? []).map((tag) => tag.nome)}
+          tags={tags ?? []}
           vazio="Tudo classificado."
         />
       )}
