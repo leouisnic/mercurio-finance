@@ -7,7 +7,11 @@ import { comoData, diaEMes, moeda, moedaCurta } from "../formato";
 function diasDoIntervalo(inicio: string, fim: string): string[] {
   const dias: string[] = [];
   const ultimo = comoData(fim);
-  for (let dia = comoData(inicio); dia <= ultimo; dia.setDate(dia.getDate() + 1)) {
+  for (
+    let dia = comoData(inicio);
+    dia <= ultimo;
+    dia.setDate(dia.getDate() + 1)
+  ) {
     dias.push(
       `${dia.getFullYear()}-${String(dia.getMonth() + 1).padStart(2, "0")}-${String(dia.getDate()).padStart(2, "0")}`,
     );
@@ -50,7 +54,9 @@ export function GraficoGastoDiario({
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-bold">{titulo}</h2>
-        <span className="num text-tinta-2 text-[13px]">total no período: {moeda(total)}</span>
+        <span className="num text-tinta-2 text-[13px]">
+          total no período: {moeda(total)}
+        </span>
       </div>
 
       <div className="relative pt-5">
@@ -58,7 +64,9 @@ export function GraficoGastoDiario({
           <div
             aria-hidden
             className="border-marca pointer-events-none absolute inset-x-1 z-10 border-t-2 border-dashed"
-            style={{ bottom: `calc(${(cota / maior) * ALTURA_MAXIMA}px + 26px)` }}
+            style={{
+              bottom: `calc(${(cota / maior) * ALTURA_MAXIMA}px + 26px)`,
+            }}
           />
         )}
         <ol className="flex h-[124px] items-end gap-1 px-1 sm:gap-2">
@@ -67,10 +75,21 @@ export function GraficoGastoDiario({
             const gasto = porDia.get(dia);
             const valor = gasto?.total ?? 0;
             const passou = cota !== null && valor > cota;
-            const altura = maior > 0 && valor > 0 ? (valor / maior) * ALTURA_MAXIMA : ALTURA_VAZIA;
-            const cor = valor === 0 ? "bg-caixinha" : passou ? "bg-alerta-forte" : "bg-marca";
+            const altura =
+              maior > 0 && valor > 0
+                ? (valor / maior) * ALTURA_MAXIMA
+                : ALTURA_VAZIA;
+            const cor =
+              valor === 0
+                ? "bg-caixinha"
+                : passou
+                  ? "bg-alerta-forte"
+                  : "bg-marca";
             return (
-              <li key={dia} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1.5">
+              <li
+                key={dia}
+                className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1.5"
+              >
                 {futuro ? (
                   <span className="block" style={{ height: ALTURA_VAZIA }} />
                 ) : (
@@ -80,10 +99,13 @@ export function GraficoGastoDiario({
                     cota={cota}
                     maiores={gasto?.maiores ?? []}
                   >
-                    <span className={`relative block w-full rounded-t-[5px] transition-opacity group-hover:opacity-80 ${cor}`} style={{ height: altura }}>
+                    <span
+                      className={`relative block w-full rounded-t-[5px] transition-opacity group-hover:opacity-80 ${cor}`}
+                      style={{ height: altura }}
+                    >
                       {valor > 0 && (
                         <span
-                          className={`num absolute -top-5 left-1/2 -translate-x-1/2 text-[11px] font-bold whitespace-nowrap max-lg:hidden ${
+                          className={`num bg-superficie absolute -top-5 left-1/2 z-20 -translate-x-1/2 rounded px-1 text-[11px] font-bold whitespace-nowrap max-lg:hidden ${
                             passou ? "text-alerta" : "text-tinta-2"
                           }`}
                         >
@@ -110,7 +132,10 @@ export function GraficoGastoDiario({
         </ol>
       </div>
 
-      <div className="text-tinta-2 flex flex-wrap gap-x-[18px] gap-y-1.5 text-sm" aria-hidden>
+      <div
+        className="text-tinta-2 flex flex-wrap gap-x-[18px] gap-y-1.5 text-sm"
+        aria-hidden
+      >
         <span className="flex items-center gap-1.5">
           <i className="bg-caixinha inline-block size-[11px] rounded-[3px]" />
           Sem gasto

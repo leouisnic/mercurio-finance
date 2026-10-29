@@ -91,6 +91,12 @@ npm run dev -- --port 3100
 - Pytest and Playwright reset that database, so do not run them while using the demo.
 - The Sync button needs Pluggy credentials in `.env` and the queue worker
   (`uv run --package finance-api python -m finance_api.worker`). The demo works without both.
+- With real data on Windows, `scripts/start.ps1` brings up everything without a window, with
+  an icon next to the clock: Docker, Postgres and Redis, pending migrations, the API on 8000,
+  the queue worker and the compiled dashboard on 3001 (rebuilt in `.next-painel` when the
+  code changed), then opens the browser. "Desligar" on the icon stops the API, worker and
+  dashboard; Docker keeps running.
+  `scripts/create-shortcut.ps1` puts a "Mercúrio" shortcut on the desktop and in the Start menu.
 
 ## Structure
 

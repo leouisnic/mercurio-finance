@@ -154,7 +154,7 @@ export function GraficoDoCiclo({
                     {dia.valor > 0 && (
                       // No celular não cabe valor em toda barra: fica só nas que passaram da cota.
                       <span
-                        className={`num absolute -top-5 left-1/2 -translate-x-1/2 text-[11px] font-bold whitespace-nowrap ${
+                        className={`num bg-superficie absolute -top-5 left-1/2 z-20 -translate-x-1/2 rounded px-1 text-[11px] font-bold whitespace-nowrap ${
                           passou ? "text-alerta" : "text-tinta-2 max-sm:hidden"
                         }`}
                       >

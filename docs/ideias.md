@@ -166,3 +166,23 @@ Adiada em: 2026-10-27
 Gatilho: 2027-01-27, três meses depois das primeiras contas fixas aprovadas.
 
 Por quê: Tela Recorrências e alerta no Início: conta fixa pequena aprovada há meses, para o dono confirmar se ainda usa.
+
+## Filtros e contadores
+
+Estado: adiada
+
+Adiada em: 2026-10-29
+
+Gatilho: a próxima leva, assim que houver limite de uso para desenvolver. Substitui a leva "filtros da página Tags".
+
+Por quê: As telas de dados não têm filtro e o dono escreve mês e ano no nome da tag. Decidido numa leva só, com um padrão único: barra de filtros no Início, em Movimentos e em Tags (período, conta, categoria e tag; Tags ganha também situação, busca pelo nome e teto); contadores no ciclo e no mês (dias de ouro, que são dias sem gasto, também no total; sequência atual e recorde sem gasto; dias dentro e acima da cota; gasto até hoje contra o mesmo ponto do ciclo anterior); no gráfico de gasto por dia, a cota sai da etiqueta repetida e vai para o balão da linha tracejada, cada dia ganha a letra do dia da semana e os dias não úteis ficam marcados, com os feriados nacionais do calendário de ciclos e feriado da cidade cadastrado pelo dono. O dono quer decidir o visual antes: spec e mockup fictício antes do código.
+
+## Plano do ciclo
+
+Estado: adiada
+
+Adiada em: 2026-10-29
+
+Gatilho: junto com "Dinheiro livre quando estoura", que mexe no mesmo número.
+
+Por quê: O livre desconta só as contas fixas que vencem até o fim do ciclo atual; as do ciclo seguinte ficam de fora, então a cota do ciclo 1 não sabe que o ciclo 2 vem pesado. Proposta, ainda sem aprovação: no início do ciclo, mostrar as contas fixas do ciclo seguinte e quanto deve entrar nele; se faltar, sugerir um valor para guardar agora, com três escolhas do dono: proteger o próximo ciclo (o valor sai do livre, como o cofrinho), usar tudo agora (só avisa quanto vai faltar) ou escolher o valor. Primeiro passo do Planejamento. Contar só saldo recebido continua valendo.
