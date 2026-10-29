@@ -39,7 +39,7 @@ Por quê: A Pluggy classifica com modelo próprio, não com a categoria do app d
 
 ## Tags e gráficos
 
-Estado: virou leva (`docs/specs/2026-10-28-tags-e-graficos.md`)
+Estado: virou leva (`docs/specs/archive/2026-10-28-tags-e-graficos.md`)
 
 Adiada em: 2026-10-28
 

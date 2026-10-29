@@ -1,6 +1,6 @@
 # Tags e gráficos
 
-Estado: aceita pelo dono e publicada
+Estado: concluída
 Data: 2026-10-28. Arquivo: `docs/specs/2026-10-28-tags-e-graficos.md`.
 
 Vem da leva de categorias próprias (`docs/specs/2026-10-28-categorias-proprias.md`) e do uso
@@ -162,3 +162,12 @@ Migração nova no banco de desenvolvimento. Commit e push só com pedido.
   473 px num celular de 390 e nenhum teste olhava essa página, porque ela só existe depois
   de marcar. Tabela escondida mora dentro de um `div` com `sr-only`, e a largura da tag
   aberta passou a ser conferida no e2e mutável.
+
+## Registro do fechamento
+
+Conferido em: 2026-10-29T13:01:03.691978-03:00
+Conteúdo validado: sha256:f25a9347d6320b09bc0a45ea459fccf9fc7319226306c88004a240baa9225bf2
+Contrato: sha256:005e918e8ef2a2d51728c71c88ca8e3762d17b4703c6dd4c79dc38d51b7749ae
+
+- suite: código 0; comando `["uv", "run", "python", "scripts/validar.py", "--e2e"]`.
+- contraste: código 0; comando `["uv", "run", "python", "scripts/contraste.py"]`.
