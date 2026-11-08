@@ -1,7 +1,7 @@
 # Toque no detalhe do gráfico
 
-Estado: concluída
-Data: 2026-11-08. Arquivo: `docs/specs/archive/2026-11-08-toque-no-detalhe-do-grafico.md`.
+Estado: em andamento
+Data: 2026-11-08. Arquivo: `docs/specs/2026-11-08-toque-no-detalhe-do-grafico.md`.
 
 ## Problema medido
 
@@ -27,6 +27,8 @@ Escape e interação fora da barra continuam funcionando no Início e em Movimen
 Corrigir o gatilho de `ColunaComDetalhe`, aguardar sua hidratação para habilitá-lo
 e ampliar a regressão de toque existente. Permitir limitar os workers no ambiente local
 para executar a validação completa com pouca memória, preservando o padrão sem a variável.
+Registrar os eventos e mudanças de estado do botão fictício quando os testes de toque
+falharem, para identificar o fechamento que só aparece na CI.
 
 ### Ficou de fora
 
@@ -139,6 +141,15 @@ fictícia local e da CI.
 - A suíte completa passou com esses limites confirmados na configuração efetiva.
   A revisão independente conferiu a proteção de hidratação, o gate, a opção local
   de workers e a correção do registro de execução, sem bloqueios.
+- A CI de `5e7e371` confirmou o estado inicial desabilitado, mas perdeu o detalhe
+  depois do primeiro toque nos dois testes. O gate corrige uma disponibilidade
+  indevida reproduzida e ainda não explica o fechamento na CI. A spec foi reaberta
+  para colher os eventos e o estado dessa execução, usando somente a base fictícia.
+- O diagnóstico distingue alvo interno e externo, identifica cada nó do botão e
+  registra montagem, remoção, atributos e origem nativa dos eventos. Uma falha
+  intencional depois da abertura confirmou JSON válido com montagem, toque, clique
+  confiável e transição de `aria-expanded`. O teste foi restaurado byte a byte.
+  Página encerrada preserva o erro original e informa a indisponibilidade do diagnóstico.
 
 ## Lições
 
@@ -150,11 +161,3 @@ fictícia local e da CI.
   responda à mesma requisição duas vezes.
 - Afinidade do processo não define o paralelismo do Playwright 1.62.1. Conferir a
   quantidade resolvida de workers, em vez de inferi-la da quantidade de CPUs disponíveis.
-
-## Registro do fechamento
-
-Conferido em: 2026-11-08T10:53:27.556218-03:00
-Conteúdo validado: sha256:07b7cf24781f9716897c4c508e3e83ec7426db693886fc9c8119e29af1ebbe3c
-Contrato: sha256:fbf0eb9a41ee41419559e420ec54aacdabbf5d94292b71e043f399970dc35bad
-
-- A suíte terminou com código 0 pelo comando `["uv", "run", "python", "scripts/validar.py", "--e2e"]`.

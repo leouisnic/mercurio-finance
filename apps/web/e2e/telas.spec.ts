@@ -204,6 +204,63 @@ test("a moldura do calendário mantém respiro ao rolar até Aplicar", async ({ 
 test.describe("gráficos por toque", () => {
   test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
 
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      const trace: unknown[] = [];
+      const buttonIds = new Map<Element, number>();
+      let observedButton: Element | null = null;
+      Object.assign(window, { chartTrace: trace });
+      function record(type: string, target: EventTarget | null, relatedTarget: EventTarget | null = null, details: Record<string, unknown> = {}) {
+        const button = target instanceof Element ? target.closest("button") : null;
+        if (!button?.getAttribute("aria-label")?.includes("07/08")) return;
+        if (!buttonIds.has(button)) buttonIds.set(button, buttonIds.size + 1);
+        trace.push({
+          time: performance.now(),
+          type,
+          buttonId: buttonIds.get(button),
+          target: target instanceof Element ? target.tagName : null,
+          relatedTarget: relatedTarget instanceof Element ? relatedTarget.tagName : null,
+          relatedInside: relatedTarget instanceof Node && button.contains(relatedTarget),
+          expanded: button.getAttribute("aria-expanded"),
+          disabled: button.hasAttribute("disabled"),
+          connected: button.isConnected,
+          ...details,
+        });
+      }
+      for (const type of ["pointerover", "pointerdown", "pointerup", "pointerout", "pointercancel", "touchstart", "touchend", "mouseover", "mouseout", "mousedown", "mouseup", "click", "focusin", "focusout"]) {
+        document.addEventListener(type, (event) => {
+          const related = event instanceof MouseEvent || event instanceof FocusEvent ? event.relatedTarget : null;
+          record(event.type, event.target, related, {
+            pointerType: event instanceof PointerEvent ? event.pointerType : undefined,
+            firesTouchEvents: Reflect.get(event, "sourceCapabilities")?.firesTouchEvents,
+            isTrusted: event.isTrusted,
+          });
+        }, true);
+      }
+      new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          record(`Changed ${mutation.attributeName} from ${mutation.oldValue}`, mutation.target);
+        }
+        const current = document.querySelector('button[aria-label*="07/08"]');
+        if (current !== observedButton) {
+          record("Detached", observedButton);
+          record("Mounted", current);
+          observedButton = current;
+        }
+      }).observe(document, { subtree: true, childList: true, attributes: true, attributeOldValue: true, attributeFilter: ["aria-expanded", "disabled"] });
+    });
+  });
+
+  test.afterEach(async ({ page }, info) => {
+    if (info.status !== info.expectedStatus) {
+      try {
+        console.log("Chart event trace", JSON.stringify({ url: page.url(), events: await page.evaluate(() => Reflect.get(window, "chartTrace")) }));
+      } catch {
+        console.log("Chart event trace unavailable");
+      }
+    }
+  });
+
   test("as barras aguardam a hidratação antes de aceitar o primeiro toque", async ({ page }) => {
     for (const caminho of ["/", "/movimentos?referencia=2026-08-10"]) {
       let releaseScripts!: () => void;
