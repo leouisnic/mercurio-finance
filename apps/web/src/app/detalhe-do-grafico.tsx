@@ -57,8 +57,12 @@ export function ColunaComDetalhe({
           type="button"
           disabled={!hydrated}
           aria-label={`${dia}: ${moeda(valor)}`}
-          onMouseEnter={() => setAberto(true)}
-          onMouseLeave={() => setAberto(false)}
+          onPointerEnter={(evento) => {
+            if (evento.pointerType !== "touch") setAberto(true);
+          }}
+          onPointerLeave={(evento) => {
+            if (evento.pointerType !== "touch") setAberto(false);
+          }}
           onFocus={() => setAberto(true)}
           onBlur={() => setAberto(false)}
           onClick={(evento) => {

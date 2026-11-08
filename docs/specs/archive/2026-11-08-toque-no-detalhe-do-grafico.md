@@ -1,7 +1,7 @@
 # Toque no detalhe do gráfico
 
-Estado: em andamento
-Data: 2026-11-08. Arquivo: `docs/specs/2026-11-08-toque-no-detalhe-do-grafico.md`.
+Estado: concluída
+Data: 2026-11-08. Arquivo: `docs/specs/archive/2026-11-08-toque-no-detalhe-do-grafico.md`.
 
 ## Problema medido
 
@@ -10,12 +10,17 @@ O teste original passou em oito repetições locais. Tocar novamente na mesma ba
 depois de confirmar o detalhe aberto, reproduziu o fechamento indevido no build local.
 O botão externo ao Popover não registra seu gatilho, e o Radix o considera uma interação
 externa. O evento de fechamento pode ocorrer depois da abertura pelo clique.
-A sequência exata do primeiro toque que falhou na CI ainda não foi rastreada.
+O primeiro toque exigiu a coleta posterior de eventos na CI.
 
 A CI de `7476f55` repetiu a falha do primeiro toque. Com os scripts locais retidos,
 o teste de navegador confirmou que o botão renderizado no servidor continua habilitado.
 A hipótese de perda de interação antes da hidratação passa a ter reprodução controlada
-da disponibilidade indevida do botão. A sequência exata da falha da CI continua em aberto.
+da disponibilidade indevida do botão.
+
+A coleta de `378d1c1` confirmou, nos dois testes, o clique de toque abrindo o detalhe,
+seguido de `mouseout` do `SPAN` para `HEADER` e fechamento. O mesmo nó permaneceu
+conectado, sem perda de foco nem `pointerout` de mouse nesse intervalo. A saída de mouse
+aciona o handler de hover. O hover passa a usar Pointer Events, ignorando o tipo touch.
 
 ## Resultado esperado
 
@@ -27,8 +32,8 @@ Escape e interação fora da barra continuam funcionando no Início e em Movimen
 Corrigir o gatilho de `ColunaComDetalhe`, aguardar sua hidratação para habilitá-lo
 e ampliar a regressão de toque existente. Permitir limitar os workers no ambiente local
 para executar a validação completa com pouca memória, preservando o padrão sem a variável.
-Registrar os eventos e mudanças de estado do botão fictício quando os testes de toque
-falharem, para identificar o fechamento que só aparece na CI.
+Colher os eventos do botão fictício para identificar o fechamento da CI. Encerrada a
+coleta, remover o logger temporário e manter a regressão da sequência observada.
 
 ### Ficou de fora
 
@@ -68,6 +73,11 @@ O número de workers pode ser configurado. A versão instalada 1.62.1 resolve o 
 pela quantidade de CPUs, independente da afinidade do processo.
 [Playwright TestConfig.workers](https://playwright.dev/docs/api/class-testconfig#test-config-workers).
 
+Pointer Events expõe o tipo do dispositivo e permite separar hover de mouse e caneta
+do fim de um toque. Context7 e fontes oficiais conferidos.
+[React PointerEvent](https://react.dev/reference/react-dom/components/common#pointerevent-handler),
+[W3C Pointer Events](https://www.w3.org/TR/pointerevents3/#compatibility-mapping-with-mouse-events).
+
 ## Como provar
 
 - A regressão ampliada falha antes da correção e passa depois nos dois gráficos.
@@ -84,7 +94,7 @@ Nenhuma. A aparência aprovada, o alvo de toque e a âncora na barra são preser
 ## Validações obrigatórias
 
 ```json
-{"versao": 2, "natureza": "produto", "mudanca": ["logica", "tela"], "aprovacoes": [], "locais": [{"id": "suite", "prova": "suite", "comando": ["uv", "run", "python", "scripts/validar.py", "--e2e"], "limite_s": 900}], "declaradas": {"regressao": "Segundo toque na barra com o detalhe aberto falhou antes da correcao. Primeiro toque e repeticao passaram oito vezes depois nos dois graficos. Gate de scripts confirmou controle habilitado indevidamente antes da hidratacao. Gate e interacao completa passaram quatro repeticoes cada apos disabled por snapshot.", "mutacao": "Retirar apenas preventDefault fez o teste falhar no primeiro toque. Fonte restaurada byte a byte em finally. Retirar apenas disabled derrubou o gate em toBeDisabled. Fonte restaurada byte a byte em finally.", "borda": "Regressao ampliada passou com Escape, toque em outra barra, foco, Enter, mouse e saida do ponteiro. SSR desabilitado, primeiro gesto iniciado antes de liberar os scripts, rotas liberadas e encerradas em finally nas duas paginas. Configuracao efetiva por --list confirmou 6 workers sem variavel, 1 e 2 com a variavel. Zero, negativo, texto e fracao foram rejeitados antes dos testes.", "diff": "Ajuste restrito ao gatilho e sua regressao, preservando o trabalho publicado. Revisao independente conferiu o comportamento do Radix.", "tela": "Oito capturas ficticias inspecionadas no build em 390 e 1366 px, nos dois temas. Ancora acima da barra e balao dentro da largura da janela, com assercoes de geometria. Capturas e script temporarios apagados. Inspecao repetida apos a protecao de hidratacao, com oito novas capturas e quatro testes de geometria aprovados."}, "aceitacoes": []}
+{"versao": 2, "natureza": "produto", "mudanca": ["logica", "tela"], "aprovacoes": [], "locais": [{"id": "suite", "prova": "suite", "comando": ["uv", "run", "python", "scripts/validar.py", "--e2e"], "limite_s": 900}], "declaradas": {"regressao": "Segundo toque na barra com o detalhe aberto falhou antes da correcao. Primeiro toque e repeticao passaram oito vezes depois nos dois graficos. Gate de scripts confirmou controle habilitado indevidamente antes da hidratacao. Gate e interacao completa passaram quatro repeticoes cada apos disabled por snapshot. Sequencia mouseout SPAN para HEADER registrada na CI e reproduzida localmente com falha antes da correcao. Pointer Events passaram quatro repeticoes de cada teste de toque.", "mutacao": "Retirar apenas preventDefault fez o teste falhar no primeiro toque. Fonte restaurada byte a byte em finally. Retirar apenas disabled derrubou o gate em toBeDisabled. Fonte restaurada byte a byte em finally. Restaurar hover por mouse derrubou a assercao apos mouseout na linha 249. Retirar guarda touch derrubou a assercao apos pointerout na linha 251. Ambas restauradas byte a byte.", "borda": "Regressao ampliada passou com Escape, toque em outra barra, foco, Enter, mouse e saida do ponteiro. SSR desabilitado, primeiro gesto iniciado antes de liberar os scripts, rotas liberadas e encerradas em finally nas duas paginas. Configuracao efetiva por --list confirmou 6 workers sem variavel, 1 e 2 com a variavel. Zero, negativo, texto e fracao foram rejeitados antes dos testes. Saida de toque preserva o detalhe. Mouse e caneta abrem e fecham por hover, teclado e toque repetido continuam cobertos.", "diff": "Ajuste restrito ao gatilho e sua regressao, preservando o trabalho publicado. Revisao independente conferiu o comportamento do Radix. Logger temporario removido apos identificar a causa, com revisao independente da correcao e das mutacoes.", "tela": "Oito capturas ficticias inspecionadas no build em 390 e 1366 px, nos dois temas. Ancora acima da barra e balao dentro da largura da janela, com assercoes de geometria. Capturas e script temporarios apagados. Inspecao repetida apos a protecao de hidratacao, com oito novas capturas e quatro testes de geometria aprovados. Build final com Pointer Events conferido novamente nas oito capturas e quatro casos de geometria, sem alteracao de apresentacao."}, "aceitacoes": []}
 ```
 
 ## Riscos
@@ -150,6 +160,18 @@ fictícia local e da CI.
   intencional depois da abertura confirmou JSON válido com montagem, toque, clique
   confiável e transição de `aria-expanded`. O teste foi restaurado byte a byte.
   Página encerrada preserva o erro original e informa a indisponibilidade do diagnóstico.
+- Os dois traces da CI de `378d1c1` mostraram o mesmo nó aberto no clique e fechado
+  após `mouseout` para `HEADER`. A revisão independente conferiu os dois JSON.
+  A reprodução local da saída de mouse falhou com o detalhe ausente antes da correção.
+  O logger temporário foi removido depois de cumprir sua finalidade.
+  [Execução de diagnóstico](https://github.com/leouisnic/mercurio-finance/actions/runs/42490075036).
+- Os dois testes de toque passaram quatro repetições cada com Pointer Events.
+  Restaurar o hover por eventos de mouse derrubou a asserção após `SPAN` para `HEADER`.
+  Retirar a guarda de touch derrubou a asserção após `pointerout`. As duas fontes foram
+  restauradas byte a byte. A inspeção visual final passou nos quatro casos, com oito
+  capturas conferidas e removidas.
+- A suíte completa do fechamento passou com a correção de Pointer Events, usando
+  `PLAYWRIGHT_MAX_WORKERS=1` e `VITEST_MAX_WORKERS=2` no ambiente local.
 
 ## Lições
 
@@ -161,3 +183,13 @@ fictícia local e da CI.
   responda à mesma requisição duas vezes.
 - Afinidade do processo não define o paralelismo do Playwright 1.62.1. Conferir a
   quantidade resolvida de workers, em vez de inferi-la da quantidade de CPUs disponíveis.
+- Hover usa Pointer Events para distinguir o dispositivo. Um mouseout posterior ao
+  toque pode fechar uma interface recém-aberta quando tratado como saída de hover.
+
+## Registro do fechamento
+
+Conferido em: 2026-11-08T15:32:10.188384-03:00
+Conteúdo validado: sha256:d6d8ea17d2947c9bd55d8a594ec48efe5ce854b00fd2a4f15ee90cdb3ae386aa
+Contrato: sha256:5b2ab4f61a92c63e4b9206e387efc32802c870c03682189c006d1c3d6c064f71
+
+- A suíte terminou com código 0 pelo comando `["uv", "run", "python", "scripts/validar.py", "--e2e"]`.
