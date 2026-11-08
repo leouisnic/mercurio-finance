@@ -11,7 +11,8 @@ export function CicloContraAnterior({
   anterior: number;
   numero: number;
 }) {
-  const variacao = anterior > 0 ? Math.round(((atual - anterior) / anterior) * 100) : null;
+  const variacao =
+    anterior > 0 ? Math.round(((atual - anterior) / anterior) * 100) : null;
   const subiu = variacao !== null && variacao > 0;
   const maior = Math.max(atual, anterior, 1);
 
@@ -20,9 +21,7 @@ export function CicloContraAnterior({
       aria-label="Comparativo com o ciclo anterior"
       className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border px-[22px] py-5"
     >
-      <h2 className="text-sm font-bold">
-        Ciclo {numero} vs ciclo anterior
-      </h2>
+      <h2 className="text-sm font-bold">Ciclo {numero} vs ciclo anterior</h2>
 
       <div className="flex flex-wrap items-baseline gap-2.5">
         <span className="num text-gasto text-[26px] font-semibold tracking-[-0.3px]">
@@ -31,7 +30,9 @@ export function CicloContraAnterior({
         {variacao !== null && (
           <span
             className={`num rounded-full px-[7px] py-[3px] text-[13px] font-bold ${
-              subiu ? "bg-gasto-fundo text-gasto" : "bg-positivo-fundo text-positivo"
+              subiu
+                ? "bg-gasto-fundo text-gasto"
+                : "bg-positivo-fundo text-positivo"
             }`}
           >
             {subiu ? "+" : ""}
@@ -39,7 +40,9 @@ export function CicloContraAnterior({
           </span>
         )}
       </div>
-      <span className="text-tinta-3 text-[13px]">Ciclo anterior: {moeda(anterior)}</span>
+      <span className="text-tinta-3 text-[13px]">
+        Ciclo anterior: {moeda(anterior)}
+      </span>
 
       <div className="mt-0.5 flex flex-col gap-[7px]">
         <div className="bg-borda-sutil h-1.5 overflow-hidden rounded-full">
@@ -68,9 +71,7 @@ export function GastoPorConta({ fluxos }: { fluxos: FluxoDaConta[] }) {
       aria-label="Gasto por conta no período"
       className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border px-[22px] py-5"
     >
-      <h2 className="text-sm font-bold">
-        Gasto por conta no período
-      </h2>
+      <h2 className="text-sm font-bold">Gasto por conta no período</h2>
 
       {comGasto.length === 0 ? (
         <p className="text-tinta-3 text-[13px]">Nenhuma saída neste recorte.</p>
@@ -79,8 +80,12 @@ export function GastoPorConta({ fluxos }: { fluxos: FluxoDaConta[] }) {
           {comGasto.map((fluxo) => (
             <div key={fluxo.contaId} className="flex items-center gap-3">
               <SeloDoBanco conta={fluxo} tamanho={22} />
-              <span className="w-[150px] shrink-0 truncate text-[12.5px]" title={fluxo.nome}>
-                {fluxo.tipo === "CREDIT" ? "Cartão" : "Conta"} {nomeDaConta(fluxo)}
+              <span
+                className="w-[150px] shrink-0 truncate text-[12.5px]"
+                title={fluxo.nome}
+              >
+                {fluxo.tipo === "CREDIT" ? "Cartão" : "Conta"}{" "}
+                {nomeDaConta(fluxo)}
               </span>
               <div className="bg-borda-sutil h-2 grow overflow-hidden rounded-full">
                 <div

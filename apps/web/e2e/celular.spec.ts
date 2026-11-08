@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 test.use({ viewport: { width: 390, height: 844 } });
 
 test("no celular a navegação fica embaixo e nada passa da largura da tela", async ({ page }) => {
-  for (const caminho of ["/", "/movimentos", "/movimentos/classificar", "/movimentos/tags", "/recorrencias"]) {
+  for (const caminho of ["/", "/movimentos", "/movimentos/classificar", "/movimentos/tags", "/recorrencias", "/ajustes"]) {
     await page.goto(caminho);
     const navegacao = page.getByRole("navigation", { name: "Navegação principal" });
     await expect(navegacao).toHaveCount(1);

@@ -1,25 +1,50 @@
 import Image from "next/image";
-import { nomeDaConta } from "./banco";
 import { CabecalhoDaConta } from "./cabecalho-da-conta";
 import type { Conta } from "./buscar-resumo";
 import type { FluxoDaConta } from "./buscar-movimentos";
-import { comoData, diasEntre, diaEMes, moeda } from "./formato";
+import { comoData, comSinal, diasEntre, diaEMes, moeda } from "./formato";
 import { Info } from "./info";
 
 /** Verde até 60% do limite, laranja até 85%, vermelho acima. */
-function corDoUso(percentual: number): { barra: string; texto: string; trilho: string } {
+function corDoUso(percentual: number): {
+  barra: string;
+  texto: string;
+  trilho: string;
+} {
   if (percentual > 85) {
-    return { barra: "bg-alerta-forte", texto: "text-alerta", trilho: "bg-alerta-fundo" };
+    return {
+      barra: "bg-alerta-forte",
+      texto: "text-alerta",
+      trilho: "bg-alerta-fundo",
+    };
   }
   if (percentual > 60) {
-    return { barra: "bg-gasto-forte", texto: "text-gasto", trilho: "bg-gasto-fundo" };
+    return {
+      barra: "bg-gasto-forte",
+      texto: "text-gasto",
+      trilho: "bg-gasto-fundo",
+    };
   }
-  return { barra: "bg-positivo-forte", texto: "text-positivo", trilho: "bg-positivo-fundo" };
+  return {
+    barra: "bg-positivo-forte",
+    texto: "text-positivo",
+    trilho: "bg-positivo-fundo",
+  };
 }
 
-const BANDEIRAS: { padrao: RegExp; nome: string; logo: string; largura: number }[] = [
+const BANDEIRAS: {
+  padrao: RegExp;
+  nome: string;
+  logo: string;
+  largura: number;
+}[] = [
   { padrao: /visa/i, nome: "Visa", logo: "/bandeiras/visa.svg", largura: 44 },
-  { padrao: /master/i, nome: "Mastercard", logo: "/bandeiras/mastercard.svg", largura: 40 },
+  {
+    padrao: /master/i,
+    nome: "Mastercard",
+    logo: "/bandeiras/mastercard.svg",
+    largura: 40,
+  },
 ];
 
 function Bandeira({ bandeira }: { bandeira: string | null }) {
@@ -28,20 +53,33 @@ function Bandeira({ bandeira }: { bandeira: string | null }) {
   }
   const conhecida = BANDEIRAS.find(({ padrao }) => padrao.test(bandeira));
   return conhecida ? (
-    <Image src={conhecida.logo} alt={conhecida.nome} width={conhecida.largura} height={26} unoptimized />
+    <Image
+      src={conhecida.logo}
+      alt={conhecida.nome}
+      width={conhecida.largura}
+      height={26}
+      unoptimized
+    />
   ) : (
     <span className="text-tinta-2 text-[13px] font-bold">{bandeira}</span>
   );
 }
 
-const CARTAO = "bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border p-4";
+const CARTAO =
+  "bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border p-4";
 const ROTULO_DA_BARRA = "mt-2 flex justify-between gap-3 text-sm font-semibold";
 
-function comSinal(valor: number): string {
-  return valor < 0 ? `- ${moeda(-valor)}` : `+ ${moeda(valor)}`;
-}
-
-function Caixa({ rotulo, valor, cor, dica }: { rotulo: string; valor: string; cor?: string; dica?: string }) {
+function Caixa({
+  rotulo,
+  valor,
+  cor,
+  dica,
+}: {
+  rotulo: string;
+  valor: string;
+  cor?: string;
+  dica?: string;
+}) {
   return (
     <div className="bg-superficie-2 border-borda-sutil flex flex-col gap-0.5 rounded-xl border px-3 py-2.5">
       <span className="text-tinta-2 flex items-center gap-1 text-[13px]">
@@ -76,18 +114,12 @@ function CartaoCorrente({
 
   return (
     <article className={CARTAO}>
-      <CabecalhoDaConta
-        conta={conta}
-        subtitulo="Conta corrente"
-        direita={
-          <span className="bg-positivo-fundo text-positivo rounded-full px-3 py-1 text-[13px] font-bold tracking-[0.04em]">
-            SALDO
-          </span>
-        }
-      />
+      <CabecalhoDaConta conta={conta} subtitulo="Conta corrente" />
       <span className="flex flex-col gap-0.5">
-        <span className="num text-positivo text-2xl font-bold tracking-[-0.3px]">{moeda(conta.saldo)}</span>
-        <span className="text-tinta-2 text-sm">disponível agora</span>
+        <span className="num text-positivo text-2xl font-bold tracking-[-0.3px]">
+          {moeda(conta.saldo)}
+        </span>
+        <span className="text-tinta-2 text-sm">Disponível agora</span>
       </span>
       {fluxoIndisponivel ? (
         <p className="text-tinta-2 mt-auto text-sm">
@@ -117,7 +149,9 @@ function CartaoCorrente({
  * sendo verdade e é o que importa para o ciclo de pagamento.
  */
 function prazoDaFatura(conta: Conta, hoje: Date) {
-  const diasAteFechar = conta.fechamento ? diasEntre(hoje, comoData(conta.fechamento)) : null;
+  const diasAteFechar = conta.fechamento
+    ? diasEntre(hoje, comoData(conta.fechamento))
+    : null;
   const fechamento =
     diasAteFechar !== null && diasAteFechar >= 0
       ? `fecha em ${diasAteFechar} ${diasAteFechar === 1 ? "dia" : "dias"}`
@@ -133,24 +167,15 @@ function prazoDaFatura(conta: Conta, hoje: Date) {
   return { fechamento, vencimento };
 }
 
-/**
- * "Cartão Gold": o nome cru da Pluggy vira o nome do produto quando o título
- * já mostra o banco (herdado ou do apelido) e o nome é curto. Nome longo ou
- * igual ao título fica só "Cartão de crédito".
- */
-export function produtoDoCartao(conta: Conta): string {
-  const cru = conta.nome.trim();
-  if (nomeDaConta(conta) === cru || cru.length > 20) {
-    return "Cartão de crédito";
-  }
-  return `Cartão ${cru.charAt(0).toUpperCase()}${cru.slice(1)}`;
-}
-
 function CartaoCredito({ conta, hoje }: { conta: Conta; hoje: Date }) {
-  const percentual = conta.limite ? Math.min(100, (conta.saldo / conta.limite) * 100) : 0;
+  const percentual = conta.limite
+    ? Math.min(100, (conta.saldo / conta.limite) * 100)
+    : 0;
   const cor = corDoUso(percentual);
   const prazo = prazoDaFatura(conta, hoje);
-  const quando = [prazo.fechamento, prazo.vencimento].filter(Boolean).join(" e ");
+  const quando = [prazo.fechamento, prazo.vencimento]
+    .filter(Boolean)
+    .join(" e ");
 
   // O nome do banco fica em cima e os números juntos no pé: o card estica
   // para ter a altura do vizinho, e a sobra fica no meio, não entre o valor
@@ -159,7 +184,8 @@ function CartaoCredito({ conta, hoje }: { conta: Conta; hoje: Date }) {
     <article className={CARTAO}>
       <CabecalhoDaConta
         conta={conta}
-        subtitulo={produtoDoCartao(conta)}
+        // O nome do produto ("Gold", "Platinum") não diz nada ao dono: todo cartão é igual aqui.
+        subtitulo="Cartão de crédito"
         direita={
           <span className="flex shrink-0 flex-col items-end gap-1">
             <span className="flex items-center gap-2.5">
@@ -183,9 +209,13 @@ function CartaoCredito({ conta, hoje }: { conta: Conta; hoje: Date }) {
       />
       <div className="mt-auto flex flex-col gap-2.5">
         <div className="flex items-end justify-between gap-3.5">
-          <span className="num text-gasto text-2xl font-bold tracking-[-0.3px]">{moeda(conta.saldo)}</span>
+          <span className="num text-gasto text-2xl font-bold tracking-[-0.3px]">
+            {moeda(conta.saldo)}
+          </span>
           {conta.limite !== null && (
-            <span className={`${cor.trilho} ${cor.texto} shrink-0 rounded-full px-3 py-1 text-[13px] font-bold`}>
+            <span
+              className={`${cor.trilho} ${cor.texto} shrink-0 rounded-full px-3 py-1 text-[13px] font-bold`}
+            >
               {Math.round(percentual)}% do limite
             </span>
           )}
@@ -200,11 +230,20 @@ function CartaoCredito({ conta, hoje }: { conta: Conta; hoje: Date }) {
               aria-valuemax={100}
               className={`${cor.trilho} h-2.5 overflow-hidden rounded-full`}
             >
-              <div className={`${cor.barra} h-full rounded-full`} style={{ width: `${percentual}%` }} />
+              <div
+                className={`${cor.barra} h-full rounded-full`}
+                style={{ width: `${percentual}%` }}
+              />
             </div>
             <p className={ROTULO_DA_BARRA}>
-              <span className="num text-tinta-2">Limite {moeda(conta.limite)}</span>
-              {conta.disponivel !== null && <span className="num">{moeda(conta.disponivel)} disponível</span>}
+              <span className="num text-tinta-2">
+                Limite {moeda(conta.limite)}
+              </span>
+              {conta.disponivel !== null && (
+                <span className="num">
+                  {moeda(conta.disponivel)} disponível
+                </span>
+              )}
             </p>
           </div>
         )}
@@ -226,7 +265,9 @@ function TituloDaColuna({
 }) {
   return (
     <div className={`flex items-baseline justify-between gap-3 ${ordem}`}>
-      <h2 className="text-tinta-2 text-[13px] font-bold tracking-[0.05em] uppercase">{titulo}</h2>
+      <h2 className="text-tinta-2 text-[13px] font-bold tracking-[0.05em] uppercase">
+        {titulo}
+      </h2>
       {contas.length > 0 && (
         <span className={`num text-base font-bold ${cor}`}>
           {moeda(contas.reduce((soma, conta) => soma + conta.saldo, 0))}
@@ -238,7 +279,9 @@ function TituloDaColuna({
 
 function ColunaVazia({ texto }: { texto: string }) {
   return (
-    <p className="border-borda text-tinta-2 rounded-2xl border border-dashed p-5 text-sm">{texto}</p>
+    <p className="border-borda text-tinta-2 rounded-2xl border border-dashed p-5 text-sm">
+      {texto}
+    </p>
   );
 }
 
@@ -257,13 +300,18 @@ export function ResumoPainel({
   fluxos: FluxoDaConta[] | null;
   hoje: Date;
 }) {
-  const porConta = new Map((fluxos ?? []).map((fluxo) => [fluxo.contaId, fluxo]));
+  const porConta = new Map(
+    (fluxos ?? []).map((fluxo) => [fluxo.contaId, fluxo]),
+  );
   const correntes = contas.filter((conta) => conta.tipo !== "CREDIT");
   const cartoes = contas.filter((conta) => conta.tipo === "CREDIT");
   const linhas = Math.max(correntes.length, cartoes.length, 1);
 
   return (
-    <section aria-label="Contas conectadas" className="grid grid-cols-1 gap-x-4 gap-y-3 lg:grid-cols-2">
+    <section
+      aria-label="Contas conectadas"
+      className="grid grid-cols-1 gap-x-4 gap-y-3 lg:grid-cols-2"
+    >
       <TituloDaColuna
         titulo="Contas correntes"
         contas={correntes}
@@ -280,8 +328,13 @@ export function ResumoPainel({
         const corrente = correntes[indice];
         const cartao = cartoes[indice];
         return [
-          <div key={`corrente-${indice}`} className="order-2 flex flex-col lg:order-none [&>article]:flex-1">
-            {indice === 0 && !corrente && <ColunaVazia texto="Nenhuma conta corrente conectada" />}
+          <div
+            key={`corrente-${indice}`}
+            className="order-2 flex flex-col lg:order-none [&>article]:flex-1"
+          >
+            {indice === 0 && !corrente && (
+              <ColunaVazia texto="Nenhuma conta corrente conectada" />
+            )}
             {corrente && (
               <CartaoCorrente
                 conta={corrente}
@@ -290,8 +343,13 @@ export function ResumoPainel({
               />
             )}
           </div>,
-          <div key={`cartao-${indice}`} className="order-4 flex flex-col lg:order-none [&>article]:flex-1">
-            {indice === 0 && !cartao && <ColunaVazia texto="Nenhum cartão conectado" />}
+          <div
+            key={`cartao-${indice}`}
+            className="order-4 flex flex-col lg:order-none [&>article]:flex-1"
+          >
+            {indice === 0 && !cartao && (
+              <ColunaVazia texto="Nenhum cartão conectado" />
+            )}
             {cartao && <CartaoCredito conta={cartao} hoje={hoje} />}
           </div>,
         ];

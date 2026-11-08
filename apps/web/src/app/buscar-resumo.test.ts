@@ -88,10 +88,7 @@ test("devolve null quando o finance-api responde com erro", async () => {
 });
 
 test("devolve null quando o finance-api está fora do ar", async () => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn().mockRejectedValue(new Error("fetch failed")),
-  );
+  vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("fetch failed")));
 
   expect(await buscarResumo()).toBeNull();
 });

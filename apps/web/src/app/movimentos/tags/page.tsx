@@ -4,6 +4,8 @@ import { dataDeHoje } from "../../hoje";
 import { BlocoIndisponivel } from "../../indisponivel";
 import { AbasDeMovimentos } from "../abas";
 import { BotaoNovaTag } from "../formulario-de-tag";
+import { anosDasTags, filtrarTags, lerFiltroDeTags } from "../filtro-de-tags";
+import { FiltrosDeTags } from "../filtros-de-tags";
 import { ListaDeTags } from "../tag";
 
 export default async function Tags(props: {
@@ -21,6 +23,8 @@ export default async function Tags(props: {
     buscarTags(),
     buscarParaClassificar(dataDeHoje()),
   ]);
+  const filtro = lerFiltroDeTags(parametros);
+  const filtradas = tags ? filtrarTags(tags, filtro, dataDeHoje()) : [];
 
   return (
     <>
@@ -31,13 +35,22 @@ export default async function Tags(props: {
             Quanto saiu em cada grupo que você marcou.
           </span>
         </span>
-        <BotaoNovaTag />
+        <BotaoNovaTag hoje={dataDeHoje()} />
       </header>
       <AbasDeMovimentos paraClassificar={paraClassificar} />
       {tags === null ? (
         <BlocoIndisponivel titulo="Suas tags" rotulo="Suas tags" />
       ) : (
-        <ListaDeTags tags={tags} />
+        <>
+          <FiltrosDeTags filtro={filtro} anos={anosDasTags(tags)} />
+          {tags.length > 0 && filtradas.length === 0 ? (
+            <p className="bg-superficie border-borda text-tinta-3 rounded-2xl border px-[22px] py-6 text-[13px]">
+              Nenhuma tag com esses filtros.
+            </p>
+          ) : (
+            <ListaDeTags tags={filtradas} />
+          )}
+        </>
       )}
     </>
   );

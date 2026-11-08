@@ -1,6 +1,16 @@
+import { type DiaNaoUtil, marcaDoDia } from "../buscar-feriados";
 import type { GastoDiario } from "../buscar-movimentos";
 import { ColunaComDetalhe } from "../detalhe-do-grafico";
-import { comoData, diaEMes, moeda, moedaCurta } from "../formato";
+import { maiorDia, mediaPorDia, projecao } from "../analise-do-grafico";
+import {
+  AreaDaProjecao,
+  DiaDoEixo,
+  LegendaDosDias,
+  LinhaDaCota,
+  LinhaDaMedia,
+} from "../dias-do-grafico";
+import { BARRA_DA_PROJECAO, LISTRAS_DO_MAIOR_DIA } from "../estilos-do-grafico";
+import { comoData, diaEMes, moeda } from "../formato";
 
 /** Todos os dias do intervalo, inclusive os sem gasto: o gráfico precisa
  *  mostrar o buraco, não pular a coluna. */
@@ -23,9 +33,10 @@ const ALTURA_MAXIMA = 100;
 const ALTURA_VAZIA = 6;
 
 /**
- * As cores do Início: dourado sem gasto, índigo com gasto e, só no ciclo
- * atual, vermelho acima da cota. Ciclo passado não tem cota guardada, então
- * fica sem linha e sem vermelho. Os dias depois de `hoje` ficam vazios.
+ * As cores do Início: dourado sem gasto, índigo com gasto e, com cota (a de
+ * hoje ou a guardada do ciclo), vermelho acima dela. A média do período fica
+ * sempre; o maior dia ganha listras; os dias depois de `hoje` mostram a
+ * projeção no ritmo recente.
  */
 export function GraficoGastoDiario({
   gastos,
@@ -34,6 +45,7 @@ export function GraficoGastoDiario({
   titulo,
   cota = null,
   hoje = null,
+  naoUteis = [],
 }: {
   gastos: GastoDiario[];
   inicio: string;
@@ -41,11 +53,26 @@ export function GraficoGastoDiario({
   titulo: string;
   cota?: number | null;
   hoje?: string | null;
+  naoUteis?: DiaNaoUtil[];
 }) {
   const porDia = new Map(gastos.map((gasto) => [gasto.data, gasto]));
   const dias = diasDoIntervalo(inicio, fim);
-  const maior = Math.max(...gastos.map((gasto) => gasto.total), cota ?? 0, 0);
   const total = gastos.reduce((soma, gasto) => soma + gasto.total, 0);
+  const passados = dias
+    .filter((dia) => hoje === null || dia <= hoje)
+    .map((dia) => ({ data: dia, valor: porDia.get(dia)?.total ?? 0 }));
+  const media = mediaPorDia(passados);
+  const doMaior = maiorDia(passados);
+  const previsto = projecao(passados, dias.length - passados.length);
+  const maior = Math.max(
+    ...gastos.map((gasto) => gasto.total),
+    cota ?? 0,
+    previsto?.ritmo ?? 0,
+    0,
+  );
+  // 34 px: a altura do eixo (número e letra do dia) embaixo das barras.
+  const naAltura = (valor: number) =>
+    `calc(${(valor / maior) * ALTURA_MAXIMA}px + 34px)`;
 
   return (
     <section
@@ -55,17 +82,26 @@ export function GraficoGastoDiario({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-bold">{titulo}</h2>
         <span className="num text-tinta-2 text-[13px]">
-          total no período: {moeda(total)}
+          Total no período: {moeda(total)}
         </span>
       </div>
 
       <div className="relative pt-5">
         {cota !== null && maior > 0 && (
-          <div
-            aria-hidden
-            className="border-marca pointer-events-none absolute inset-x-1 z-10 border-t-2 border-dashed"
+          <LinhaDaCota cota={cota} style={{ bottom: naAltura(cota) }} />
+        )}
+        {media !== null && media > 0 && (
+          <LinhaDaMedia media={media} style={{ bottom: naAltura(media) }} />
+        )}
+        {previsto && (
+          <AreaDaProjecao
+            projecao={previsto.total}
+            ritmo={previsto.ritmo}
             style={{
-              bottom: `calc(${(cota / maior) * ALTURA_MAXIMA}px + 26px)`,
+              left: `${(passados.length / dias.length) * 100}%`,
+              right: 0,
+              bottom: 34,
+              height: maior > 0 ? Math.max(ALTURA_VAZIA, (previsto.ritmo / maior) * ALTURA_MAXIMA) : ALTURA_VAZIA,
             }}
           />
         )}
@@ -91,40 +127,48 @@ export function GraficoGastoDiario({
                 className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1.5"
               >
                 {futuro ? (
-                  <span className="block" style={{ height: ALTURA_VAZIA }} />
+                  <span
+                    aria-hidden
+                    className="block w-full rounded-t-[5px]"
+                    style={
+                      previsto && previsto.ritmo > 0
+                        ? {
+                            ...BARRA_DA_PROJECAO,
+                            height: (previsto.ritmo / maior) * ALTURA_MAXIMA,
+                          }
+                        : { height: ALTURA_VAZIA }
+                    }
+                  />
                 ) : (
                   <ColunaComDetalhe
                     data={dia}
                     valor={valor}
                     cota={cota}
                     maiores={gasto?.maiores ?? []}
+                    feriado={marcaDoDia(naoUteis, dia) ?? null}
+                    maiorDoPeriodo={dia === doMaior}
                   >
                     <span
                       className={`relative block w-full rounded-t-[5px] transition-opacity group-hover:opacity-80 ${cor}`}
-                      style={{ height: altura }}
-                    >
-                      {valor > 0 && (
-                        <span
-                          className={`num bg-superficie absolute -top-5 left-1/2 z-20 -translate-x-1/2 rounded px-1 text-[11px] font-bold whitespace-nowrap max-lg:hidden ${
-                            passou ? "text-alerta" : "text-tinta-2"
-                          }`}
-                        >
-                          {moedaCurta(valor)}
-                        </span>
-                      )}
-                    </span>
+                      style={{
+                        height: altura,
+                        ...(dia === doMaior ? LISTRAS_DO_MAIOR_DIA : {}),
+                      }}
+                    />
                   </ColunaComDetalhe>
                 )}
-                <span
-                  className={`text-xs sm:text-[13px] ${valor > 0 ? "text-tinta font-semibold" : "text-tinta-3"} ${
-                    // No celular não cabe um rótulo por dia: fica um a cada três.
-                    indice % 3 === 0 ? "" : "max-sm:invisible"
-                  }`}
-                >
-                  {dia.slice(8, 10)}
-                </span>
+                <DiaDoEixo
+                  data={dia}
+                  hoje={hoje}
+                  marca={marcaDoDia(naoUteis, dia)}
+                  // No celular não cabe um número por dia: fica um a cada três, e a letra em todos.
+                  escondidoNoCelular={indice % 3 !== 0}
+                />
                 <span className="sr-only">
                   {diaEMes(dia)}: {moeda(valor)}
+                  {marcaDoDia(naoUteis, dia)
+                    ? `, ${marcaDoDia(naoUteis, dia)}`
+                    : ""}
                 </span>
               </li>
             );
@@ -132,25 +176,7 @@ export function GraficoGastoDiario({
         </ol>
       </div>
 
-      <div
-        className="text-tinta-2 flex flex-wrap gap-x-[18px] gap-y-1.5 text-sm"
-        aria-hidden
-      >
-        <span className="flex items-center gap-1.5">
-          <i className="bg-caixinha inline-block size-[11px] rounded-[3px]" />
-          Sem gasto
-        </span>
-        <span className="flex items-center gap-1.5">
-          <i className="bg-marca inline-block size-[11px] rounded-[3px]" />
-          {cota === null ? "Com gasto" : "Dentro da cota"}
-        </span>
-        {cota !== null && (
-          <span className="flex items-center gap-1.5">
-            <i className="bg-alerta-forte inline-block size-[11px] rounded-[3px]" />
-            Passou da cota
-          </span>
-        )}
-      </div>
+      <LegendaDosDias comCota={cota !== null} />
     </section>
   );
 }

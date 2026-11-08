@@ -129,7 +129,7 @@ Por quê: Tela Início: uma faixa curta com o que pede ação agora, como hoje n
 
 ## Dinheiro livre quando estoura
 
-Estado: adiada
+Estado: virou leva (`docs/specs/2026-11-07-dinheiro-livre-e-plano-do-ciclo.md`)
 
 Adiada em: 2026-10-28
 
@@ -145,7 +145,7 @@ Adiada em: 2026-10-27
 
 Gatilho: as metas por categoria da Movimentos em construção, que precisam de um lugar para configurar.
 
-Por quê: Reúne o que é cadastro: recorrências (saem do menu principal), compromissos, nomes das contas e dos pagadores, limites por categoria e notificações. Depois das categorias próprias, também editar e apagar categoria (apagar pergunta para onde vão os movimentos) e ver e desfazer as regras por destinatário. E ocultar uma conta que o dono não usa mais (decidido em 2026-10-29: por enquanto fica como está, porque com saldo zero não muda nenhuma soma; quando entrar, vale para o sistema todo) (por exemplo a conta corrente de um banco do qual ele só usa o cartão): a Pluggy conecta o banco inteiro, então não dá para tirar só a conta corrente sem desconectar o cartão junto. Ocultar tira a conta das telas e dos filtros e guarda o histórico; o que pede cuidado é o saldo dela no dinheiro livre (só some sem perda se estiver zerado) e as transferências antigas entre ela e as outras contas, que continuam marcadas como movimentação própria. Fecha a navegação de quatro páginas (Início, Movimentos, Planejamento, Ajustes) decidida na spec do Início.
+Por quê: Reúne o que é cadastro: recorrências (saem do menu principal), compromissos, nomes das contas e dos pagadores, limites por categoria e notificações. Depois das categorias próprias, também editar e apagar categoria (apagar pergunta para onde vão os movimentos) e ver e desfazer as regras por destinatário. E ocultar uma conta que o dono não usa mais (decidido em 2026-10-29: por enquanto fica como está, porque com saldo zero não muda nenhuma soma; quando entrar, vale para o sistema todo) (por exemplo a conta corrente de um banco do qual ele só usa o cartão): a Pluggy conecta o banco inteiro, então não dá para tirar só a conta corrente sem desconectar o cartão junto. Ocultar tira a conta das telas e dos filtros e guarda o histórico; o que pede cuidado é o saldo dela no dinheiro livre (só some sem perda se estiver zerado) e as transferências antigas entre ela e as outras contas, que continuam marcadas como movimentação própria. Fecha a navegação de quatro páginas (Início, Movimentos, Planejamento, Ajustes) decidida na spec do Início. A página nasce na leva "Filtros e contadores" só com a seção Feriados; esta ideia traz as outras seções para ela.
 
 ## Aviso no Telegram
 
@@ -169,7 +169,7 @@ Por quê: Tela Recorrências e alerta no Início: conta fixa pequena aprovada h�
 
 ## Filtros e contadores
 
-Estado: adiada
+Estado: concluída (`docs/specs/archive/2026-11-04-filtros-e-contadores.md`)
 
 Adiada em: 2026-10-29
 
@@ -179,10 +179,36 @@ Por quê: As telas de dados não têm filtro e o dono escreve mês e ano no nome
 
 ## Plano do ciclo
 
-Estado: adiada
+Estado: virou leva (`docs/specs/2026-11-07-dinheiro-livre-e-plano-do-ciclo.md`)
 
 Adiada em: 2026-10-29
 
 Gatilho: junto com "Dinheiro livre quando estoura", que mexe no mesmo número.
 
-Por quê: O livre desconta só as contas fixas que vencem até o fim do ciclo atual; as do ciclo seguinte ficam de fora, então a cota do ciclo 1 não sabe que o ciclo 2 vem pesado. Proposta, ainda sem aprovação: no início do ciclo, mostrar as contas fixas do ciclo seguinte e quanto deve entrar nele; se faltar, sugerir um valor para guardar agora, com três escolhas do dono: proteger o próximo ciclo (o valor sai do livre, como o cofrinho), usar tudo agora (só avisa quanto vai faltar) ou escolher o valor. Primeiro passo do Planejamento. Contar só saldo recebido continua valendo.
+Por quê: O livre desconta só as contas fixas que vencem até o fim do ciclo atual. Aprovado para detalhamento: sugerir cobertura das despesas futuras por regras, mostrar a justificativa e o impacto na cota diária. Renda prevista é editável, com atalho por cálculo de trabalho. A política de aplicação, os parâmetros e o visual serão definidos na spec.
+
+O [mapa das specs](specs/2026-11-07-dinheiro-livre-e-plano-do-ciclo.md) organiza os
+desdobramentos aprovados para detalhamento. Metas e desejos, reservas e despesas
+previsíveis, revisão mensal e recomendações, planejamento por conversa e Hermes.
+Cada spec declara suas dependências. A preparação da implementação define sua
+posição entre as demais levas, considerando a matriz anual e Movimentos redesenhada.
+
+## Pix no crédito com nome legível
+
+Estado: adiada
+
+Adiada em: 2026-11-05
+
+Gatilho: a seção "Regras por destinatário" da página Ajustes.
+
+Por quê: Pix feito com o cartão de crédito pelo Mercado Pago chega da fatura como "MP*" seguido do nome de quem recebeu, cortado no limite da operadora; quando o dono paga a si mesmo, aparece o próprio nome. A fatura não traz a descrição da compra. Proposta: reconhecer o prefixo "MP*" e mostrar "Pix no crédito para <nome>", e conferir se a Pluggy manda o recebedor completo em outro campo (`merchant` ou `paymentData`) antes de decidir.
+
+## Gastos de fora e lançamento rápido
+
+Estado: importação e acertos especificados em `docs/specs/2026-11-06-acertos-e-importacao-compartilhada.md`; bot e áudio adiados
+
+Adiada em: 2026-11-05
+
+Gatilho: o bot do Telegram (que espera autenticação do painel e o token da API) para a parte de mensagem e áudio; a importação de fatura compartilhada pode vir antes, sem depender dele.
+
+Por quê: Parte do gasto do dono não passa pelas contas dele: ele usa o cartão da namorada e às vezes divide a compra ao meio. Hoje isso é feito à mão. Três entradas, da mais simples para a mais trabalhosa: (1) importar a fatura dela (PDF, CSV ou print) e marcar linha a linha o que é dele e quanto, com atalho "metade"; o que ele marca entra como compromisso a pagar a ela no próximo ciclo, então também alimenta a previsibilidade do Plano do ciclo; (2) mensagem curta no Telegram, como "pizza 80 metade com a [pessoa]", que vira o mesmo lançamento pendente; (3) áudio ou foto da nota no Telegram, lidos por um modelo que propõe o lançamento para o dono confirmar. Sugestão: começar pela (1), porque resolve o caso que mais se repete sem depender do bot, e reaproveitar o mesmo "lançamento pendente com divisão" nas outras duas. Print de fatura exige leitura de imagem; arquivo da operadora (PDF ou CSV) é mais confiável. Dado da fatura de outra pessoa é dado de terceiro: fica só no banco local, nunca em arquivo do repositório.

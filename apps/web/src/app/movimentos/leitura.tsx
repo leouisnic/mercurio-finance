@@ -133,7 +133,7 @@ export function achadosDaTag(
             destaque={(dia) => picos.has(dia.data)}
           />
         ),
-        apoio: `de ${dias.length} dias de gasto`,
+        apoio: `De ${dias.length} dias de gasto`,
       });
     }
   }
@@ -175,7 +175,7 @@ export function achadosDaTag(
           ))}
         </span>
       ),
-      apoio: parte >= 50 ? "de sexta a domingo" : "de segunda a quinta",
+      apoio: parte >= 50 ? "De sexta a domingo" : "De segunda a quinta",
     });
   }
 
@@ -288,7 +288,7 @@ export function achadosDaTag(
       ),
       apoio:
         zerados.length === 0
-          ? "gastou todos os dias"
+          ? "Gastou todos os dias"
           : `${DIA_E_MES.format(comoData(zerados[0].data))} sem gasto`,
     });
   }
@@ -441,7 +441,7 @@ export function CartoesDaTag({
             </svg>
           )
         }
-        apoio={resumo.dias === 1 ? "em 1 dia" : `em ${resumo.dias} dias`}
+        apoio={resumo.dias === 1 ? "Em 1 dia" : `Em ${resumo.dias} dias`}
       />
       <CartaoDeAchado
         destaque
@@ -460,7 +460,7 @@ export function CartoesDaTag({
         apoio={
           maior
             ? `${maior.descricao}, ${parteDoMaior}% do total`
-            : "sem gasto ainda"
+            : "Sem gasto ainda"
         }
       />
     </div>

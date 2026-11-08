@@ -10,25 +10,32 @@ dia útil e não em dia fixo:
 
 Por isso o Ciclo 2 atravessa a virada do mês, e o Ciclo 1 de janeiro começa
 antes do dia 5 sempre que o dia 5 cai em fim de semana ou feriado.
+
+Feriado da cidade, cadastrado pelo dono, muda só o pagamento de quem ele
+marcou: quem paga o ciclo 1 (P1) ou quem paga o ciclo 2 (P2). Cada pagador
+fica numa cidade, e o feriado de uma não mexe no pagamento da outra. A API
+carrega esses feriados com `definir_feriados_locais`; sem nenhum, o
+calendário é só o nacional.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-# Feriados nacionais de data fixa, como (mês, dia). Feriados estaduais e
-# municipais ficam fora desta primeira aproximação do calendário.
+# Feriados nacionais de data fixa, como (mês, dia, nome). Os estaduais não
+# entram; os da cidade o dono cadastra.
 FERIADOS_NACIONAIS_FIXOS = (
-    (1, 1),  # Confraternização Universal
-    (4, 21),  # Tiradentes
-    (5, 1),  # Dia do Trabalho
-    (9, 7),  # Independência
-    (10, 12),  # Nossa Senhora Aparecida
-    (11, 2),  # Finados
-    (11, 15),  # Proclamação da República
-    (11, 20),  # Consciência Negra (nacional desde a Lei 14.759/2023)
-    (12, 25),  # Natal
+    (1, 1, "Confraternização Universal"),
+    (4, 21, "Tiradentes"),
+    (5, 1, "Dia do Trabalho"),
+    (9, 7, "Independência"),
+    (10, 12, "Nossa Senhora Aparecida"),
+    (11, 2, "Finados"),
+    (11, 15, "Proclamação da República"),
+    (11, 20, "Consciência Negra"),  # nacional desde a Lei 14.759/2023
+    (12, 25, "Natal"),
 )
 
 # Datas móveis tratadas como não úteis pela regra. Carnaval e Corpus Christi
@@ -37,10 +44,10 @@ FERIADOS_NACIONAIS_FIXOS = (
 # mas entra nesta aproximação por ser observada no calendário financeiro usado
 # pelo projeto.
 DATAS_MOVEIS_NAO_UTEIS = (
-    -48,  # Carnaval (segunda)
-    -47,  # Carnaval (terça)
-    -2,  # Sexta-feira Santa
-    60,  # Corpus Christi
+    (-48, "Carnaval"),
+    (-47, "Carnaval"),
+    (-2, "Sexta-feira Santa"),
+    (60, "Corpus Christi"),
 )
 
 DIA_ANCORA_P1 = 5
@@ -55,6 +62,36 @@ class Ciclo:
 
     def contem(self, dia: date) -> bool:
         return self.inicio <= dia <= self.fim
+
+
+@dataclass(frozen=True)
+class FeriadoLocal:
+    """Feriado da cidade. `pagadores` diz de quem ele muda o pagamento: 1 é
+    quem paga o ciclo 1, 2 quem paga o ciclo 2; vazio, só marca o dia."""
+
+    nome: str
+    data: date
+    repete_todo_ano: bool
+    pagadores: frozenset[int]
+
+    def cai_em(self, dia: date) -> bool:
+        if self.repete_todo_ano:
+            return dia.year >= self.data.year and (dia.month, dia.day) == (self.data.month, self.data.day)
+        return dia == self.data
+
+
+_feriados_locais: tuple[FeriadoLocal, ...] = ()
+
+
+def definir_feriados_locais(feriados: Iterable[FeriadoLocal]) -> None:
+    """Troca os feriados da cidade que o calendário usa. Chamado pela API ao
+    subir e a cada cadastro; o cálculo continua sem banco."""
+    global _feriados_locais
+    _feriados_locais = tuple(feriados)
+
+
+def feriados_locais() -> tuple[FeriadoLocal, ...]:
+    return _feriados_locais
 
 
 def pascoa(ano: int) -> date:
@@ -72,27 +109,37 @@ def pascoa(ano: int) -> date:
     return date(ano, mes, dia + 1)
 
 
+def feriados_nacionais(ano: int) -> dict[date, str]:
+    """Datas nacionais ou móveis tratadas como não úteis pela regra, com o nome."""
+    domingo = pascoa(ano)
+    datas = {date(ano, mes, dia): nome for mes, dia, nome in FERIADOS_NACIONAIS_FIXOS}
+    datas.update({domingo + timedelta(days=offset): nome for offset, nome in DATAS_MOVEIS_NAO_UTEIS})
+    return datas
+
+
 def datas_nao_uteis_do_calendario(ano: int) -> frozenset[date]:
     """Datas nacionais ou móveis tratadas como não úteis pela regra."""
-    domingo = pascoa(ano)
-    fixos = (date(ano, mes, dia) for mes, dia in FERIADOS_NACIONAIS_FIXOS)
-    moveis = (domingo + timedelta(days=offset) for offset in DATAS_MOVEIS_NAO_UTEIS)
-    return frozenset((*fixos, *moveis))
+    return frozenset(feriados_nacionais(ano))
 
 
-def e_dia_util(dia: date) -> bool:
-    """Dia útil da regra: não é fim de semana nem data excluída."""
-    return dia.weekday() < 5 and dia not in datas_nao_uteis_do_calendario(dia.year)
+def e_dia_util(dia: date, pagador: int | None = None) -> bool:
+    """Dia útil da regra: não é fim de semana nem data excluída. Com
+    `pagador`, o feriado da cidade marcado para ele também exclui o dia."""
+    if dia.weekday() >= 5 or dia in datas_nao_uteis_do_calendario(dia.year):
+        return False
+    return pagador is None or not any(
+        pagador in feriado.pagadores and feriado.cai_em(dia) for feriado in _feriados_locais
+    )
 
 
-def dia_util_anterior_ou_igual(dia: date) -> date:
-    while not e_dia_util(dia):
+def dia_util_anterior_ou_igual(dia: date, pagador: int | None = None) -> date:
+    while not e_dia_util(dia, pagador):
         dia -= timedelta(days=1)
     return dia
 
 
-def dia_util_posterior_ou_igual(dia: date) -> date:
-    while not e_dia_util(dia):
+def dia_util_posterior_ou_igual(dia: date, pagador: int | None = None) -> date:
+    while not e_dia_util(dia, pagador):
         dia += timedelta(days=1)
     return dia
 
@@ -106,11 +153,11 @@ def _mes_anterior(ano: int, mes: int) -> tuple[int, int]:
 
 
 def p1(ano: int, mes: int) -> date:
-    return dia_util_anterior_ou_igual(date(ano, mes, DIA_ANCORA_P1))
+    return dia_util_anterior_ou_igual(date(ano, mes, DIA_ANCORA_P1), pagador=1)
 
 
 def p2(ano: int, mes: int) -> date:
-    return dia_util_posterior_ou_igual(date(ano, mes, DIA_ANCORA_P2))
+    return dia_util_posterior_ou_igual(date(ano, mes, DIA_ANCORA_P2), pagador=2)
 
 
 def ciclos_do_mes(ano: int, mes: int) -> tuple[Ciclo, Ciclo]:
@@ -144,3 +191,19 @@ def ciclo_anterior(ciclo: Ciclo) -> Ciclo:
 
 def ciclo_seguinte(ciclo: Ciclo) -> Ciclo:
     return ciclo_de(ciclo.fim + timedelta(days=1))
+
+
+def dias_nao_uteis(inicio: date, fim: date) -> dict[date, str | None]:
+    """Fim de semana e feriado entre as duas datas, inclusive, para marcar no
+    gráfico. O valor é o nome do feriado, ou None no fim de semana comum.
+    Feriado da cidade entra mesmo sem mudar pagamento nenhum."""
+    dias: dict[date, str | None] = {}
+    dia = inicio
+    while dia <= fim:
+        nome = feriados_nacionais(dia.year).get(dia) or next(
+            (feriado.nome for feriado in _feriados_locais if feriado.cai_em(dia)), None
+        )
+        if nome is not None or dia.weekday() >= 5:
+            dias[dia] = nome
+        dia += timedelta(days=1)
+    return dias

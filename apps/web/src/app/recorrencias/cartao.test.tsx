@@ -45,14 +45,19 @@ test("o nome vem depois do |, e o tipo da cobrança vira contexto", () => {
     nome: "Pessoa Fictícia",
     tipo: "Transferência enviada",
   });
-  expect(partesDaDescricao("NETFLIX.COM")).toEqual({ nome: "NETFLIX.COM", tipo: null });
+  expect(partesDaDescricao("NETFLIX.COM")).toEqual({
+    nome: "NETFLIX.COM",
+    tipo: null,
+  });
 });
 
 test("candidata mostra nome, tipo, banco, valor e histórico", () => {
   render(<CartaoPendente recorrencia={recorrencia()} conta={CONTA} />);
 
   expect(screen.getByText("Pessoa Fictícia")).toBeDefined();
-  expect(screen.getByText("Transferência enviada no Cartão Nubank")).toBeDefined();
+  expect(
+    screen.getByText("Transferência enviada no Cartão Nubank"),
+  ).toBeDefined();
   expect(screen.getByText("R$ 65,00")).toBeDefined();
   expect(screen.getByText("3 cobranças, de 10/06 a 10/08")).toBeDefined();
 });
@@ -60,13 +65,18 @@ test("candidata mostra nome, tipo, banco, valor e histórico", () => {
 test("as decisões mandam o estado certo", () => {
   render(<CartaoPendente recorrencia={recorrencia()} conta={CONTA} />);
 
-  const valor = (nome: string) => screen.getByRole("button", { name: nome }).getAttribute("value");
+  const valor = (nome: string) =>
+    screen.getByRole("button", { name: nome }).getAttribute("value");
   expect(valor("Conta fixa")).toBe("aprovada");
   expect(valor("Encerrada")).toBe("encerrada");
   expect(valor("Não é recorrência")).toBe("rejeitada");
   // O id vai junto, senão a ação não sabe qual recorrência decidir.
   expect(
-    screen.getByRole("button", { name: "Conta fixa" }).closest("form")?.querySelector('input[name="id"]')?.getAttribute("value"),
+    screen
+      .getByRole("button", { name: "Conta fixa" })
+      .closest("form")
+      ?.querySelector('input[name="id"]')
+      ?.getAttribute("value"),
   ).toBe("7");
 });
 
@@ -76,14 +86,22 @@ test("parcelamento pede quantas parcelas faltam antes de confirmar", () => {
 
   fireEvent.click(screen.getByRole("button", { name: "Parcelamento" }));
 
-  expect(screen.getByLabelText("Parcelas que faltam").getAttribute("name")).toBe("parcelas");
-  expect(screen.getByRole("button", { name: "Confirmar" }).getAttribute("value")).toBe("parcelamento");
+  expect(
+    screen.getByLabelText("Parcelas que faltam").getAttribute("name"),
+  ).toBe("parcelas");
+  expect(
+    screen.getByRole("button", { name: "Confirmar" }).getAttribute("value"),
+  ).toBe("parcelamento");
 });
 
 test("parcelamento decidido mostra quantas foram pagas e quando termina", () => {
   render(
     <CartaoDecidido
-      recorrencia={recorrencia({ status: "parcelamento", ocorrencias: 6, fimPrevisto: "2027-02-10" })}
+      recorrencia={recorrencia({
+        status: "parcelamento",
+        ocorrencias: 6,
+        fimPrevisto: "2027-02-10",
+      })}
       conta={CONTA}
     />,
   );
@@ -95,7 +113,12 @@ test("parcelamento decidido mostra quantas foram pagas e quando termina", () => 
 });
 
 test("decidida mostra o estado e abre as decisões em Mudar", () => {
-  render(<CartaoDecidido recorrencia={recorrencia({ status: "encerrada" })} conta={CONTA} />);
+  render(
+    <CartaoDecidido
+      recorrencia={recorrencia({ status: "encerrada" })}
+      conta={CONTA}
+    />,
+  );
 
   expect(screen.getByText("Encerrada")).toBeDefined();
   expect(screen.getByText("última em 10/08")).toBeDefined();

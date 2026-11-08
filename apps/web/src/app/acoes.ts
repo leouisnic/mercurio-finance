@@ -11,9 +11,15 @@ export type ResultadoDaAcao = { erro: string | null };
  * falha também: um 503 que termina como sucesso faria a tela recarregar
  * como se a decisão tivesse sido gravada.
  */
-async function enviar(caminho: string, init: RequestInit): Promise<string | null> {
+async function enviar(
+  caminho: string,
+  init: RequestInit,
+): Promise<string | null> {
   try {
-    const resposta = await fetch(`${FINANCE_API_URL}${caminho}`, { ...init, cache: "no-store" });
+    const resposta = await fetch(`${FINANCE_API_URL}${caminho}`, {
+      ...init,
+      cache: "no-store",
+    });
     return resposta.ok ? null : `a API respondeu com erro ${resposta.status}`;
   } catch {
     return "a API não respondeu";
@@ -45,7 +51,9 @@ export async function sincronizar(): Promise<ResultadoDaAcao> {
  * Rejeitar é definitivo em relação à detecção: a sincronização seguinte
  * reencontra o mesmo padrão e não devolve a recorrência para a fila.
  */
-export async function decidirRecorrencia(dados: FormData): Promise<ResultadoDaAcao> {
+export async function decidirRecorrencia(
+  dados: FormData,
+): Promise<ResultadoDaAcao> {
   const id = String(dados.get("id"));
   const apelido = String(dados.get("apelido") ?? "").trim();
   const categoria = String(dados.get("categoria") ?? "");
@@ -72,7 +80,9 @@ export async function decidirRecorrencia(dados: FormData): Promise<ResultadoDaAc
     body: JSON.stringify(alteracoes),
   });
   if (motivo) {
-    return { erro: `Não foi possível registrar a decisão: ${motivo}. O que você preencheu foi mantido.` };
+    return {
+      erro: `Não foi possível registrar a decisão: ${motivo}. O que você preencheu foi mantido.`,
+    };
   }
   revalidatePath("/recorrencias");
   return { erro: null };
@@ -84,7 +94,9 @@ export async function decidirRecorrencia(dados: FormData): Promise<ResultadoDaAc
  */
 export async function renomearConta(dados: FormData): Promise<ResultadoDaAcao> {
   const id = String(dados.get("conta_id"));
-  const apelido = dados.get("limpar") ? "" : String(dados.get("apelido") ?? "").trim();
+  const apelido = dados.get("limpar")
+    ? ""
+    : String(dados.get("apelido") ?? "").trim();
 
   const motivo = await enviar(`/contas/${encodeURIComponent(id)}`, {
     method: "PATCH",
@@ -92,7 +104,9 @@ export async function renomearConta(dados: FormData): Promise<ResultadoDaAcao> {
     body: JSON.stringify({ apelido: apelido || null }),
   });
   if (motivo) {
-    return { erro: `Não foi possível salvar: ${motivo}. O nome digitado foi mantido.` };
+    return {
+      erro: `Não foi possível salvar: ${motivo}. O nome digitado foi mantido.`,
+    };
   }
   revalidatePath("/");
   revalidatePath("/movimentos");
@@ -104,18 +118,26 @@ export async function renomearConta(dados: FormData): Promise<ResultadoDaAcao> {
  * escolha vira regra do destinatário e alcança os antigos dele que o
  * Mercúrio classificou sozinho.
  */
-export async function classificarMovimento(dados: FormData): Promise<ResultadoDaAcao> {
+export async function classificarMovimento(
+  dados: FormData,
+): Promise<ResultadoDaAcao> {
   const id = String(dados.get("movimento_id"));
   const categoria = String(dados.get("categoria") ?? "");
   if (!categoria) {
     return { erro: "Escolha uma categoria." };
   }
 
-  const motivo = await enviar(`/movimentos/${encodeURIComponent(id)}/categoria`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ categoria, todos_do_destinatario: dados.get("alcance") === "todos" }),
-  });
+  const motivo = await enviar(
+    `/movimentos/${encodeURIComponent(id)}/categoria`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        categoria,
+        todos_do_destinatario: dados.get("alcance") === "todos",
+      }),
+    },
+  );
   if (motivo) {
     return { erro: `Não foi possível salvar a categoria: ${motivo}.` };
   }
@@ -132,7 +154,10 @@ function recarregarMovimentos() {
 }
 
 /** Troca as tags de um movimento. As que não existem são criadas. */
-export async function definirTags(movimentoId: number, tags: string[]): Promise<ResultadoDaAcao> {
+export async function definirTags(
+  movimentoId: number,
+  tags: string[],
+): Promise<ResultadoDaAcao> {
   const motivo = await enviar(`/movimentos/${movimentoId}/tags`, {
     method: "PUT",
     headers: JSON_HEADERS,
@@ -179,13 +204,19 @@ export async function criarCategoria(dados: {
       return { erro: "Já existe uma categoria com esse nome.", id: null };
     }
     if (!resposta.ok) {
-      return { erro: `Não foi possível criar a categoria: a API respondeu com erro ${resposta.status}.`, id: null };
+      return {
+        erro: `Não foi possível criar a categoria: a API respondeu com erro ${resposta.status}.`,
+        id: null,
+      };
     }
     const criada = (await resposta.json()) as { id: string };
     recarregarMovimentos();
     return { erro: null, id: criada.id };
   } catch {
-    return { erro: "Não foi possível criar a categoria: a API não respondeu.", id: null };
+    return {
+      erro: "Não foi possível criar a categoria: a API não respondeu.",
+      id: null,
+    };
   }
 }
 
@@ -199,19 +230,29 @@ export type DadosDaTag = {
 };
 
 /** Cria uma tag ou, com `id`, altera a que existe. */
-export async function salvarTag(dados: DadosDaTag, id?: number): Promise<ResultadoDaAcao> {
+export async function salvarTag(
+  dados: DadosDaTag,
+  id?: number,
+): Promise<ResultadoDaAcao> {
   try {
-    const resposta = await fetch(`${FINANCE_API_URL}/tags${id ? `/${id}` : ""}`, {
-      method: id ? "PATCH" : "POST",
-      headers: JSON_HEADERS,
-      body: JSON.stringify(dados),
-      cache: "no-store",
-    });
+    const resposta = await fetch(
+      `${FINANCE_API_URL}/tags${id ? `/${id}` : ""}`,
+      {
+        method: id ? "PATCH" : "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify(dados),
+        cache: "no-store",
+      },
+    );
     if (resposta.status === 422) {
-      return { erro: "Já existe uma tag com esse nome, ou o período termina antes de começar." };
+      return {
+        erro: "Já existe uma tag com esse nome, ou o período termina antes de começar.",
+      };
     }
     if (!resposta.ok) {
-      return { erro: `Não foi possível salvar a tag: a API respondeu com erro ${resposta.status}.` };
+      return {
+        erro: `Não foi possível salvar a tag: a API respondeu com erro ${resposta.status}.`,
+      };
     }
   } catch {
     return { erro: "Não foi possível salvar a tag: a API não respondeu." };
@@ -221,14 +262,19 @@ export async function salvarTag(dados: DadosDaTag, id?: number): Promise<Resulta
   return { erro: null };
 }
 
-export async function arquivarTag(id: number, arquivada: boolean): Promise<ResultadoDaAcao> {
+export async function arquivarTag(
+  id: number,
+  arquivada: boolean,
+): Promise<ResultadoDaAcao> {
   const motivo = await enviar(`/tags/${id}`, {
     method: "PATCH",
     headers: JSON_HEADERS,
     body: JSON.stringify({ arquivada }),
   });
   if (motivo) {
-    return { erro: `Não foi possível ${arquivada ? "arquivar" : "desarquivar"} a tag: ${motivo}.` };
+    return {
+      erro: `Não foi possível ${arquivada ? "arquivar" : "desarquivar"} a tag: ${motivo}.`,
+    };
   }
   revalidatePath("/movimentos/tags");
   return { erro: null };
@@ -242,5 +288,58 @@ export async function apagarTag(id: number): Promise<ResultadoDaAcao> {
   }
   recarregarMovimentos();
   revalidatePath("/movimentos/tags");
+  return { erro: null };
+}
+
+export type DadosDoFeriado = {
+  nome: string;
+  data: string;
+  repete_todo_ano: boolean;
+  muda_ciclo_1: boolean;
+  muda_ciclo_2: boolean;
+};
+
+/**
+ * Cadastra o feriado, ou troca o que tem `id`. Feriado que muda pagamento muda as datas do ciclo, e
+ * com elas todas as páginas; por isso recarrega o layout inteiro.
+ * `mudaCicloPassado` avisa quando um ciclo que já passou mudou de data.
+ */
+export async function salvarFeriado(
+  dados: DadosDoFeriado,
+  id?: number,
+): Promise<ResultadoDaAcao & { mudaCicloPassado: boolean }> {
+  try {
+    const resposta = await fetch(
+      `${FINANCE_API_URL}/feriados${id ? `/${id}` : ""}`,
+      {
+        method: id ? "PUT" : "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify(dados),
+        cache: "no-store",
+      },
+    );
+    if (!resposta.ok) {
+      return {
+        erro: `Não foi possível salvar o feriado: a API respondeu com erro ${resposta.status}.`,
+        mudaCicloPassado: false,
+      };
+    }
+    const criado = (await resposta.json()) as { muda_ciclo_passado?: unknown };
+    revalidatePath("/", "layout");
+    return { erro: null, mudaCicloPassado: criado.muda_ciclo_passado === true };
+  } catch {
+    return {
+      erro: "Não foi possível salvar o feriado: a API não respondeu.",
+      mudaCicloPassado: false,
+    };
+  }
+}
+
+export async function apagarFeriado(id: number): Promise<ResultadoDaAcao> {
+  const motivo = await enviar(`/feriados/${id}`, { method: "DELETE" });
+  if (motivo) {
+    return { erro: `Não foi possível apagar o feriado: ${motivo}.` };
+  }
+  revalidatePath("/", "layout");
   return { erro: null };
 }

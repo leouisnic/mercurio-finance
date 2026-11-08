@@ -23,13 +23,10 @@ import {
 } from "react";
 import { apagarTag, arquivarTag, type DadosDaTag, salvarTag } from "../acoes";
 import type { Tag } from "../buscar-movimentos";
-import { moeda, periodoPorExtenso } from "../formato";
+import { comoData, moeda, periodoPorExtenso } from "../formato";
+import { CampoDeData } from "../calendario";
 import { Info } from "../info";
-import {
-  CORES_PARA_CRIAR,
-  ICONES_DE_TAG,
-  IconeDaCategoria,
-} from "./icones";
+import { CORES_PARA_CRIAR, ICONES_DE_TAG, IconeDaCategoria } from "./icones";
 import type { CSSProperties } from "react";
 
 const TETOS = [1000, 3000, 6000];
@@ -107,11 +104,13 @@ function Atalho({
 export function FormularioDeTag({
   tag,
   fechar,
+  hoje: diaDeHoje,
 }: {
   tag?: Tag;
   fechar: () => void;
+  hoje: string;
 }) {
-  const hoje = new Date();
+  const hoje = comoData(diaDeHoje);
   const [nome, setNome] = useState(tag?.nome ?? "");
   const [icone, setIcone] = useState(tag?.icone ?? "Plane");
   const [cor, setCor] = useState(tag?.cor ?? CORES_PARA_CRIAR[4]);
@@ -135,6 +134,10 @@ export function FormularioDeTag({
 
   function salvar(evento: FormEvent) {
     evento.preventDefault();
+    if (inicio && fim && fim < inicio) {
+      setErro("O fim do período deve ser igual ou posterior ao início.");
+      return;
+    }
     const dados: DadosDaTag = {
       nome: nome.trim(),
       icone,
@@ -173,7 +176,7 @@ export function FormularioDeTag({
           <div className="text-tinta-2 flex flex-wrap gap-x-3 gap-y-1 px-3 py-2 text-[12.5px]">
             <span className="inline-flex items-center gap-1">
               <ReceiptText size={13} aria-hidden="true" />{" "}
-              {tag ? `${tag.quantidade} movimentos` : "nenhum movimento ainda"}
+              {tag ? `${tag.quantidade} movimentos` : "Nenhum movimento ainda"}
             </span>
             {resumo && (
               <span className="inline-flex items-center gap-1">
@@ -340,25 +343,25 @@ export function FormularioDeTag({
           </div>
           {datasAbertas && (
             <div className="grid grid-cols-2 gap-2">
-              <label className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1">
                 <span className="text-tinta-3 text-[12px]">De</span>
-                <input
-                  type="date"
-                  value={inicio}
-                  onChange={(evento) => setInicio(evento.target.value)}
-                  className="border-borda hover:border-tinta-4 rounded-[10px] border bg-transparent px-2.5 py-2 text-[13.5px]"
+                <CampoDeData
+                  valor={inicio}
+                  mudar={setInicio}
+                  rotulo="De"
+                  hoje={diaDeHoje}
                 />
-              </label>
-              <label className="flex flex-col gap-1">
+              </div>
+              <div className="flex flex-col gap-1">
                 <span className="text-tinta-3 text-[12px]">Até</span>
-                <input
-                  type="date"
-                  value={fim}
-                  min={inicio || undefined}
-                  onChange={(evento) => setFim(evento.target.value)}
-                  className="border-borda hover:border-tinta-4 rounded-[10px] border bg-transparent px-2.5 py-2 text-[13.5px]"
+                <CampoDeData
+                  valor={fim}
+                  mudar={setFim}
+                  minimo={inicio || undefined}
+                  rotulo="Até"
+                  hoje={diaDeHoje}
                 />
-              </label>
+              </div>
             </div>
           )}
         </fieldset>
@@ -392,7 +395,7 @@ export function FormularioDeTag({
   );
 }
 
-export function BotaoNovaTag() {
+export function BotaoNovaTag({ hoje }: { hoje: string }) {
   const [aberto, setAberto] = useState(false);
   return (
     <>
@@ -403,7 +406,7 @@ export function BotaoNovaTag() {
       >
         <Plus size={16} aria-hidden="true" /> Nova tag
       </button>
-      {aberto && <FormularioDeTag fechar={() => setAberto(false)} />}
+      {aberto && <FormularioDeTag hoje={hoje} fechar={() => setAberto(false)} />}
     </>
   );
 }
@@ -416,10 +419,12 @@ export function AcoesDaTag({
   tag,
   compacto = false,
   depoisDeApagar,
+  hoje,
 }: {
   tag: Tag;
   compacto?: boolean;
   depoisDeApagar?: string;
+  hoje: string;
 }) {
   const router = useRouter();
   const [menu, setMenu] = useState(false);
@@ -554,7 +559,7 @@ export function AcoesDaTag({
         </span>
       )}
       {editando && (
-        <FormularioDeTag tag={tag} fechar={() => setEditando(false)} />
+        <FormularioDeTag tag={tag} hoje={hoje} fechar={() => setEditando(false)} />
       )}
     </span>
   );

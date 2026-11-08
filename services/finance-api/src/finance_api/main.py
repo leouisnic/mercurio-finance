@@ -19,7 +19,9 @@ fictício) antes de rodar em desenvolvimento sem Pluggy configurado.
 Nenhuma credencial, extrato real ou dado pessoal é usado neste módulo.
 """
 
-from datetime import date
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from datetime import date, timedelta
 from decimal import Decimal
 
 from fastapi import Depends, FastAPI, HTTPException, Query
@@ -28,11 +30,18 @@ from rq.exceptions import NoSuchJobError
 from rq.job import Job
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from finance_api import feriados
 from finance_api.categorias import chave_do_destinatario
 from finance_api.centavos import centavos
-from finance_api.ciclo import Ciclo, ciclo_anterior, ciclo_de, ciclo_seguinte
+from finance_api.ciclo import Ciclo, ciclo_anterior, ciclo_de, ciclo_seguinte, dias_nao_uteis
 from finance_api.compromissos import resumo_parcelas
-from finance_api.db import obter_sessao
+from finance_api.contadores import calcular as calcular_contadores
+from finance_api.contadores import (
+    categoria_que_mais_cresceu,
+    dia_util_contra_nao_util,
+    gasto_ate_o_dia,
+)
+from finance_api.db import async_session, obter_sessao
 from finance_api.dinheiro_livre import calcular as calcular_dinheiro_livre
 from finance_api.dinheiro_livre import contas_fixas_pendentes
 from finance_api.domain import (
@@ -41,15 +50,19 @@ from finance_api.domain import (
     CategoriaJaUsada,
     CategoriaOut,
     CategoriaPrincipal,
+    CategoriaQueCresceuOut,
     CategoriaUpdate,
     CicloOut,
     CiclosOut,
+    ComparacaoOut,
     CompromissoIn,
     CompromissoOut,
     CompromissoUpdate,
     Conta,
+    ContadoresOut,
     ContaFixaOut,
     ContaUpdate,
+    DiaUtilOut,
     DinheiroLivreOut,
     EstadoPagamentoFatura,
     FluxoDaConta,
@@ -81,6 +94,7 @@ from finance_api.jobs import job_reimportar_seed, job_sincronizar_pluggy
 from finance_api.models import CompromissoORM, ContaORM, MovimentoORM, RecorrenciaORM, TagORM
 from finance_api.repositorio import (
     CategoriaInvalida,
+    FiltroDeGasto,
     PagamentoFaturaInvalido,
     TagInvalida,
     agregar_despesas_por_dia,
@@ -92,6 +106,7 @@ from finance_api.repositorio import (
     atualizar_tag,
     contar_para_classificar,
     corrigir_categoria,
+    cota_guardada,
     criar_categoria,
     criar_compromisso,
     criar_tag,
@@ -100,7 +115,9 @@ from finance_api.repositorio import (
     entradas_do_dinheiro_livre,
     gasto_da_categoria,
     gasto_da_tag_por_categoria,
+    gasto_por_categoria_no_periodo,
     gastos_da_tag,
+    guardar_cota,
     historico_dos_destinatarios,
     listar_categorias,
     listar_compromissos,
@@ -112,6 +129,7 @@ from finance_api.repositorio import (
     maiores_por_dia,
     marcar_em_lote,
     obter_compromisso,
+    primeiro_movimento,
     tags_dos_movimentos,
     totais_dos_ciclos,
     ultima_sincronizacao,
@@ -124,11 +142,21 @@ from finance_api.tags import analisar, ciclos_do_impacto
 CICLOS_NA_FILA = 6
 
 
+@asynccontextmanager
+async def _ciclo_de_vida(_: FastAPI) -> AsyncIterator[None]:
+    # O calendário só conhece os feriados da cidade depois desta carga.
+    async with async_session() as sessao:
+        await feriados.recarregar(sessao)
+    yield
+
+
 app = FastAPI(
     title="Mercúrio · finance-api",
     description="Contas conectadas no Pluggy e seus saldos.",
     version="0.1.0",
+    lifespan=_ciclo_de_vida,
 )
+app.include_router(feriados.rotas)
 
 
 def _recorrencia_out(recorrencia: RecorrenciaORM) -> RecorrenciaOut:
@@ -268,13 +296,22 @@ async def renomear_conta(
     return _conta_out(conta)
 
 
+def _filtro(
+    conta_id: list[str] = Query(default=[]),  # noqa: B008 (padrão do FastAPI)
+    categoria: list[str] = Query(default=[]),  # noqa: B008 (padrão do FastAPI)
+    tag_id: int | None = None,
+    sem_tag_id: int | None = None,
+) -> FiltroDeGasto:
+    """Os filtros da barra, repetíveis no endereço: `?conta_id=a&conta_id=b`."""
+    return FiltroDeGasto(tuple(conta_id), tuple(categoria), tag_id, sem_tag_id)
+
+
 @app.get("/movimentos", response_model=list[MovimentoOut])
 async def movimentos(
-    conta_id: str | None = None,
     data_inicio: date | None = None,
     data_fim: date | None = None,
     para_classificar: bool = False,
-    tag_id: int | None = None,
+    filtro: FiltroDeGasto = Depends(_filtro),  # noqa: B008 (padrão do FastAPI)
     hoje: date | None = None,
     limite: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
@@ -292,11 +329,10 @@ async def movimentos(
         data_inicio = _inicio_da_fila(hoje or date.today())  # noqa: DTZ011 (ciclo é data civil, sem fuso)
     encontrados = await listar_movimentos(
         sessao,
-        conta_id=conta_id,
         data_inicio=data_inicio,
         data_fim=data_fim,
         para_classificar=para_classificar,
-        tag_id=tag_id,
+        filtro=filtro,
         limite=limite,
         offset=offset,
     )
@@ -563,15 +599,19 @@ async def revisar_pagamento_de_fatura(
 async def gastos_diarios(
     data_inicio: date,
     data_fim: date,
-    conta_id: str | None = None,
+    filtro: FiltroDeGasto = Depends(_filtro),  # noqa: B008 (padrão do FastAPI)
+    sem_conta_fixa: bool = False,
     sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
 ) -> list[GastoDiario]:
     """Soma as despesas (`tipo == despesa`) de cada dia no intervalo
-    pedido (inclusive nas duas pontas). Pagamento de fatura fica fora."""
+    pedido (inclusive nas duas pontas). Pagamento de fatura fica fora; com
+    `sem_conta_fixa`, a conta fixa também, como no gráfico do Início."""
     linhas = await agregar_despesas_por_dia(
-        sessao, data_inicio=data_inicio, data_fim=data_fim, conta_id=conta_id
+        sessao, data_inicio=data_inicio, data_fim=data_fim, filtro=filtro, sem_conta_fixa=sem_conta_fixa
     )
-    maiores = await maiores_por_dia(sessao, inicio=data_inicio, fim=data_fim, conta_id=conta_id)
+    maiores = await maiores_por_dia(
+        sessao, inicio=data_inicio, fim=data_fim, filtro=filtro, sem_conta_fixa=sem_conta_fixa
+    )
     return [
         GastoDiario(
             data=data,
@@ -583,15 +623,82 @@ async def gastos_diarios(
     ]
 
 
+@app.get("/contadores", response_model=ContadoresOut)
+async def contadores(
+    data_inicio: date,
+    data_fim: date,
+    hoje: date | None = None,
+    cota: Decimal | None = None,
+    filtro: FiltroDeGasto = Depends(_filtro),  # noqa: B008 (padrão do FastAPI)
+    sem_conta_fixa: bool = False,
+    sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
+) -> ContadoresOut:
+    """Dias de ouro, sequência sem gasto e, com `cota`, dias dentro dela. O
+    painel manda a cota de hoje; ciclos passados usam a última observação
+    guardada. Compara o mesmo ciclo do mês anterior até a mesma posição."""
+    dia = hoje or date.today()  # noqa: DTZ011 (ciclo é data civil, sem fuso)
+    primeiro = await primeiro_movimento(sessao)
+    ciclo = ciclo_de(data_inicio)
+    e_ciclo = (ciclo.inicio, ciclo.fim) == (data_inicio, data_fim)
+    # Ciclo 1 com ciclo 1: cada um tem o seu pagador e o seu tamanho.
+    comparado = ciclo_anterior(ciclo_anterior(ciclo))
+    if cota is None and e_ciclo and filtro.vazio:
+        cota = await cota_guardada(sessao, ciclo.inicio, ciclo.fim)
+    if not e_ciclo or not filtro.vazio or (cota is not None and cota <= 0):
+        cota = None
+    inicio_da_busca = min(d for d in (primeiro, comparado.inicio if e_ciclo else None, data_inicio) if d)
+    linhas = await agregar_despesas_por_dia(
+        sessao, data_inicio=inicio_da_busca, data_fim=data_fim, filtro=filtro, sem_conta_fixa=sem_conta_fixa
+    )
+    por_dia = {data: total for data, total, _ in linhas}
+    resultado = calcular_contadores(
+        por_dia, inicio=data_inicio, fim=data_fim, hoje=dia, primeiro_dia=primeiro, cota=cota
+    )
+    ultimo = min(data_fim, dia)
+    dias_do_periodo = [data_inicio + timedelta(days=n) for n in range((ultimo - data_inicio).days + 1)]
+    util = dia_util_contra_nao_util(por_dia, dias_do_periodo, set(dias_nao_uteis(data_inicio, data_fim)))
+    comparacao = cresceu = None
+    if e_ciclo and resultado.dias > 0:
+        fim_comparado = min(comparado.inicio + timedelta(days=resultado.dias - 1), comparado.fim)
+        comparacao = ComparacaoOut(
+            gasto=centavos(gasto_ate_o_dia(por_dia, data_inicio, resultado.dias, data_fim)),
+            gasto_anterior=centavos(gasto_ate_o_dia(por_dia, comparado.inicio, resultado.dias, comparado.fim)),
+        )
+        categorias = await gasto_por_categoria_no_periodo(
+            sessao, inicio=data_inicio, fim=ultimo, filtro=filtro, sem_conta_fixa=sem_conta_fixa
+        )
+        antes = await gasto_por_categoria_no_periodo(
+            sessao, inicio=comparado.inicio, fim=fim_comparado, filtro=filtro, sem_conta_fixa=sem_conta_fixa
+        )
+        maior = categoria_que_mais_cresceu(categorias, antes)
+        cresceu = CategoriaQueCresceuOut(categoria=maior[0], aumento=centavos(maior[1])) if maior else None
+    return ContadoresOut(
+        **vars(resultado),
+        comparacao=comparacao,
+        cota=cota,
+        ciclo_comparado=_ciclo_out(comparado) if e_ciclo else None,
+        dia_util=DiaUtilOut(
+            # Fração, não dinheiro: quatro casas bastam para a porcentagem da tela.
+            parte_nao_util=round(util.parte_nao_util, 4),
+            dia_mais_caro=util.dia_mais_caro,
+            media_do_dia_mais_caro=centavos(util.media_do_dia_mais_caro),
+        )
+        if util
+        else None,
+        categoria_que_cresceu=cresceu,
+    )
+
+
 @app.get("/movimentos/por-conta", response_model=list[FluxoDaConta])
 async def fluxo_por_conta(
     data_inicio: date,
     data_fim: date,
+    filtro: FiltroDeGasto = Depends(_filtro),  # noqa: B008 (padrão do FastAPI)
     sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
 ) -> list[FluxoDaConta]:
     """Entradas e saídas de cada conta no intervalo (inclusive nas duas
-    pontas). Conta sem movimento no período aparece zerada."""
-    linhas = await agregar_fluxo_por_conta(sessao, data_inicio=data_inicio, data_fim=data_fim)
+    pontas). A consulta geral inclui contas sem movimento com valores zerados."""
+    linhas = await agregar_fluxo_por_conta(sessao, data_inicio=data_inicio, data_fim=data_fim, filtro=filtro)
     return [
         FluxoDaConta(
             conta_id=conta_id,
@@ -665,6 +772,10 @@ async def dinheiro_livre(
         ),
         gastos_por_dia=gastos,
     )
+    # Só o dia de verdade guarda a cota: com `hoje` fixado (demonstração e
+    # testes), o saldo de agora reconstruiria a cota de outro ciclo errado.
+    if hoje is None or hoje == date.today():  # noqa: DTZ011 (ciclo é data civil, sem fuso)
+        await guardar_cota(sessao, ciclo.inicio, resultado.cota_do_dia, fim=ciclo.fim)
     return DinheiroLivreOut(
         hoje=dia,
         ciclo=_ciclo_out(ciclo),

@@ -51,12 +51,18 @@ type Resposta = {
   cofrinho: string;
   gasto_hoje: string;
   hoje_disponivel: string;
-  gastos_por_dia: { data: string; total: string; maiores?: { descricao: string; valor: string }[] }[];
+  gastos_por_dia: {
+    data: string;
+    total: string;
+    maiores?: { descricao: string; valor: string }[];
+  }[];
 };
 
 /** Quanto dá para gastar até a véspera do próximo pagamento. A conta é da
  *  API (`finance_api.dinheiro_livre`); a tela só mostra. */
-export async function buscarDinheiroLivre(hoje: string): Promise<DinheiroLivre | null> {
+export async function buscarDinheiroLivre(
+  hoje: string,
+): Promise<DinheiroLivre | null> {
   const corpo = await buscarJson<Resposta>("/dinheiro-livre", { hoje });
   if (corpo === null) {
     return null;
@@ -86,7 +92,10 @@ export async function buscarDinheiroLivre(hoje: string): Promise<DinheiroLivre |
     gastosPorDia: corpo.gastos_por_dia.map((dia) => ({
       data: dia.data,
       total: paraNumero(dia.total),
-      maiores: (dia.maiores ?? []).map((item) => ({ descricao: item.descricao, valor: paraNumero(item.valor) })),
+      maiores: (dia.maiores ?? []).map((item) => ({
+        descricao: item.descricao,
+        valor: paraNumero(item.valor),
+      })),
     })),
   };
 }

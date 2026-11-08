@@ -15,8 +15,20 @@ const DINHEIRO: DinheiroLivre = {
   saldoContas: 3152.9,
   cartaoUsado: 640.3,
   contasFixas: [
-    { nome: "Internet", valor: 99.9, dataPrevista: "2026-10-12", origem: "recorrencia", atrasada: false },
-    { nome: "Academia", valor: 89, dataPrevista: "2026-10-13", origem: "recorrencia", atrasada: false },
+    {
+      nome: "Internet",
+      valor: 99.9,
+      dataPrevista: "2026-10-12",
+      origem: "recorrencia",
+      atrasada: false,
+    },
+    {
+      nome: "Academia",
+      valor: 89,
+      dataPrevista: "2026-10-13",
+      origem: "recorrencia",
+      atrasada: false,
+    },
   ],
   contasFixasTotal: 188.9,
   caixinha: 380,
@@ -34,31 +46,57 @@ function montar(conteudo: ReactNode) {
   return render(<ProvedorDeDicas>{conteudo}</ProvedorDeDicas>);
 }
 
-function fixa(nome: string, dia: number, valor: number, atrasada = false): ContaFixa {
-  return { nome, valor, dataPrevista: `2026-10-${String(dia).padStart(2, "0")}`, origem: "recorrencia", atrasada };
+function fixa(
+  nome: string,
+  dia: number,
+  valor: number,
+  atrasada = false,
+): ContaFixa {
+  return {
+    nome,
+    valor,
+    dataPrevista: `2026-10-${String(dia).padStart(2, "0")}`,
+    origem: "recorrencia",
+    atrasada,
+  };
 }
 
 test("hoje mostra o disponível, a cota e o cofrinho da conta da spec", () => {
   montar(<HojeDaParaGastar dinheiro={DINHEIRO} />);
 
-  const bloco = within(screen.getByRole("region", { name: "Hoje dá para gastar" }));
+  const bloco = within(
+    screen.getByRole("region", { name: "Hoje dá para gastar" }),
+  );
   expect(bloco.getByText("R$ 868,74")).toBeDefined();
   expect(bloco.getByText("R$ 268,74")).toBeDefined();
   expect(bloco.getByText("+ R$ 600,00")).toBeDefined();
 });
 
 test("gasto acima do que o ciclo comporta aparece negativo e com aviso", () => {
-  montar(<HojeDaParaGastar dinheiro={{ ...DINHEIRO, hojeDisponivel: -120, cofrinho: -388.74, gastoHoje: 0 }} />);
+  montar(
+    <HojeDaParaGastar
+      dinheiro={{
+        ...DINHEIRO,
+        hojeDisponivel: -120,
+        cofrinho: -388.74,
+        gastoHoje: 0,
+      }}
+    />,
+  );
 
   expect(screen.getByText("- R$ 120,00")).toBeDefined();
   expect(screen.getByText("- R$ 388,74")).toBeDefined();
-  expect(screen.getByRole("status").textContent).toMatch(/além do que o ciclo comporta/);
+  expect(screen.getByRole("status").textContent).toMatch(
+    /além do que o ciclo comporta/,
+  );
 });
 
 test("a composição mostra cada parte do saldo e as contas fixas com a data", () => {
   montar(<ComposicaoDoSaldo dinheiro={DINHEIRO} temCartao />);
 
-  const saldo = within(screen.getByRole("region", { name: "Saldo nas contas" }));
+  const saldo = within(
+    screen.getByRole("region", { name: "Saldo nas contas" }),
+  );
   expect(saldo.getByText("R$ 640,30")).toBeDefined();
   expect(saldo.getByText("R$ 188,90")).toBeDefined();
   expect(saldo.getByText("R$ 380,00")).toBeDefined();
@@ -68,9 +106,14 @@ test("a composição mostra cada parte do saldo e as contas fixas com a data", (
 });
 
 test("sem cartão conectado, o cartão diz isso em vez de mostrar zero", () => {
-  montar(<ComposicaoDoSaldo dinheiro={{ ...DINHEIRO, cartaoUsado: 0 }} temCartao={false} />);
+  montar(
+    <ComposicaoDoSaldo
+      dinheiro={{ ...DINHEIRO, cartaoUsado: 0 }}
+      temCartao={false}
+    />,
+  );
 
-  expect(screen.getByText("sem cartão conectado")).toBeDefined();
+  expect(screen.getByText("Sem cartão conectado")).toBeDefined();
 });
 
 test("mais de três contas fixas: três na lista e o resto somado", () => {
@@ -81,7 +124,9 @@ test("mais de três contas fixas: três na lista e o resto somado", () => {
     fixa("Seguro", 13, 80),
     fixa("Streaming", 14, 39.9),
   ];
-  montar(<ComposicaoDoSaldo dinheiro={{ ...DINHEIRO, contasFixas }} temCartao />);
+  montar(
+    <ComposicaoDoSaldo dinheiro={{ ...DINHEIRO, contasFixas }} temCartao />,
+  );
 
   expect(screen.getAllByRole("listitem")).toHaveLength(3);
   expect(screen.getByText(/\+ 2 contas/)).toBeDefined();
@@ -89,21 +134,37 @@ test("mais de três contas fixas: três na lista e o resto somado", () => {
 });
 
 test("conta fixa atrasada fica marcada", () => {
-  montar(<ComposicaoDoSaldo dinheiro={{ ...DINHEIRO, contasFixas: [fixa("Internet", 7, 99.9, true)] }} temCartao />);
+  montar(
+    <ComposicaoDoSaldo
+      dinheiro={{ ...DINHEIRO, contasFixas: [fixa("Internet", 7, 99.9, true)] }}
+      temCartao
+    />,
+  );
 
-  expect(screen.getByText("atrasada, prevista para 07/10")).toBeDefined();
+  expect(screen.getByText("Atrasada, prevista para 07/10")).toBeDefined();
 });
 
 test("livre negativo aparece negativo na legenda", () => {
-  montar(<ComposicaoDoSaldo dinheiro={{ ...DINHEIRO, livre: -250 }} temCartao />);
+  montar(
+    <ComposicaoDoSaldo dinheiro={{ ...DINHEIRO, livre: -250 }} temCartao />,
+  );
 
   expect(screen.getByText("- R$ 250,00")).toBeDefined();
 });
 
 test("sem conta fixa prevista, a tela leva a aprovar recorrências", () => {
-  montar(<ComposicaoDoSaldo dinheiro={{ ...DINHEIRO, contasFixas: [], contasFixasTotal: 0 }} temCartao />);
+  montar(
+    <ComposicaoDoSaldo
+      dinheiro={{ ...DINHEIRO, contasFixas: [], contasFixasTotal: 0 }}
+      temCartao
+    />,
+  );
 
-  expect(screen.getByRole("link", { name: "Aprovar recorrências" }).getAttribute("href")).toBe("/recorrencias");
+  expect(
+    screen
+      .getByRole("link", { name: "Aprovar recorrências" })
+      .getAttribute("href"),
+  ).toBe("/recorrencias");
 });
 
 test("a linha do tempo usa o nome de quem paga e cai no dia quando não há nome", () => {
@@ -156,19 +217,39 @@ test("o dia fora da escala mostra o valor escrito e a legenda explica o corte", 
   );
 
   const grafico = screen.getByRole("region", { name: "Gasto por dia e cota" });
-  expect(within(grafico).getByText("Cota do dia")).toBeDefined();
+  // Cota e média só na ponta das linhas. Média de 15 a 18/10:
+  // (1.720 + 38,50 + 310 + 0) / 4 = 517,125; projeção dos dois dias que
+  // faltam no mesmo ritmo: 2.068,50 + 2 x 517,125 = 3.102,75.
+  expect(within(grafico).getByText(/^Cota R\$\s42,30$/)).toBeDefined();
+  expect(within(grafico).getByText(/^Média R\$\s517,13$/)).toBeDefined();
+  expect(
+    within(grafico).getByRole("button", {
+      name: /^Projeção do período: R\$\s3\.102,75$/,
+    }),
+  ).toBeDefined();
   expect(grafico.textContent).toMatch(/R\$\s1\.720,00/);
   expect(within(grafico).getByText("Fora da escala")).toBeDefined();
-  expect(within(grafico).getByText(/^R\$\s1\.720,00, acima da cota$/)).toBeDefined();
-  // O valor curto em cima da barra, com moeda.
-  expect(within(grafico).getByText("R$ 1.720").className).toContain("alerta");
-  expect(within(grafico).getByText("R$ 39").className).not.toContain("alerta");
-  // A cor da barra: vermelha acima da cota, índigo dentro, dourada sem gasto.
-  expect(within(grafico).getByText("R$ 1.720").parentElement?.className).toContain("bg-alerta-forte");
-  expect(within(grafico).getByText("R$ 39").parentElement?.className).toContain("bg-marca");
-  expect(within(grafico).getByRole("button", { name: /18\/10/ }).innerHTML).toContain("bg-caixinha");
+  expect(
+    within(grafico).getByText(/^R\$\s1\.720,00, acima da cota$/),
+  ).toBeDefined();
+  // Nada escrito sobre as barras. A cor: vermelha acima da cota, índigo
+  // dentro, dourada sem gasto; o maior dia (15/10) com listras.
+  expect(within(grafico).queryByText("R$ 1.720")).toBeNull();
+  const barra = (dia: RegExp) =>
+    within(grafico).getByRole("button", { name: dia }).innerHTML;
+  expect(barra(/15\/10/)).toContain("bg-alerta-forte");
+  expect(barra(/15\/10/)).toContain(
+    "repeating-linear-gradient(135deg, transparent",
+  );
+  expect(barra(/16\/10/)).toContain("bg-marca");
+  expect(barra(/16\/10/)).not.toContain(
+    "repeating-linear-gradient(135deg, transparent",
+  );
+  expect(
+    within(grafico).getByRole("button", { name: /18\/10/ }).innerHTML,
+  ).toContain("bg-caixinha");
   // Dia sem gasto em dourado; os dias que ainda vêm não têm barra.
-  expect(within(grafico).getByText("Sem gasto")).toBeDefined();
+  expect(within(grafico).getByText("Dia de ouro")).toBeDefined();
   expect(within(grafico).queryByRole("button", { name: /19\/10/ })).toBeNull();
 });
 
@@ -184,4 +265,33 @@ test("sem dia fora da escala, a legenda não fala de corte", () => {
   );
 
   expect(screen.queryByText("Fora da escala")).toBeNull();
+});
+
+test("o eixo mostra a letra do dia e marca fim de semana e feriado só na letra", () => {
+  // 17 de outubro de 2026 é sábado; o dia 20 é um feriado fictício da cidade.
+  montar(
+    <GraficoDoCiclo
+      inicio="2026-10-15"
+      fim="2026-10-20"
+      hoje="2026-10-20"
+      cota={42.3}
+      gastos={[{ data: "2026-10-15", total: 10 }]}
+      naoUteis={[
+        { data: "2026-10-17", feriado: null },
+        { data: "2026-10-18", feriado: null },
+        { data: "2026-10-20", feriado: "Aniversário da Cidade A" },
+      ]}
+    />,
+  );
+
+  const grafico = screen.getByRole("region", { name: "Gasto por dia e cota" });
+  const letras = [
+    ...grafico.querySelectorAll("[aria-hidden] > span + span"),
+  ].filter((letra) => /^[DSTQ]$/.test(letra.textContent ?? ""));
+  expect(letras.map((letra) => letra.textContent).join("")).toBe("QSSDST");
+  // Fim de semana e feriado na mesma cor: o balão diz qual é.
+  expect(letras[2].className).toContain("bg-nao-util");
+  expect(letras[5].className).toContain("bg-nao-util");
+  expect(letras[4].className).not.toContain("bg-");
+  expect(within(grafico).getByText(/Aniversário da Cidade A/)).toBeDefined();
 });

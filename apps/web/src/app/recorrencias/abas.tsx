@@ -17,7 +17,11 @@ export function AbasDeRecorrencias({ abas }: { abas: Aba[] }) {
 
   return (
     <div className="flex max-w-[860px] flex-col gap-3.5">
-      <div role="tablist" aria-label="Recorrências por estado" className="flex flex-wrap gap-1.5">
+      <div
+        role="tablist"
+        aria-label="Recorrências por estado"
+        className="flex flex-wrap gap-1.5"
+      >
         {abas.map((aba) => {
           const selecionada = aba.chave === ativa;
           return (

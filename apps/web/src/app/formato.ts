@@ -11,7 +11,14 @@ const DIA_POR_EXTENSO = new Intl.DateTimeFormat("pt-BR", {
 });
 
 export function moeda(valor: number): string {
-  return MOEDA.format(valor);
+  // -0 (de uma conta como 0 * -1) sairia "-R$ 0,00": zero é zero.
+  return MOEDA.format(valor === 0 ? 0 : valor);
+}
+
+/** "+ R$ 10,00", "- R$ 10,00" ou "R$ 0,00": zero não leva sinal. */
+export function comSinal(valor: number): string {
+  if (Math.abs(valor) < 0.005) return moeda(0);
+  return valor < 0 ? `- ${moeda(-valor)}` : `+ ${moeda(valor)}`;
 }
 
 /**
@@ -84,4 +91,9 @@ export function periodoPorExtenso(
  *  Mora aqui, e não no componente do detalhe, porque o servidor também chama. */
 export function moedaCurta(valor: number): string {
   return `R$ ${Math.round(valor).toLocaleString("pt-BR")}`;
+}
+
+/** Texto de tela começa com maiúscula, inclusive o que vem do Intl ("dom"). */
+export function primeiraMaiuscula(texto: string): string {
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
 }

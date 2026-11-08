@@ -216,3 +216,34 @@ class CompromissoORM(Base):
     atualizado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class FeriadoORM(Base):
+    """Feriado da cidade cadastrado pelo dono. Os nacionais vêm do calendário
+    em `finance_api.ciclo` e não ficam aqui. `muda_ciclo_1` e `muda_ciclo_2`
+    dizem se ele muda o dia de pagamento de quem paga cada ciclo."""
+
+    __tablename__ = "feriados"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nome: Mapped[str] = mapped_column(String(60))
+    data: Mapped[date] = mapped_column(Date)
+    repete_todo_ano: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    muda_ciclo_1: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    muda_ciclo_2: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CotaDoCicloORM(Base):
+    """A cota do dia de cada ciclo, guardada enquanto ele é o ciclo de hoje.
+    O Mercúrio só tem o saldo de hoje, então a cota de um ciclo passado não
+    se reconstrói depois: ela fica aqui para o gráfico e os contadores."""
+
+    __tablename__ = "cotas_dos_ciclos"
+
+    inicio: Mapped[date] = mapped_column(Date, primary_key=True)
+    fim: Mapped[date | None] = mapped_column(Date, nullable=True)
+    cota: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

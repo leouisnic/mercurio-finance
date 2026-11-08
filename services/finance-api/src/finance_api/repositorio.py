@@ -10,12 +10,13 @@ de conciliação aqui.
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 
 import pandas as pd
 from ingestion_worker.pluggy import CATEGORIA_ID_PAGAMENTO_DE_FATURA
-from sqlalchemy import Numeric, and_, case, cast, delete, func, or_, select, update
+from sqlalchemy import Numeric, and_, case, cast, delete, exists, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -37,6 +38,7 @@ from finance_api.models import (
     CategoriaORM,
     CompromissoORM,
     ContaORM,
+    CotaDoCicloORM,
     MovimentoORM,
     MovimentoTagORM,
     RecorrenciaORM,
@@ -231,6 +233,38 @@ def _para_classificar():
     )
 
 
+@dataclass(frozen=True)
+class FiltroDeGasto:
+    """Os filtros da barra: várias contas ou categorias do Mercúrio, só a tag
+    ou sem a tag. Vazio não filtra nada."""
+
+    contas: tuple[str, ...] = ()
+    categorias: tuple[str, ...] = ()
+    tag_id: int | None = None
+    sem_tag_id: int | None = None
+
+    @property
+    def vazio(self) -> bool:
+        return not (self.contas or self.categorias or self.tag_id or self.sem_tag_id)
+
+
+def _com_filtro(consulta, filtro: FiltroDeGasto | None):
+    if filtro is None:
+        return consulta
+    if filtro.contas:
+        consulta = consulta.where(MovimentoORM.conta_id.in_(filtro.contas))
+    if filtro.categorias:
+        consulta = consulta.where(MovimentoORM.categoria_propria.in_(filtro.categorias))
+    marcado = lambda tag_id: exists().where(
+        MovimentoTagORM.movimento_id == MovimentoORM.id, MovimentoTagORM.tag_id == tag_id
+    )
+    if filtro.tag_id is not None:
+        consulta = consulta.where(marcado(filtro.tag_id))
+    if filtro.sem_tag_id is not None:
+        consulta = consulta.where(~marcado(filtro.sem_tag_id))
+    return consulta
+
+
 async def listar_movimentos(
     sessao: AsyncSession,
     *,
@@ -239,6 +273,7 @@ async def listar_movimentos(
     data_fim: date | None = None,
     para_classificar: bool = False,
     tag_id: int | None = None,
+    filtro: FiltroDeGasto | None = None,
     limite: int = 100,
     offset: int = 0,
 ) -> list[MovimentoORM]:
@@ -259,7 +294,7 @@ async def listar_movimentos(
         consulta = consulta.where(MovimentoORM.data >= data_inicio)
     if data_fim is not None:
         consulta = consulta.where(MovimentoORM.data <= data_fim)
-    consulta = consulta.limit(limite).offset(offset)
+    consulta = _com_filtro(consulta, filtro).limit(limite).offset(offset)
 
     resultado = await sessao.execute(consulta)
     return list(resultado.scalars().all())
@@ -289,6 +324,8 @@ async def agregar_despesas_por_dia(
     data_inicio: date,
     data_fim: date,
     conta_id: str | None = None,
+    filtro: FiltroDeGasto | None = None,
+    sem_conta_fixa: bool = False,
 ) -> list[tuple[date, Decimal, Decimal]]:
     """Soma `valor` por `data`, só para `tipo == "despesa"`, no intervalo
     (inclusive nas duas pontas). Pagamento de fatura fica fora, ver
@@ -312,9 +349,16 @@ async def agregar_despesas_por_dia(
     )
     if conta_id is not None:
         consulta = consulta.where(MovimentoORM.conta_id == conta_id)
+    if sem_conta_fixa:
+        consulta = consulta.where(~_e_conta_fixa())
 
-    resultado = await sessao.execute(consulta)
+    resultado = await sessao.execute(_com_filtro(consulta, filtro))
     return [(linha.data, linha[1], linha[2]) for linha in resultado.all()]
+
+
+async def primeiro_movimento(sessao: AsyncSession) -> date | None:
+    """Data do movimento mais antigo: o começo do "total" dos contadores."""
+    return await sessao.scalar(select(func.min(MovimentoORM.data)))
 
 
 async def agregar_fluxo_por_conta(
@@ -322,6 +366,7 @@ async def agregar_fluxo_por_conta(
     *,
     data_inicio: date,
     data_fim: date,
+    filtro: FiltroDeGasto | None = None,
 ) -> list[tuple]:
     """Entradas e saídas de cada conta no intervalo (inclusive nas duas
     pontas), como `(conta_id, nome, apelido, tipo, entradas, saidas,
@@ -377,7 +422,7 @@ async def agregar_fluxo_por_conta(
         .order_by(ContaORM.nome)
     )
 
-    resultado = await sessao.execute(consulta)
+    resultado = await sessao.execute(_com_filtro(consulta, filtro))
     return [tuple(linha) for linha in resultado.all()]
 
 
@@ -1143,6 +1188,7 @@ async def maiores_por_dia(
     fim: date,
     conta_id: str | None = None,
     sem_conta_fixa: bool = False,
+    filtro: FiltroDeGasto | None = None,
     quantos: int = 3,
 ) -> dict[date, list[tuple[str, Decimal]]]:
     """Os maiores gastos de cada dia, para o detalhe do gráfico. Usa o mesmo
@@ -1158,7 +1204,7 @@ async def maiores_por_dia(
     if sem_conta_fixa:
         consulta = consulta.where(~_e_conta_fixa())
     por_dia: dict[date, list[tuple[str, Decimal]]] = {}
-    for dia, descricao, valor in (await sessao.execute(consulta)).all():
+    for dia, descricao, valor in (await sessao.execute(_com_filtro(consulta, filtro))).all():
         por_dia.setdefault(dia, []).append((descricao, valor))
     return {
         dia: sorted(itens, key=lambda item: -item[1])[:quantos] for dia, itens in por_dia.items()
@@ -1176,3 +1222,45 @@ async def gasto_da_categoria(sessao: AsyncSession, categoria: str, *, inicio: da
             _nao_e_pagamento_de_fatura(),
         )
     ) or Decimal(0)
+
+
+async def guardar_cota(sessao: AsyncSession, inicio: date, cota: Decimal, *, fim: date) -> None:
+    """Guarda a cota do ciclo que começa em `inicio`; a última vale."""
+    await sessao.execute(
+        pg_insert(CotaDoCicloORM)
+        .values(inicio=inicio, fim=fim, cota=cota)
+        .on_conflict_do_update(index_elements=["inicio"], set_={"fim": fim, "cota": cota, "atualizado_em": func.now()})
+    )
+    await sessao.commit()
+
+
+async def cota_guardada(sessao: AsyncSession, inicio: date, fim: date) -> Decimal | None:
+    return await sessao.scalar(
+        select(CotaDoCicloORM.cota).where(CotaDoCicloORM.inicio == inicio, CotaDoCicloORM.fim == fim)
+    )
+
+
+async def gasto_por_categoria_no_periodo(
+    sessao: AsyncSession,
+    *,
+    inicio: date,
+    fim: date,
+    filtro: FiltroDeGasto | None = None,
+    sem_conta_fixa: bool = False,
+) -> dict[str, Decimal]:
+    """Despesa por categoria do Mercúrio no intervalo, sem fatura; sem
+    categoria fica de fora, porque não dá nome ao cartão."""
+    consulta = (
+        select(MovimentoORM.categoria_propria, func.sum(MovimentoORM.valor))
+        .where(
+            MovimentoORM.tipo == "despesa",
+            MovimentoORM.data >= inicio,
+            MovimentoORM.data <= fim,
+            MovimentoORM.categoria_propria.is_not(None),
+            _nao_e_pagamento_de_fatura(),
+        )
+        .group_by(MovimentoORM.categoria_propria)
+    )
+    if sem_conta_fixa:
+        consulta = consulta.where(~_e_conta_fixa())
+    return {categoria: total for categoria, total in (await sessao.execute(_com_filtro(consulta, filtro))).all()}

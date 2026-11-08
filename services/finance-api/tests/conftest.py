@@ -7,6 +7,7 @@ from collections.abc import Callable
 
 import pandas as pd
 import pytest
+from finance_api.ciclo import definir_feriados_locais
 from finance_api.config import DATABASE_URL, TEST_DATABASE_URL, validar_banco_de_teste
 from finance_api.db import obter_sessao
 from finance_api.main import app
@@ -14,6 +15,8 @@ from finance_api.models import (
     CategoriaORM,
     CompromissoORM,
     ContaORM,
+    CotaDoCicloORM,
+    FeriadoORM,
     MovimentoORM,
     RecorrenciaORM,
     RegraDeCategoriaORM,
@@ -55,6 +58,8 @@ async def _limpar_movimentos() -> None:
         # Tudo que aponta para contas primeiro: as três tabelas têm chave
         # estrangeira para `contas`. As categorias ficam: vêm da migração.
         await sessao.execute(delete(MovimentoORM))
+        await sessao.execute(delete(FeriadoORM))
+        await sessao.execute(delete(CotaDoCicloORM))
         await sessao.execute(delete(RegraDeCategoriaORM))
         await sessao.execute(delete(TagORM))
         # As 20 das migrações têm ordem de 0 a 19; acima disso é categoria criada num teste.
@@ -63,6 +68,8 @@ async def _limpar_movimentos() -> None:
         await sessao.execute(delete(CompromissoORM))
         await sessao.execute(delete(ContaORM))
         await sessao.commit()
+    # O calendário guarda os feriados em memória; sem isto, o de um teste vazaria para o seguinte.
+    definir_feriados_locais(())
 
 
 @pytest.fixture

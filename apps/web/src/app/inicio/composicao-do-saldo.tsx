@@ -1,29 +1,37 @@
 import Link from "next/link";
 import type { ContaFixa, DinheiroLivre } from "../buscar-dinheiro-livre";
-import { comoData, diaEMes, moeda } from "../formato";
+import { comoData, diaEMes, moeda, primeiraMaiuscula } from "../formato";
 import { Info } from "../info";
 
 const PROXIMAS_VISIVEIS = 3;
 const DIA_DA_SEMANA = new Intl.DateTimeFormat("pt-BR", { weekday: "short" });
 
-type Parte = { rotulo: string; valor: number; cor: string; dica: string; semValor?: string };
+type Parte = {
+  rotulo: string;
+  valor: number;
+  cor: string;
+  dica: string;
+  semValor?: string;
+};
 
 function LinhaDaContaFixa({ conta }: { conta: ContaFixa }) {
   const data = comoData(conta.dataPrevista);
   return (
     <li className="grid grid-cols-[auto_1fr_auto] items-center gap-2.5 text-[13.5px]">
       <span className="bg-fixa-fundo text-fixa w-[42px] rounded-lg py-1 text-center text-[13px] leading-tight font-semibold">
-        {DIA_DA_SEMANA.format(data).replace(".", "")}
+        {primeiraMaiuscula(DIA_DA_SEMANA.format(data).replace(".", ""))}
         <b className="block text-[15px]">{data.getDate()}</b>
       </span>
       <span className="min-w-0">
         <span className="block truncate">{conta.nome}</span>
-        <small className={`block text-[13px] ${conta.atrasada ? "text-alerta font-semibold" : "text-tinta-3"}`}>
+        <small
+          className={`block text-[13px] ${conta.atrasada ? "text-alerta font-semibold" : "text-tinta-3"}`}
+        >
           {conta.atrasada
-            ? `atrasada, prevista para ${diaEMes(conta.dataPrevista)}`
+            ? `Atrasada, prevista para ${diaEMes(conta.dataPrevista)}`
             : conta.origem === "recorrencia"
-              ? "recorrência aprovada"
-              : "compromisso"}
+              ? "Recorrência aprovada"
+              : "Compromisso"}
         </small>
       </span>
       <span className="num text-fixa font-semibold">{moeda(conta.valor)}</span>
@@ -46,7 +54,7 @@ export function ComposicaoDoSaldo({
       valor: dinheiro.cartaoUsado,
       cor: "bg-alerta-forte",
       dica: "Já sai do livre no dia da compra.",
-      semValor: temCartao ? undefined : "sem cartão conectado",
+      semValor: temCartao ? undefined : "Sem cartão conectado",
     },
     {
       rotulo: "Contas fixas",
@@ -69,7 +77,10 @@ export function ComposicaoDoSaldo({
   ];
   // Livre negativo não ocupa espaço na barra: a barra mostra o que o saldo
   // cobre, e o valor negativo aparece na legenda.
-  const total = partes.reduce((soma, parte) => soma + Math.max(parte.valor, 0), 0);
+  const total = partes.reduce(
+    (soma, parte) => soma + Math.max(parte.valor, 0),
+    0,
+  );
   const visiveis = dinheiro.contasFixas.slice(0, PROXIMAS_VISIVEIS);
   const escondidas = dinheiro.contasFixas.slice(PROXIMAS_VISIVEIS);
 
@@ -80,9 +91,13 @@ export function ComposicaoDoSaldo({
     >
       <div className="flex items-center gap-1">
         <h2 className="text-sm font-bold">
-          Saldo nas contas: <span className="num">{moeda(dinheiro.saldoContas)}</span>
+          Saldo nas contas:{" "}
+          <span className="num">{moeda(dinheiro.saldoContas)}</span>
         </h2>
-        <Info sobre="saldo nas contas" texto="Soma das contas correntes na última sincronização." />
+        <Info
+          sobre="saldo nas contas"
+          texto="Soma das contas correntes na última sincronização."
+        />
       </div>
 
       {total > 0 && (
@@ -103,39 +118,54 @@ export function ComposicaoDoSaldo({
         {partes.map((parte) => (
           <div key={parte.rotulo} className="flex flex-col gap-0.5">
             <dt className="text-tinta-2 flex items-center gap-1 text-[13px]">
-              <i aria-hidden className={`${parte.cor} inline-block size-[11px] rounded-[3px]`} />
+              <i
+                aria-hidden
+                className={`${parte.cor} inline-block size-[11px] rounded-[3px]`}
+              />
               {parte.rotulo}
               <Info sobre={parte.rotulo.toLowerCase()} texto={parte.dica} />
             </dt>
-            <dd className={`num text-[15px] font-semibold ${parte.valor < 0 ? "text-alerta" : ""}`}>
-              {parte.semValor ?? (parte.valor < 0 ? `- ${moeda(-parte.valor)}` : moeda(parte.valor))}
+            <dd
+              className={`num text-[15px] font-semibold ${parte.valor < 0 ? "text-alerta" : ""}`}
+            >
+              {parte.semValor ??
+                (parte.valor < 0
+                  ? `- ${moeda(-parte.valor)}`
+                  : moeda(parte.valor))}
             </dd>
           </div>
         ))}
       </dl>
 
       <div className="border-borda-sutil flex flex-col gap-2 border-t pt-3">
-        <h3 className="text-sm font-bold">
-          Contas fixas até o pagamento
-        </h3>
+        <h3 className="text-sm font-bold">Contas fixas até o pagamento</h3>
         {visiveis.length === 0 ? (
           <p className="text-tinta-3 text-[13px]">
             Nenhuma prevista até {fim}.{" "}
-            <Link href="/recorrencias" className="text-marca font-semibold hover:underline">
+            <Link
+              href="/recorrencias"
+              className="text-marca font-semibold hover:underline"
+            >
               Aprovar recorrências
             </Link>
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
             {visiveis.map((conta) => (
-              <LinhaDaContaFixa key={`${conta.nome}-${conta.dataPrevista}`} conta={conta} />
+              <LinhaDaContaFixa
+                key={`${conta.nome}-${conta.dataPrevista}`}
+                conta={conta}
+              />
             ))}
           </ul>
         )}
         {escondidas.length > 0 && (
           <p className="text-tinta-2 text-[13px]">
-            + {escondidas.length} {escondidas.length === 1 ? "conta" : "contas"} somando{" "}
-            <span className="num">{moeda(escondidas.reduce((soma, conta) => soma + conta.valor, 0))}</span>
+            + {escondidas.length} {escondidas.length === 1 ? "conta" : "contas"}{" "}
+            somando{" "}
+            <span className="num">
+              {moeda(escondidas.reduce((soma, conta) => soma + conta.valor, 0))}
+            </span>
           </p>
         )}
       </div>

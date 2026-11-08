@@ -8,10 +8,16 @@ export type Pagadores = { ciclo1: string | null; ciclo2: string | null };
 
 export function lerPagadores(): Pagadores {
   const ler = (valor: string | undefined) => valor?.trim() || null;
-  return { ciclo1: ler(process.env.PAGADOR_CICLO_1), ciclo2: ler(process.env.PAGADOR_CICLO_2) };
+  return {
+    ciclo1: ler(process.env.PAGADOR_CICLO_1),
+    ciclo2: ler(process.env.PAGADOR_CICLO_2),
+  };
 }
 
-export function pagadorDoCiclo(numero: number, pagadores: Pagadores): string | null {
+export function pagadorDoCiclo(
+  numero: number,
+  pagadores: Pagadores,
+): string | null {
   return numero === 1 ? pagadores.ciclo1 : pagadores.ciclo2;
 }
 

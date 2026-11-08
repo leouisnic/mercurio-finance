@@ -4,6 +4,7 @@ import { ListChecks, Tag as IconeDeTag, X } from "lucide-react";
 import { Popover } from "radix-ui";
 import { type PointerEvent, useRef, useState, useTransition } from "react";
 import { marcarVarios } from "../acoes";
+import { useLadoDoBalao } from "../lado-do-balao";
 import { SeloDoBanco, nomeDaConta } from "../banco";
 import type { Categoria, Movimento, Tag } from "../buscar-movimentos";
 import type { Conta } from "../buscar-resumo";
@@ -209,12 +210,12 @@ export function Lista({
                 {movimento.pagamentoDeFatura !== null &&
                   movimento.pagamentoDeFatura !== "descartado" && (
                     <span className="text-tinta-3 text-[13px]">
-                      pagamento de fatura, fora das somas de gasto
+                      Pagamento de fatura, fora das somas de gasto
                     </span>
                   )}
                 {movimento.duplicadoPossivel && (
                   <span className="text-gasto text-[13px]">
-                    possível duplicidade, valor incluído no total
+                    Possível duplicidade, valor incluído no total
                   </span>
                 )}
               </span>
@@ -354,6 +355,20 @@ function BarraDeAcao({
   const [busca, setBusca] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, iniciar] = useTransition();
+  const {
+    gatilho: gatilhoBalaoDaTag,
+    lado: ladoBalaoDaTag,
+    deslocamento: deslocamentoBalaoDaTag,
+    alturaMaxima: alturaMaximaBalaoDaTag,
+    decidir: decidirBalaoDaTag,
+  } = useLadoDoBalao(460, 340);
+  const {
+    gatilho: gatilhoBalaoDaCategoria,
+    lado: ladoBalaoDaCategoria,
+    deslocamento: deslocamentoBalaoDaCategoria,
+    alturaMaxima: alturaMaximaBalaoDaCategoria,
+    decidir: decidirBalaoDaCategoria,
+  } = useLadoDoBalao(460, 340);
 
   function aplicar() {
     const marca =
@@ -383,13 +398,19 @@ function BarraDeAcao({
         <Popover.Root
           open={aberto === "tag"}
           onOpenChange={(abrir) => {
+            if (abrir) decidirBalaoDaTag();
             setValor("");
             setBusca("");
             setAberto(abrir ? "tag" : null);
           }}
         >
           <Popover.Trigger asChild>
-            <button type="button" aria-label="Marcar com tag" className={botao}>
+            <button
+              ref={gatilhoBalaoDaTag}
+              type="button"
+              aria-label="Marcar com tag"
+              className={botao}
+            >
               <IconeDeTag size={14} aria-hidden="true" />
               <span className="md:hidden">Tag</span>
               <span className="max-md:hidden">Marcar com tag</span>
@@ -397,7 +418,11 @@ function BarraDeAcao({
           </Popover.Trigger>
           <Popover.Portal>
             <Popover.Content
-              align="end"
+              align="start"
+              alignOffset={deslocamentoBalaoDaTag}
+              side={ladoBalaoDaTag}
+              style={{ maxHeight: alturaMaximaBalaoDaTag }}
+              avoidCollisions={false}
               sideOffset={8}
               collisionPadding={12}
               aria-label={`Tag para ${ids.length === 1 ? "1 movimento" : `${ids.length} movimentos`}`}
@@ -446,19 +471,28 @@ function BarraDeAcao({
           <Popover.Root
             open={aberto === "categoria"}
             onOpenChange={(abrir) => {
+              if (abrir) decidirBalaoDaCategoria();
               setValor("");
               setBusca("");
               setAberto(abrir ? "categoria" : null);
             }}
           >
             <Popover.Trigger asChild>
-              <button type="button" className={botao}>
+              <button
+                ref={gatilhoBalaoDaCategoria}
+                type="button"
+                className={botao}
+              >
                 Categoria
               </button>
             </Popover.Trigger>
             <Popover.Portal>
               <Popover.Content
-                align="end"
+                align="start"
+                alignOffset={deslocamentoBalaoDaCategoria}
+                side={ladoBalaoDaCategoria}
+                style={{ maxHeight: alturaMaximaBalaoDaCategoria }}
+                avoidCollisions={false}
                 sideOffset={8}
                 collisionPadding={12}
                 aria-label={`Categoria para ${ids.length === 1 ? "1 movimento" : `${ids.length} movimentos`}`}

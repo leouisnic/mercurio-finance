@@ -10,6 +10,7 @@ import type { CSSProperties } from "react";
 import type { Categoria, ResumoDaTag, Tag } from "../buscar-movimentos";
 import { comoData, mes, moeda, periodoPorExtenso } from "../formato";
 import { Info } from "../info";
+import { dataDeHoje } from "../hoje";
 import {
   lerPagadores,
   nomeDoCiclo as nomeDoCicloPeloPagador,
@@ -71,7 +72,7 @@ function DadosDaTag({ tag }: { tag: Tag }) {
 }
 
 /** Faixa na cor da tag no topo, valor grande, teto em frase e barra fina. */
-function CartaoDaTag({ tag }: { tag: Tag }) {
+function CartaoDaTag({ tag, hoje }: { tag: Tag; hoje: string }) {
   const teto = textoDoTeto(tag);
   return (
     <article
@@ -93,7 +94,7 @@ function CartaoDaTag({ tag }: { tag: Tag }) {
             arquivada
           </span>
         )}
-        <AcoesDaTag tag={tag} compacto />
+        <AcoesDaTag tag={tag} hoje={hoje} compacto />
       </div>
       <Link
         href={`/movimentos/tags/${tag.id}`}
@@ -110,7 +111,7 @@ function CartaoDaTag({ tag }: { tag: Tag }) {
   );
 }
 
-export function ListaDeTags({ tags }: { tags: Tag[] }) {
+export function ListaDeTags({ tags, hoje = dataDeHoje() }: { tags: Tag[]; hoje?: string }) {
   if (tags.length === 0) {
     return (
       <p className="bg-superficie border-borda text-tinta-3 rounded-2xl border px-[22px] py-6 text-[13px]">
@@ -130,7 +131,7 @@ export function ListaDeTags({ tags }: { tags: Tag[] }) {
       className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3.5"
     >
       {ordenadas.map((tag) => (
-        <CartaoDaTag key={tag.id} tag={tag} />
+        <CartaoDaTag key={tag.id} tag={tag} hoje={hoje} />
       ))}
     </section>
   );
@@ -404,7 +405,7 @@ export function TagAberta({
           </h1>
           <DadosDaTag tag={resumo} />
         </span>
-        <AcoesDaTag tag={resumo} depoisDeApagar="/movimentos/tags" />
+        <AcoesDaTag tag={resumo} hoje={hoje} depoisDeApagar="/movimentos/tags" />
       </header>
 
       <CartoesDaTag resumo={resumo} textoDoTeto={teto} />

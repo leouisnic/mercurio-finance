@@ -56,7 +56,12 @@ export type Movimento = {
 };
 
 /** `icone` é o nome no lucide-react; `cor` é só o tom, de 0 a 359. */
-export type Categoria = { id: string; nome: string; icone: string; cor: number };
+export type Categoria = {
+  id: string;
+  nome: string;
+  icone: string;
+  cor: number;
+};
 
 /** `icone` e `cor` como na categoria; `teto`, `inicio` e `fim` são opcionais. */
 export type Tag = {
@@ -84,7 +89,11 @@ export type ResumoDaTag = Tag & {
   maiores: { data: string; descricao: string; valor: number }[];
   diaMaisCaro: { data: string; total: number } | null;
   acumulado: { data: string; total: number }[];
-  categoriaPrincipal: { categoria: string; total: number; tipicoPorCiclo: number | null } | null;
+  categoriaPrincipal: {
+    categoria: string;
+    total: number;
+    tipicoPorCiclo: number | null;
+  } | null;
   impacto: {
     ciclo: CicloDoImpacto;
     gasto: number;
@@ -93,7 +102,11 @@ export type ResumoDaTag = Tag & {
     romboDaTag: number;
     sobraMedia: number;
     ciclosParaRecuperar: number | null;
-    barras: { ciclo: CicloDoImpacto; gastoSemATag: number; gastoDaTag: number }[];
+    barras: {
+      ciclo: CicloDoImpacto;
+      gastoSemATag: number;
+      gastoDaTag: number;
+    }[];
   } | null;
 };
 
@@ -101,7 +114,8 @@ export type ResumoDaTag = Tag & {
 export function levaCategoria(movimento: Movimento): boolean {
   return (
     ["despesa", "receita"].includes(movimento.tipo) &&
-    (movimento.pagamentoDeFatura === null || movimento.pagamentoDeFatura === "descartado")
+    (movimento.pagamentoDeFatura === null ||
+      movimento.pagamentoDeFatura === "descartado")
   );
 }
 
@@ -110,32 +124,68 @@ export function levaCategoria(movimento: Movimento): boolean {
  * seguinte. Quem calcula é o finance-api: a regra depende do calendário de
  * dias não úteis e não é replicada aqui.
  */
-export async function buscarCiclos(referencia?: string): Promise<Ciclos | null> {
+export async function buscarCiclos(
+  referencia?: string,
+): Promise<Ciclos | null> {
   return buscarJson<Ciclos>("/ciclos", { referencia });
+}
+
+/** Os filtros da barra, já no formato que a API lê. Vazio não filtra nada. */
+export type FiltroDaApi = {
+  contas?: string[];
+  categorias?: string[];
+  comTag?: number;
+  semTag?: number;
+};
+
+function parametrosDoFiltro(filtro: FiltroDaApi) {
+  return {
+    conta_id: filtro.contas ?? [],
+    categoria: filtro.categorias ?? [],
+    tag_id: filtro.comTag,
+    sem_tag_id: filtro.semTag,
+  };
 }
 
 export async function buscarGastosDiarios(
   inicio: string,
   fim: string,
   contaId?: string,
+  filtro: FiltroDaApi = {},
+  semContaFixa = false,
 ): Promise<GastoDiario[] | null> {
-  type Linha = { data: string; total: string; em_revisao: string; maiores?: { descricao: string; valor: string }[] };
+  type Linha = {
+    data: string;
+    total: string;
+    em_revisao: string;
+    maiores?: { descricao: string; valor: string }[];
+  };
   const corpo = await buscarJson<Linha[]>("/movimentos/gastos-diarios", {
     data_inicio: inicio,
     data_fim: fim,
-    conta_id: contaId,
+    ...parametrosDoFiltro({
+      ...filtro,
+      contas: contaId ? [contaId] : filtro.contas,
+    }),
+    sem_conta_fixa: semContaFixa || undefined,
   });
-  return corpo?.map((linha) => ({
-    data: linha.data,
-    total: paraNumero(linha.total),
-    emRevisao: paraNumero(linha.em_revisao),
-    maiores: (linha.maiores ?? []).map((item) => ({ descricao: item.descricao, valor: paraNumero(item.valor) })),
-  })) ?? null;
+  return (
+    corpo?.map((linha) => ({
+      data: linha.data,
+      total: paraNumero(linha.total),
+      emRevisao: paraNumero(linha.em_revisao),
+      maiores: (linha.maiores ?? []).map((item) => ({
+        descricao: item.descricao,
+        valor: paraNumero(item.valor),
+      })),
+    })) ?? null
+  );
 }
 
 export async function buscarFluxoPorConta(
   inicio: string,
   fim: string,
+  filtro: FiltroDaApi = {},
 ): Promise<FluxoDaConta[] | null> {
   type Linha = {
     conta_id: string;
@@ -152,6 +202,7 @@ export async function buscarFluxoPorConta(
   const corpo = await buscarJson<Linha[]>("/movimentos/por-conta", {
     data_inicio: inicio,
     data_fim: fim,
+    ...parametrosDoFiltro(filtro),
   });
   return (
     corpo?.map((linha) => ({
@@ -180,6 +231,7 @@ export async function buscarMovimentos(
   paraClassificar = false,
   hoje?: string,
   tagId?: number,
+  filtro: FiltroDaApi = {},
 ): Promise<Movimento[] | null> {
   type Linha = {
     id: number;
@@ -199,10 +251,13 @@ export async function buscarMovimentos(
   const corpo = await buscarJson<Linha[]>("/movimentos", {
     data_inicio: inicio,
     data_fim: fim,
-    conta_id: contaId,
     para_classificar: paraClassificar ? "true" : undefined,
     hoje,
-    tag_id: tagId,
+    ...parametrosDoFiltro({
+      ...filtro,
+      contas: contaId ? [contaId] : filtro.contas,
+      comTag: tagId ?? filtro.comTag,
+    }),
     limite,
     offset,
   });
@@ -273,7 +328,11 @@ type LinhaDoResumo = LinhaDeTag & {
   maiores: { data: string; descricao: string; valor: string }[];
   dia_mais_caro: { data: string; total: string } | null;
   acumulado: { data: string; total: string }[];
-  categoria_principal: { categoria: string; total: string; tipico_por_ciclo: string | null } | null;
+  categoria_principal: {
+    categoria: string;
+    total: string;
+    tipico_por_ciclo: string | null;
+  } | null;
   impacto: {
     ciclo: ValorDoCiclo;
     gasto: string;
@@ -282,11 +341,18 @@ type LinhaDoResumo = LinhaDeTag & {
     rombo_da_tag: string;
     sobra_media: string;
     ciclos_para_recuperar: number | null;
-    barras: { ciclo: ValorDoCiclo; gasto_sem_a_tag: string; gasto_da_tag: string }[];
+    barras: {
+      ciclo: ValorDoCiclo;
+      gasto_sem_a_tag: string;
+      gasto_da_tag: string;
+    }[];
   } | null;
 };
 
-export async function buscarResumoDaTag(id: number, hoje?: string): Promise<ResumoDaTag | null> {
+export async function buscarResumoDaTag(
+  id: number,
+  hoje?: string,
+): Promise<ResumoDaTag | null> {
   const corpo = await buscarJson<LinhaDoResumo>(`/tags/${id}`, { hoje });
   if (corpo === null) {
     return null;
@@ -294,14 +360,26 @@ export async function buscarResumoDaTag(id: number, hoje?: string): Promise<Resu
   const impacto = corpo.impacto;
   return {
     ...comoTag(corpo),
-    porCategoria: corpo.por_categoria.map((item) => ({ categoria: item.categoria, total: paraNumero(item.total) })),
+    porCategoria: corpo.por_categoria.map((item) => ({
+      categoria: item.categoria,
+      total: paraNumero(item.total),
+    })),
     dias: corpo.dias,
     porDia: paraNumero(corpo.por_dia),
-    maiores: corpo.maiores.map((item) => ({ ...item, valor: paraNumero(item.valor) })),
+    maiores: corpo.maiores.map((item) => ({
+      ...item,
+      valor: paraNumero(item.valor),
+    })),
     diaMaisCaro: corpo.dia_mais_caro
-      ? { data: corpo.dia_mais_caro.data, total: paraNumero(corpo.dia_mais_caro.total) }
+      ? {
+          data: corpo.dia_mais_caro.data,
+          total: paraNumero(corpo.dia_mais_caro.total),
+        }
       : null,
-    acumulado: corpo.acumulado.map((item) => ({ data: item.data, total: paraNumero(item.total) })),
+    acumulado: corpo.acumulado.map((item) => ({
+      data: item.data,
+      total: paraNumero(item.total),
+    })),
     categoriaPrincipal: corpo.categoria_principal
       ? {
           categoria: corpo.categoria_principal.categoria,
@@ -331,6 +409,97 @@ export async function buscarResumoDaTag(id: number, hoje?: string): Promise<Resu
   };
 }
 
-export async function buscarParaClassificar(hoje: string): Promise<number | null> {
-  return (await buscarJson<{ total: number }>("/movimentos/para-classificar", { hoje }))?.total ?? null;
+export async function buscarParaClassificar(
+  hoje: string,
+): Promise<number | null> {
+  return (
+    (
+      await buscarJson<{ total: number }>("/movimentos/para-classificar", {
+        hoje,
+      })
+    )?.total ?? null
+  );
+}
+
+export type Contadores = {
+  dias: number;
+  diasDeOuro: number;
+  diasDeOuroNoTotal: number;
+  sequencia: number;
+  recorde: number;
+  dentroDaCota: number | null;
+  acimaDaCota: number | null;
+  comparacao: { gasto: number; gastoAnterior: number } | null;
+  /** A cota usada: a de hoje ou, num ciclo passado, a guardada. */
+  cota: number | null;
+  /** O mesmo ciclo do mês anterior, contra o qual a comparação foi feita. */
+  cicloComparado: Ciclo | null;
+  diaUtil: {
+    parteNaoUtil: number;
+    diaMaisCaro: string | null;
+    mediaDoDiaMaisCaro: number;
+  } | null;
+  categoriaQueCresceu: { categoria: string; aumento: number } | null;
+};
+
+export async function buscarContadores(
+  inicio: string,
+  fim: string,
+  hoje: string,
+  cota: number | null,
+  filtro: FiltroDaApi,
+  semContaFixa: boolean,
+): Promise<Contadores | null> {
+  type Linha = {
+    dias: number;
+    dias_de_ouro: number;
+    dias_de_ouro_no_total: number;
+    sequencia: number;
+    recorde: number;
+    dentro_da_cota: number | null;
+    acima_da_cota: number | null;
+    comparacao: { gasto: string; gasto_anterior: string } | null;
+    cota: string | null;
+    ciclo_comparado: Ciclo | null;
+    dia_util: {
+      parte_nao_util: string;
+      dia_mais_caro: string | null;
+      media_do_dia_mais_caro: string;
+    } | null;
+    categoria_que_cresceu: { categoria: string; aumento: string } | null;
+  };
+  const linha = await buscarJson<Linha>("/contadores", {
+    data_inicio: inicio,
+    data_fim: fim,
+    hoje,
+    cota: cota ?? undefined,
+    ...parametrosDoFiltro(filtro),
+    sem_conta_fixa: semContaFixa || undefined,
+  });
+  return linha
+    ? {
+        dias: linha.dias,
+        diasDeOuro: linha.dias_de_ouro,
+        diasDeOuroNoTotal: linha.dias_de_ouro_no_total,
+        sequencia: linha.sequencia,
+        recorde: linha.recorde,
+        dentroDaCota: linha.dentro_da_cota,
+        acimaDaCota: linha.acima_da_cota,
+        comparacao: linha.comparacao && linha.ciclo_comparado ? {
+          gasto: paraNumero(linha.comparacao.gasto),
+          gastoAnterior: paraNumero(linha.comparacao.gasto_anterior),
+        } : null,
+        cota: linha.cota == null ? null : paraNumero(linha.cota),
+        cicloComparado: linha.ciclo_comparado ?? null,
+        diaUtil: linha.dia_util ? {
+          parteNaoUtil: paraNumero(linha.dia_util.parte_nao_util),
+          diaMaisCaro: linha.dia_util.dia_mais_caro,
+          mediaDoDiaMaisCaro: paraNumero(linha.dia_util.media_do_dia_mais_caro),
+        } : null,
+        categoriaQueCresceu: linha.categoria_que_cresceu ? {
+          categoria: linha.categoria_que_cresceu.categoria,
+          aumento: paraNumero(linha.categoria_que_cresceu.aumento),
+        } : null,
+      }
+    : null;
 }

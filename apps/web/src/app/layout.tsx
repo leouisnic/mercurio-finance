@@ -6,6 +6,7 @@ import { ProvedorDeDicas } from "./info";
 import { SCRIPT_DO_TEMA } from "./tema";
 import { buscarParaClassificar } from "./buscar-movimentos";
 import { dataDeHoje } from "./hoje";
+import { Suspense } from "react";
 
 const sora = localFont({
   src: "./fonts/Sora-Variable.ttf",
@@ -16,7 +17,8 @@ const sora = localFont({
 
 export const metadata: Metadata = {
   title: "Mercúrio",
-  description: "Quanto dá para gastar até o próximo pagamento, com as contas conectadas por Open Finance.",
+  description:
+    "Quanto dá para gastar até o próximo pagamento, com as contas conectadas por Open Finance.",
   manifest: "/manifest.webmanifest",
 };
 
@@ -26,14 +28,22 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
 
   return (
     // O script do tema muda data-tema antes da hidratação, de propósito.
-    <html lang="pt-BR" className={`${sora.variable} h-full antialiased`} suppressHydrationWarning>
+    <html
+      lang="pt-BR"
+      className={`${sora.variable} h-full antialiased`}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_DO_TEMA }} />
       </head>
       <body className="bg-fundo text-tinta flex min-h-full flex-col font-sans md:flex-row">
         <ProvedorDeDicas>
-          <BarraLateral paraClassificar={paraClassificar} />
-          <div className="flex min-w-0 flex-1 flex-col gap-5 px-4 pt-6 pb-24 sm:px-9 md:py-7">{children}</div>
+          <Suspense>
+            <BarraLateral paraClassificar={paraClassificar} />
+          </Suspense>
+          <div className="flex min-w-0 flex-1 flex-col gap-5 px-4 pt-6 pb-24 sm:px-9 md:py-7">
+            {children}
+          </div>
         </ProvedorDeDicas>
       </body>
     </html>

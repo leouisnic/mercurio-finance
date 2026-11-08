@@ -12,7 +12,8 @@ export const CATEGORIAS = [
 
 export type Categoria = (typeof CATEGORIAS)[number];
 /** `aprovada` é conta fixa; `rejeitada` é "não é recorrência". */
-export type StatusRecorrencia = "pendente" | "aprovada" | "parcelamento" | "encerrada" | "rejeitada";
+export type StatusRecorrencia =
+  "pendente" | "aprovada" | "parcelamento" | "encerrada" | "rejeitada";
 
 export const ROTULO_DA_CATEGORIA: Record<Categoria, string> = {
   saude: "Saúde",

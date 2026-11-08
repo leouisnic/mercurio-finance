@@ -10,7 +10,9 @@ const GERADOS: Record<string, string> = JSON.parse(
 );
 
 function hash(relativo: string): string {
-  return createHash("sha256").update(readFileSync(path.join(WEB, relativo))).digest("hex");
+  return createHash("sha256")
+    .update(readFileSync(path.join(WEB, relativo)))
+    .digest("hex");
 }
 
 test("cada arquivo de marca é o que o script gerou", () => {
@@ -22,8 +24,12 @@ test("cada arquivo de marca é o que o script gerou", () => {
 });
 
 test("não existe arquivo de marca fora do que o script gera", () => {
-  const publicos = readdirSync(path.join(WEB, "public/marca")).map((nome) => `public/marca/${nome}`);
-  const doApp = ["favicon.ico", "icon.png", "apple-icon.png"].map((nome) => `src/app/${nome}`);
+  const publicos = readdirSync(path.join(WEB, "public/marca")).map(
+    (nome) => `public/marca/${nome}`,
+  );
+  const doApp = ["favicon.ico", "icon.png", "apple-icon.png"].map(
+    (nome) => `src/app/${nome}`,
+  );
 
   for (const relativo of [...publicos, ...doApp]) {
     expect(Object.keys(GERADOS), relativo).toContain(relativo);

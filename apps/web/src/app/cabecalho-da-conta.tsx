@@ -80,7 +80,10 @@ export function CabecalhoDaConta({
               {/* Nome longo trunca em vez de quebrar o card em duas linhas: a
                   Pluggy devolve coisas como "Nu Pagamentos S.A. - Instituição
                   de Pagamento (Conta Pré-paga)". */}
-              <span className="min-w-0 truncate text-base font-semibold" title={conta.nome}>
+              <span
+                className="min-w-0 truncate text-base font-semibold"
+                title={conta.nome}
+              >
                 {nome}
               </span>
               <button
@@ -95,7 +98,9 @@ export function CabecalhoDaConta({
                 <Lapis />
               </button>
             </span>
-            <span className="text-tinta-2 truncate text-[13px]">{subtitulo}</span>
+            <span className="text-tinta-2 truncate text-[13px]">
+              {subtitulo}
+            </span>
           </span>
         </div>
         {direita}

@@ -140,6 +140,31 @@ Os ciclos são contínuos e não se sobrepõem. O calendário considera fins de
 semana, feriados nacionais aplicáveis e dias nacionais sem expediente bancário
 definidos para a regra.
 
+Feriados da cidade cadastrados pelo dono podem mudar o dia útil de cada pagador
+separadamente. Sem pagador marcado, só sinalizam o dia. Repetição anual vale a
+partir do ano cadastrado, inclusive. Alterar feriado pode mudar ciclos passados.
+
+## Análise por período
+
+Filtros de período, contas, categorias e tag moram no endereço e acompanham a
+navegação entre Início e Movimentos. No Início afetam só gráfico e contadores;
+saldo, dinheiro livre e cota de hoje continuam olhando todas as contas.
+
+A cota observada do ciclo atual fica guardada pela data inicial do ciclo; a
+observação mais recente substitui a anterior. Não reconstruir cotas históricas
+com saldo atual nem gravar uma simulação com data antiga como observação real.
+O fim do ciclo observado também fica registrado. Reutilizar uma cota exige que
+o intervalo completo corresponda ao ciclo consultado. Observações antigas com
+fim desconhecido ficam preservadas e aguardam uma observação válida.
+Contar dias dentro da cota exige cota positiva, ciclo inteiro e nenhum filtro
+de gasto. Sem cota guardada não se inventa uma.
+
+A comparação dos contadores usa o mesmo número de ciclo do mês anterior até
+a mesma posição, limitada ao fim daquele ciclo. A média diária inclui zeros
+dos dias passados. A projeção soma o gasto observado ao ritmo dos sete últimos
+dias passados multiplicado pelos dias restantes. Sem dias passados ou restantes,
+não há projeção. Todas essas análises mantêm a exclusão de pagamento de fatura.
+
 ## Operações sensíveis
 
 Pagamentos, transferências, emissão ou cancelamento de notas e qualquer ação

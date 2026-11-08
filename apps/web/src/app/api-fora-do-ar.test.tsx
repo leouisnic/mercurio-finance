@@ -16,6 +16,8 @@ const buscas = vi.hoisted(() => ({
   buscarDinheiroLivre: vi.fn(),
   buscarCategorias: vi.fn(),
   buscarParaClassificar: vi.fn(),
+  buscarContadores: vi.fn(),
+  buscarTags: vi.fn(),
 }));
 
 vi.mock("./buscar-movimentos", async (original) => ({
@@ -23,7 +25,13 @@ vi.mock("./buscar-movimentos", async (original) => ({
   ...buscas,
 }));
 vi.mock("./buscar-resumo", () => ({ buscarResumo: buscas.buscarResumo }));
-vi.mock("./buscar-dinheiro-livre", () => ({ buscarDinheiroLivre: buscas.buscarDinheiroLivre }));
+vi.mock("./buscar-feriados", async (original) => ({
+  ...(await original<typeof import("./buscar-feriados")>()),
+  buscarDiasNaoUteis: vi.fn().mockResolvedValue(null),
+}));
+vi.mock("./buscar-dinheiro-livre", () => ({
+  buscarDinheiroLivre: buscas.buscarDinheiroLivre,
+}));
 vi.mock("./buscar-recorrencias", async (original) => ({
   ...(await original<typeof import("./buscar-recorrencias")>()),
   buscarRecorrencias: buscas.buscarRecorrencias,
@@ -65,7 +73,6 @@ const CONTA: Conta = {
   vencimento: null,
 };
 
-
 beforeEach(() => {
   for (const busca of Object.values(buscas)) {
     busca.mockReset();
@@ -80,17 +87,26 @@ function semZero() {
 test("Movimentos com a API falhando nos dados do ciclo avisa e não mostra zero", async () => {
   buscas.buscarCiclos.mockResolvedValue(CICLOS);
 
-  render(await Movimentos({ searchParams: Promise.resolve({}), params: Promise.resolve({}) }));
+  render(
+    await Movimentos({
+      searchParams: Promise.resolve({}),
+      params: Promise.resolve({}),
+    }),
+  );
 
   const faixa = screen.getByRole("alert");
   expect(faixa.textContent).toMatch(/gasto por dia/);
   expect(faixa.textContent).toMatch(/comparativo com o ciclo anterior/);
   expect(faixa.textContent).toMatch(/nada aqui é zero/);
-  expect(within(screen.getByRole("region", { name: "Gasto por dia" })).getByText("Indisponível"));
   expect(
-    within(screen.getByRole("region", { name: "Comparativo com o ciclo anterior" })).getByText(
+    within(screen.getByRole("region", { name: "Gasto por dia" })).getByText(
       "Indisponível",
     ),
+  );
+  expect(
+    within(
+      screen.getByRole("region", { name: "Comparativo com o ciclo anterior" }),
+    ).getByText("Indisponível"),
   );
   expect(screen.queryByText("Nenhum movimento neste recorte.")).toBeNull();
   expect(screen.queryByText("Nenhuma saída neste recorte.")).toBeNull();
@@ -100,15 +116,22 @@ test("Movimentos com a API falhando nos dados do ciclo avisa e não mostra zero"
 test("Movimentos: só o ciclo anterior falhando já derruba o comparativo", async () => {
   buscas.buscarCiclos.mockResolvedValue(CICLOS);
   buscas.buscarGastosDiarios.mockImplementation(async (inicio: string) =>
-    inicio === CICLOS.atual.inicio ? [{ data: "2026-08-06", total: 50, emRevisao: 0 }] : null,
+    inicio === CICLOS.atual.inicio
+      ? [{ data: "2026-08-06", total: 50, emRevisao: 0 }]
+      : null,
   );
 
-  render(await Movimentos({ searchParams: Promise.resolve({}), params: Promise.resolve({}) }));
+  render(
+    await Movimentos({
+      searchParams: Promise.resolve({}),
+      params: Promise.resolve({}),
+    }),
+  );
 
   expect(
-    within(screen.getByRole("region", { name: "Comparativo com o ciclo anterior" })).getByText(
-      "Indisponível",
-    ),
+    within(
+      screen.getByRole("region", { name: "Comparativo com o ciclo anterior" }),
+    ).getByText("Indisponível"),
   );
   // Aqui R$ 0,00 aparece de verdade: os dias sem gasto do ciclo que carregou.
   expect(screen.queryByText(/^Ciclo anterior:/)).toBeNull();
@@ -134,37 +157,69 @@ const DINHEIRO = {
 };
 
 test("Início sem o fluxo do ciclo avisa em vez de esconder entradas e saídas", async () => {
-  buscas.buscarResumo.mockResolvedValue({ atualizadoEm: null, contas: [CONTA] });
+  buscas.buscarResumo.mockResolvedValue({
+    atualizadoEm: null,
+    contas: [CONTA],
+  });
   buscas.buscarDinheiroLivre.mockResolvedValue(DINHEIRO);
 
   // Na aplicação o provedor dos balões fica no layout, que o teste não monta.
-  render(<ProvedorDeDicas>{await Inicio()}</ProvedorDeDicas>);
+  render(
+    <ProvedorDeDicas>
+      {await Inicio({
+        searchParams: Promise.resolve({}),
+        params: Promise.resolve({}),
+      })}
+    </ProvedorDeDicas>,
+  );
 
-  expect(screen.getByRole("alert").textContent).toMatch(/entradas e saídas do ciclo/);
+  expect(screen.getByRole("alert").textContent).toMatch(
+    /entradas e saídas do ciclo/,
+  );
   expect(screen.getByText("Indisponível")).toBeDefined();
 });
 
 test("Início sem o dinheiro livre mostra indisponível, nunca zero", async () => {
-  buscas.buscarResumo.mockResolvedValue({ atualizadoEm: null, contas: [CONTA] });
+  buscas.buscarResumo.mockResolvedValue({
+    atualizadoEm: null,
+    contas: [CONTA],
+  });
 
-  render(await Inicio());
+  render(
+    await Inicio({
+      searchParams: Promise.resolve({}),
+      params: Promise.resolve({}),
+    }),
+  );
 
   expect(screen.getByRole("alert").textContent).toMatch(/dinheiro livre/);
   expect(
-    within(screen.getByRole("region", { name: "Hoje dá para gastar" })).getByText("Indisponível"),
+    within(
+      screen.getByRole("region", { name: "Hoje dá para gastar" }),
+    ).getByText("Indisponível"),
   ).toBeDefined();
   semZero();
 });
 
 test("com a API toda fora, as três telas mostram a faixa e nenhum zero", async () => {
   for (const tela of [
-    await Inicio(),
-    await Movimentos({ searchParams: Promise.resolve({}), params: Promise.resolve({}) }),
+    await Inicio({
+      searchParams: Promise.resolve({}),
+      params: Promise.resolve({}),
+    }),
+    await Movimentos({
+      searchParams: Promise.resolve({}),
+      params: Promise.resolve({}),
+    }),
     await Recorrencias(),
   ]) {
     const { unmount } = render(<ProvedorDeDicas>{tela}</ProvedorDeDicas>);
-    expect(screen.getByRole("alert").textContent).toMatch(/A API não respondeu/);
-    expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeDefined();
+    expect(screen.getByRole("alert").textContent).toMatch(
+      /A API não respondeu/,
+    );
+    expect(
+      screen.getByRole("button", { name: "Tentar de novo" }),
+    ).toBeDefined();
     semZero();
     unmount();
   }

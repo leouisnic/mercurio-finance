@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeft, Plus, Search, Tag as IconeDeTag, X } from "lucide-react";
+import { Popover } from "radix-ui";
 import {
   type CSSProperties,
   type FormEvent,
@@ -10,6 +11,7 @@ import {
   useTransition,
 } from "react";
 import { classificarMovimento, criarCategoria, definirTags } from "../acoes";
+import { useLadoDoBalao } from "../lado-do-balao";
 import {
   type Categoria,
   type Movimento,
@@ -23,8 +25,10 @@ import {
   IconeDaCategoria,
 } from "./icones";
 
-// Altura máxima do balão no computador, a mesma do `md:max-h` do painel.
-const ALTURA_DO_PAINEL = 560;
+// O balão cabe no espaço que sobra na tela, para cima ou para baixo, e rola
+// por dentro, como os de marcar vários.
+const BALAO =
+  "bg-superficie border-borda text-tinta z-50 flex max-h-[min(560px,var(--radix-popover-content-available-height))] w-[380px] max-w-[calc(100vw-24px)] flex-col gap-3 rounded-2xl border p-4 shadow-xl";
 
 const semAcento = (texto: string) =>
   texto
@@ -34,10 +38,9 @@ const semAcento = (texto: string) =>
     .trim();
 
 /**
- * A categoria e as tags do movimento, que abrem a escolha ao tocar. No
- * computador a escolha aparece como balão sob a categoria; no celular, como
- * folha que sobe de baixo. Só a lista rola: busca, tags e "vale para" ficam
- * sempre à vista.
+ * A categoria e as tags do movimento, que abrem a escolha ao tocar, num
+ * balão preso à categoria que nunca passa da borda da tela. Só a lista rola:
+ * busca, tags e "vale para" ficam sempre à vista.
  */
 export function CategoriaDoMovimento({
   movimento,
@@ -49,7 +52,13 @@ export function CategoriaDoMovimento({
   tagsExistentes?: string[];
 }) {
   const [aberto, setAberto] = useState(false);
-  const [paraCima, setParaCima] = useState(false);
+  const {
+    gatilho: gatilhoBalao,
+    lado: ladoBalao,
+    deslocamento: deslocamentoBalao,
+    alturaMaxima: alturaMaximaBalao,
+    decidir: decidirBalao,
+  } = useLadoDoBalao(560, 380);
 
   if (!levaCategoria(movimento)) {
     return null;
@@ -66,42 +75,53 @@ export function CategoriaDoMovimento({
       : "Para classificar");
 
   return (
-    <span className="relative inline-flex min-w-0">
-      <button
-        type="button"
-        aria-haspopup="dialog"
-        aria-expanded={aberto}
-        aria-label={`Categoria de ${nome}: ${rotulo}. Alterar`}
-        disabled={categorias === null}
-        onClick={(evento) => {
-          // Sem espaço embaixo, o balão abre para cima: aberto para baixo no
-          // fim da lista, ele esticava a página além da tela.
-          const caixa = evento.currentTarget.getBoundingClientRect();
-          const embaixo = window.innerHeight - caixa.bottom;
-          setParaCima(embaixo < ALTURA_DO_PAINEL && caixa.top > embaixo);
-          setAberto(!aberto);
-        }}
-        className={`hover:border-marca inline-flex max-w-full cursor-pointer items-center gap-1.5 truncate rounded-full border text-[12.5px] font-semibold whitespace-nowrap transition-colors ${
-          atual
-            ? "border-borda bg-superficie-2 text-tinta-2 py-0.5 pr-2.5 pl-0.5"
-            : "border-aviso-borda bg-aviso-fundo text-aviso px-2.5 py-1"
-        } ${aberto ? "border-marca" : ""}`}
-      >
-        {atual && <BolaDaCategoria categoria={atual} tamanho={22} />}
-        <span className="truncate">{rotulo}</span>
-      </button>
-
-      {aberto && categorias && (
-        <Painel
-          movimento={movimento}
-          nome={nome}
-          categorias={categorias}
-          tagsExistentes={tagsExistentes}
-          paraCima={paraCima}
-          fechar={() => setAberto(false)}
-        />
+    <Popover.Root
+      open={aberto}
+      onOpenChange={(abrir) => {
+        if (abrir) decidirBalao();
+        setAberto(abrir);
+      }}
+    >
+      <Popover.Trigger asChild>
+        <button
+          ref={gatilhoBalao}
+          type="button"
+          aria-label={`Categoria de ${nome}: ${rotulo}. Alterar`}
+          disabled={categorias === null}
+          className={`hover:border-marca inline-flex max-w-full cursor-pointer items-center gap-1.5 truncate rounded-full border text-[12.5px] font-semibold whitespace-nowrap transition-colors ${
+            atual
+              ? "border-borda bg-superficie-2 text-tinta-2 py-0.5 pr-2.5 pl-0.5"
+              : "border-aviso-borda bg-aviso-fundo text-aviso px-2.5 py-1"
+          } ${aberto ? "border-marca" : ""}`}
+        >
+          {atual && <BolaDaCategoria categoria={atual} tamanho={22} />}
+          <span className="truncate">{rotulo}</span>
+        </button>
+      </Popover.Trigger>
+      {categorias && (
+        <Popover.Portal>
+          <Popover.Content
+            align="start"
+            alignOffset={deslocamentoBalao}
+            side={ladoBalao}
+            style={{ maxHeight: alturaMaximaBalao }}
+            avoidCollisions={false}
+            sideOffset={8}
+            collisionPadding={12}
+            aria-label={`Categoria de ${nome}`}
+            className={BALAO}
+          >
+            <Painel
+              movimento={movimento}
+              nome={nome}
+              categorias={categorias}
+              tagsExistentes={tagsExistentes}
+              fechar={() => setAberto(false)}
+            />
+          </Popover.Content>
+        </Popover.Portal>
       )}
-    </span>
+    </Popover.Root>
   );
 }
 
@@ -110,14 +130,12 @@ function Painel({
   nome,
   categorias,
   tagsExistentes,
-  paraCima,
   fechar,
 }: {
   movimento: Movimento;
   nome: string;
   categorias: Categoria[];
   tagsExistentes: string[];
-  paraCima: boolean;
   fechar: () => void;
 }) {
   const [escolhida, setEscolhida] = useState(movimento.categoriaPropria ?? "");
@@ -163,110 +181,86 @@ function Painel({
   }
 
   return (
-    <>
-      <div
-        aria-hidden="true"
-        onClick={fechar}
-        className="bg-tinta/30 fixed inset-0 z-40 md:bg-transparent"
-      />
-      <div
-        ref={painel}
-        role="dialog"
-        aria-label={`Categoria de ${nome}`}
-        onKeyDown={(evento) => evento.key === "Escape" && fechar()}
-        className={`bg-superficie border-borda fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col gap-3 rounded-t-2xl border p-4 shadow-xl md:absolute md:inset-x-auto md:right-0 md:max-h-[560px] md:w-[380px] md:rounded-2xl ${
-          paraCima
-            ? "md:bottom-full md:mb-2"
-            : "md:top-full md:bottom-auto md:mt-2"
-        }`}
-      >
-        <span
-          aria-hidden="true"
-          className="bg-borda h-1 w-10 shrink-0 self-center rounded-full md:hidden"
+    <div ref={painel} className="flex min-h-0 flex-1 flex-col gap-3">
+      {criando ? (
+        <NovaCategoria
+          nomeInicial={busca}
+          voltar={() => setCriando(false)}
+          criada={(id) => {
+            setEscolhida(id);
+            setBusca("");
+            setCriando(false);
+          }}
         />
-        {criando ? (
-          <NovaCategoria
-            nomeInicial={busca}
-            voltar={() => setCriando(false)}
-            criada={(id) => {
-              setEscolhida(id);
-              setBusca("");
-              setCriando(false);
-            }}
+      ) : (
+        <form onSubmit={salvar} className="flex min-h-0 flex-1 flex-col gap-3">
+          <strong className="text-[14px]">Categoria de {nome}</strong>
+          <EscolhaDeCategoria
+            categorias={categorias}
+            usadas={usadas}
+            para={nome}
+            busca={busca}
+            buscar={setBusca}
+            escolhida={escolhida}
+            escolher={setEscolhida}
+            criar={() => setCriando(true)}
           />
-        ) : (
-          <form
-            onSubmit={salvar}
-            className="flex min-h-0 flex-1 flex-col gap-3"
-          >
-            <strong className="text-[14px]">Categoria de {nome}</strong>
-            <EscolhaDeCategoria
-              categorias={categorias}
-              usadas={usadas}
-              para={nome}
-              busca={busca}
-              buscar={setBusca}
-              escolhida={escolhida}
-              escolher={setEscolhida}
-              criar={() => setCriando(true)}
-            />
 
-            <CampoDeTags
-              tags={tags}
-              mudar={setTags}
-              existentes={tagsExistentes}
-            />
+          <CampoDeTags
+            tags={tags}
+            mudar={setTags}
+            existentes={tagsExistentes}
+          />
 
-            {erro && (
-              <p
-                role="alert"
-                className="bg-alerta-fundo text-alerta rounded-[9px] px-3 py-2 text-[13px]"
-              >
-                {erro}
-              </p>
-            )}
+          {erro && (
+            <p
+              role="alert"
+              className="bg-alerta-fundo text-alerta rounded-[9px] px-3 py-2 text-[13px]"
+            >
+              {erro}
+            </p>
+          )}
 
-            <div className="border-borda-sutil flex items-end gap-2 border-t pt-3">
-              <fieldset className="flex min-w-0 flex-1 flex-col gap-1">
-                <legend className="text-tinta-3 mb-1 text-[12px]">
-                  Vale para
-                </legend>
-                <div className="border-borda grid grid-cols-[1.4fr_1fr] rounded-[10px] border p-[3px] text-[12.5px]">
-                  {(
-                    [
-                      ["todos", `Todos de ${nome}`],
-                      ["este", "Só este"],
-                    ] as const
-                  ).map(([valor, texto]) => (
-                    <label
-                      key={valor}
-                      className="text-tinta-2 hover:bg-superficie-2 has-checked:bg-marca has-checked:text-sobre-cor has-focus-visible:outline-marca cursor-pointer truncate rounded-lg px-1.5 py-1.5 text-center has-checked:font-bold has-focus-visible:outline-2"
-                    >
-                      <input
-                        type="radio"
-                        name="alcance"
-                        value={valor}
-                        checked={alcance === valor}
-                        onChange={() => setAlcance(valor)}
-                        className="sr-only"
-                      />
-                      {texto}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-              <button
-                type="submit"
-                disabled={enviando || !escolhida}
-                className="bg-marca text-sobre-cor hover:bg-marca-escura rounded-[10px] px-3.5 py-2.5 text-[13px] font-bold disabled:opacity-60"
-              >
-                {enviando ? "Salvando" : "Salvar"}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </>
+          <div className="border-borda-sutil flex items-end gap-2 border-t pt-3">
+            <fieldset className="flex min-w-0 flex-1 flex-col gap-1">
+              <legend className="text-tinta-3 mb-1 text-[12px]">
+                Vale para
+              </legend>
+              <div className="border-borda grid grid-cols-[1.4fr_1fr] rounded-[10px] border p-[3px] text-[12.5px]">
+                {(
+                  [
+                    ["todos", `Todos de ${nome}`],
+                    ["este", "Só este"],
+                  ] as const
+                ).map(([valor, texto]) => (
+                  <label
+                    key={valor}
+                    className="text-tinta-2 hover:bg-superficie-2 has-checked:bg-marca has-checked:text-sobre-cor has-focus-visible:outline-marca cursor-pointer truncate rounded-lg px-1.5 py-1.5 text-center has-checked:font-bold has-focus-visible:outline-2"
+                  >
+                    <input
+                      type="radio"
+                      name="alcance"
+                      value={valor}
+                      checked={alcance === valor}
+                      onChange={() => setAlcance(valor)}
+                      className="sr-only"
+                    />
+                    {texto}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <button
+              type="submit"
+              disabled={enviando || !escolhida}
+              className="bg-marca text-sobre-cor hover:bg-marca-escura rounded-[10px] px-3.5 py-2.5 text-[13px] font-bold disabled:opacity-60"
+            >
+              {enviando ? "Salvando" : "Salvar"}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
   );
 }
 
@@ -467,7 +461,7 @@ function CampoDeTags({
               );
             }
           }}
-          placeholder="adicionar tag"
+          placeholder="Adicionar tag"
           aria-label="Adicionar tag"
           maxLength={60}
           className="text-tinta min-w-[110px] flex-1 bg-transparent px-1 py-0.5 text-[13px] outline-none"

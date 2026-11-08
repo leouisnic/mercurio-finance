@@ -127,9 +127,17 @@ export const ICONES_PARA_CRIAR = [
 ];
 
 /** Só o tom: claridade e croma vêm de `--categoria-fundo` e `--categoria-icone`. */
-export const CORES_PARA_CRIAR = [45, 75, 140, 160, 200, 230, 265, 290, 320, 350];
+export const CORES_PARA_CRIAR = [
+  45, 75, 140, 160, 200, 230, 265, 290, 320, 350,
+];
 
-export function IconeDaCategoria({ nome, tamanho }: { nome: string; tamanho: number }) {
+export function IconeDaCategoria({
+  nome,
+  tamanho,
+}: {
+  nome: string;
+  tamanho: number;
+}) {
   const Icone = ICONES[nome] ?? Ellipsis;
   return <Icone size={tamanho} strokeWidth={2} aria-hidden="true" />;
 }
@@ -145,12 +153,36 @@ export function BolaDaCategoria({
     <span
       aria-hidden="true"
       className="categoria-bola inline-grid shrink-0 place-items-center rounded-full"
-      style={{ "--tom": categoria.cor, width: tamanho, height: tamanho } as CSSProperties}
+      style={
+        {
+          "--tom": categoria.cor,
+          width: tamanho,
+          height: tamanho,
+        } as CSSProperties
+      }
     >
-      {categoria.icone && <IconeDaCategoria nome={categoria.icone} tamanho={Math.round(tamanho * 0.55)} />}
+      {categoria.icone && (
+        <IconeDaCategoria
+          nome={categoria.icone}
+          tamanho={Math.round(tamanho * 0.55)}
+        />
+      )}
     </span>
   );
 }
 
 /** Os ícones que uma tag pode ter: viagem, obra, festa, família, esporte. */
-export const ICONES_DE_TAG = ["Plane", "Hammer", "Gift", "PartyPopper", "Baby", "Dumbbell", "Car", "House", "Heart", "Briefcase", "Ticket", "Tag"];
+export const ICONES_DE_TAG = [
+  "Plane",
+  "Hammer",
+  "Gift",
+  "PartyPopper",
+  "Baby",
+  "Dumbbell",
+  "Car",
+  "House",
+  "Heart",
+  "Briefcase",
+  "Ticket",
+  "Tag",
+];

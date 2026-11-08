@@ -52,7 +52,10 @@ const FLUXOS: FluxoDaConta[] = [
   },
 ];
 
-function montar(contas: Conta[] = [CORRENTE, CARTAO], fluxos: FluxoDaConta[] = FLUXOS) {
+function montar(
+  contas: Conta[] = [CORRENTE, CARTAO],
+  fluxos: FluxoDaConta[] = FLUXOS,
+) {
   render(
     <ProvedorDeDicas>
       <ResumoPainel contas={contas} fluxos={fluxos} hoje={HOJE} />
@@ -114,8 +117,9 @@ test("conta corrente sem movimento no ciclo não mostra entradas e saídas", () 
   montar([CORRENTE], []);
 
   expect(screen.getByText("Entrou")).toBeDefined();
-  expect(screen.getAllByText("R$ 0,00")).toHaveLength(2);
-  expect(screen.getByText("+ R$ 0,00")).toBeDefined();
+  // Entrou, saiu e a variação: zero não leva sinal.
+  expect(screen.getAllByText("R$ 0,00")).toHaveLength(3);
+  expect(screen.queryByText("+ R$ 0,00")).toBeNull();
 });
 
 test("vencimento já passado vira dia do mês, não uma data mentirosa", () => {
@@ -136,7 +140,12 @@ test("vencimento futuro aparece com data cheia", () => {
 
 test("nome comprido da Pluggy vira o nome do banco", () => {
   montar(
-    [{ ...CORRENTE, nome: "Nu Pagamentos S.A. - Instituição de Pagamento (Conta Pré-paga)" }],
+    [
+      {
+        ...CORRENTE,
+        nome: "Nu Pagamentos S.A. - Instituição de Pagamento (Conta Pré-paga)",
+      },
+    ],
     [],
   );
 

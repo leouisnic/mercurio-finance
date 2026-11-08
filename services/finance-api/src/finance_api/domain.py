@@ -404,6 +404,41 @@ class GastoDoDetalhe(BaseModel):
     valor: Decimal
 
 
+class ComparacaoOut(BaseModel):
+    """Gasto do ciclo até hoje e o do ciclo anterior no mesmo dia do ciclo."""
+
+    gasto: Decimal
+    gasto_anterior: Decimal
+
+
+class DiaUtilOut(BaseModel):
+    parte_nao_util: Decimal
+    dia_mais_caro: str | None
+    media_do_dia_mais_caro: Decimal
+
+
+class CategoriaQueCresceuOut(BaseModel):
+    categoria: str
+    aumento: Decimal
+
+
+class ContadoresOut(BaseModel):
+    # A cota usada: a que o painel mandou ou, num ciclo passado, a guardada.
+    cota: Decimal | None
+    # O ciclo da comparação: o mesmo ciclo do mês anterior (ciclo 1 com ciclo 1).
+    ciclo_comparado: CicloOut | None
+    dia_util: DiaUtilOut | None
+    categoria_que_cresceu: CategoriaQueCresceuOut | None
+    dias: int
+    dias_de_ouro: int
+    dias_de_ouro_no_total: int
+    sequencia: int
+    recorde: int
+    dentro_da_cota: int | None
+    acima_da_cota: int | None
+    comparacao: ComparacaoOut | None
+
+
 class GastoDiario(BaseModel):
     """Soma das despesas (`tipo == despesa`) de um dia. Pagamento de fatura
     fica fora, para não contar o mesmo gasto duas vezes."""

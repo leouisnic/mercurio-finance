@@ -1,34 +1,38 @@
 import {
   buscarCategorias,
   buscarCiclos,
+  buscarContadores,
   buscarFluxoPorConta,
   buscarGastosDiarios,
   buscarMovimentos,
   buscarParaClassificar,
   buscarTags,
   type Ciclo,
+  type FiltroDaApi,
 } from "../buscar-movimentos";
 import Link from "next/link";
+import { BarraDeFiltros } from "../barra-de-filtros";
+import { buscarDiasNaoUteis } from "../buscar-feriados";
 import { buscarDinheiroLivre } from "../buscar-dinheiro-livre";
 import { buscarResumo } from "../buscar-resumo";
-import { diaEMes } from "../formato";
+import { CartoesDeContadores } from "../contadores";
+import {
+  PERIODOS_DE_CICLO,
+  datasDoCiclo,
+  enderecoDoFiltro,
+  filtroDaApi,
+  intervaloDoPeriodo,
+  lerFiltroDaBarra,
+  temFiltroDeGasto,
+} from "../filtro-da-barra";
 import { dataDeHoje } from "../hoje";
 import { BlocoIndisponivel, FaixaDeFalha, FalhaTotal } from "../indisponivel";
 import { CicloContraAnterior, GastoPorConta } from "./comparativo";
-import { Filtros } from "./filtros";
 import { GraficoGastoDiario } from "./grafico-gasto-diario";
 import { Lista } from "./lista";
 import { redirect } from "next/navigation";
 import { AbasDeMovimentos } from "./abas";
-
-const CICLOS = ["anterior", "atual", "seguinte"] as const;
-type ChaveDeCiclo = (typeof CICLOS)[number];
-
-function chaveValida(valor: string | undefined): ChaveDeCiclo {
-  return CICLOS.includes(valor as ChaveDeCiclo)
-    ? (valor as ChaveDeCiclo)
-    : "atual";
-}
+import { lerPagadores, nomeDoCiclo } from "../pagadores";
 
 function umParametro(valor: string | string[] | undefined): string | undefined {
   return Array.isArray(valor) ? valor[0] : valor;
@@ -42,9 +46,14 @@ function paginaValida(valor: string | undefined): number {
 /** `null` quando a API falhou: ciclo sem dado não é ciclo sem gasto. */
 async function somaDoCiclo(
   ciclo: Ciclo,
-  contaId: string | undefined,
+  filtro: FiltroDaApi,
 ): Promise<number | null> {
-  const gastos = await buscarGastosDiarios(ciclo.inicio, ciclo.fim, contaId);
+  const gastos = await buscarGastosDiarios(
+    ciclo.inicio,
+    ciclo.fim,
+    undefined,
+    filtro,
+  );
   return gastos === null
     ? null
     : gastos.reduce((soma, gasto) => soma + gasto.total, 0);
@@ -59,14 +68,13 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
   if (umParametro(parametros.tag)) {
     redirect(`/movimentos/tags?tag=${umParametro(parametros.tag)}`);
   }
-  const escolhido = chaveValida(umParametro(parametros.ciclo));
-  const contaEscolhida = umParametro(parametros.conta);
-  const referencia = umParametro(parametros.referencia);
+  const filtro = lerFiltroDaBarra(parametros);
+  const daApi = filtroDaApi(filtro);
   const pagina = paginaValida(umParametro(parametros.pagina));
   const limite = 50;
 
   const [ciclos, resumo] = await Promise.all([
-    buscarCiclos(referencia),
+    buscarCiclos(filtro.referencia ?? dataDeHoje()),
     buscarResumo(),
   ]);
 
@@ -84,21 +92,15 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
     );
   }
 
-  const ciclo = ciclos[escolhido];
-  // O ciclo imediatamente anterior ao escolhido, não o `anterior` fixo da
-  // resposta: comparar sempre com o mesmo período tornaria o comparativo
-  // errado ao navegar para outro ciclo.
-  const anteriorAoEscolhido =
-    escolhido === "atual"
-      ? ciclos.anterior
-      : escolhido === "seguinte"
-        ? ciclos.atual
-        : null;
-
-  // A cota é a do dinheiro livre de hoje, que soma todas as contas: só vale
-  // para o ciclo de hoje e sem filtro de conta.
   const hoje = dataDeHoje();
-  const comCota = !contaEscolhida && ciclo.inicio <= hoje && hoje <= ciclo.fim;
+  const pagadores = lerPagadores();
+  const periodo = intervaloDoPeriodo(filtro, ciclos, hoje, (numero) => nomeDoCiclo(numero, pagadores));
+  const anterior = periodo.cicloAnterior;
+  // A cota é a do dinheiro livre de hoje, que soma todas as contas: só vale
+  // para o ciclo de hoje e sem filtro de conta, categoria ou tag.
+  const noCicloDeHoje =
+    periodo.ciclo !== null && periodo.inicio <= hoje && hoje <= periodo.fim;
+  const comCota = noCicloDeHoje && !temFiltroDeGasto(filtro);
   const [
     gastos,
     fluxos,
@@ -108,24 +110,41 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
     paraClassificar,
     tags,
     dinheiro,
+    naoUteis,
   ] = await Promise.all([
-    buscarGastosDiarios(ciclo.inicio, ciclo.fim, contaEscolhida),
-    buscarFluxoPorConta(ciclo.inicio, ciclo.fim),
+    buscarGastosDiarios(periodo.inicio, periodo.fim, undefined, daApi),
+    buscarFluxoPorConta(periodo.inicio, periodo.fim, daApi),
     buscarMovimentos(
-      ciclo.inicio,
-      ciclo.fim,
-      contaEscolhida,
+      periodo.inicio,
+      periodo.fim,
+      undefined,
       limite,
       (pagina - 1) * limite,
+      false,
+      undefined,
+      undefined,
+      daApi,
     ),
-    anteriorAoEscolhido
-      ? somaDoCiclo(anteriorAoEscolhido, contaEscolhida)
-      : Promise.resolve(null),
+    anterior ? somaDoCiclo(anterior, daApi) : Promise.resolve(null),
     buscarCategorias(),
     buscarParaClassificar(hoje),
     buscarTags(),
     comCota ? buscarDinheiroLivre(hoje) : Promise.resolve(null),
+    buscarDiasNaoUteis(periodo.inicio, periodo.fim),
   ]);
+  const cota =
+    dinheiro && dinheiro.ciclo.inicio === periodo.inicio
+      ? dinheiro.cotaDoDia
+      : null;
+  // Com o livre negativo, a cota também é: "dentro da cota" não teria sentido.
+  const contadores = await buscarContadores(
+    periodo.inicio,
+    periodo.fim,
+    hoje,
+    cota !== null && cota > 0 ? cota : null,
+    daApi,
+    false,
+  );
 
   const somaAtual =
     gastos?.reduce((soma, gasto) => soma + gasto.total, 0) ?? null;
@@ -133,15 +152,15 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
     gastos?.reduce((soma, gasto) => soma + gasto.emRevisao, 0) ?? 0;
   const contas = resumo?.contas ?? [];
   const fluxosVisiveis =
-    fluxos && contaEscolhida
-      ? fluxos.filter((fluxo) => fluxo.contaId === contaEscolhida)
+    fluxos && filtro.contas.length > 0
+      ? fluxos.filter((fluxo) => filtro.contas.includes(fluxo.contaId))
       : fluxos;
   const comparativoFalhou =
-    anteriorAoEscolhido !== null &&
-    (somaAtual === null || somaAnterior === null);
+    anterior !== null && (somaAtual === null || somaAnterior === null);
 
   const falhas = [
     gastos === null && "gasto por dia",
+    contadores === null && "contadores",
     comparativoFalhou && "comparativo com o ciclo anterior",
     fluxos === null && "gasto por conta",
     movimentos === null && "lista de movimentos",
@@ -149,7 +168,7 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
     categorias === null && "categorias",
   ].filter((parte): parte is string => typeof parte === "string");
 
-  const tituloDoGrafico = `Gasto por dia no Ciclo ${ciclo.numero}, de ${diaEMes(ciclo.inicio)} a ${diaEMes(ciclo.fim)}`;
+  const tituloDoGrafico = `Gasto por dia: ${periodo.rotulo}`;
   const gastoPorConta =
     fluxosVisiveis === null ? (
       <BlocoIndisponivel
@@ -165,8 +184,7 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
       <header className="flex flex-col gap-[3px]">
         <h1 className="text-[23px] font-bold tracking-[-0.2px]">Movimentos</h1>
         <span className="text-tinta-3 text-[13px]">
-          O gráfico e os indicadores cobrem o ciclo selecionado, de{" "}
-          {diaEMes(ciclo.inicio)} a {diaEMes(ciclo.fim)}.
+          O gráfico e os indicadores cobrem {periodo.rotulo}.
         </span>
       </header>
 
@@ -174,13 +192,47 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
 
       <FaixaDeFalha partes={falhas} />
 
-      <Filtros
-        ciclos={CICLOS.map((chave) => ({ chave, ciclo: ciclos[chave] }))}
-        cicloEscolhido={escolhido}
-        contas={contas}
-        contaEscolhida={contaEscolhida}
-        referencia={referencia}
+      <BarraDeFiltros
+        caminho="/movimentos"
+        filtro={filtro}
+        rotuloDoPeriodo={periodo.rotulo}
+        hoje={hoje}
+        opcoes={{
+          ciclos: PERIODOS_DE_CICLO.map((chave) => ({
+            periodo: chave,
+            rotulo: nomeDoCiclo(ciclos[chave].numero, pagadores),
+            datas: datasDoCiclo(ciclos[chave]),
+          })),
+          contas: contas.map((conta) => ({
+            id: conta.id,
+            nome: conta.nome,
+            apelido: conta.apelido,
+            bancoDaConexao: conta.bancoDaConexao,
+            tipo: conta.tipo,
+            final: conta.final,
+          })),
+          categorias: (categorias ?? []).map((categoria) => ({
+            id: categoria.id,
+            nome: categoria.nome,
+            icone: categoria.icone,
+            cor: categoria.cor,
+          })),
+          tags: (tags ?? []).map((tag) => ({ id: tag.id, nome: tag.nome, icone: tag.icone, cor: tag.cor })),
+        }}
       />
+
+      {contadores && (
+        <CartoesDeContadores
+          contadores={contadores}
+          cotaNegativa={cota !== null && cota <= 0}
+          nomeDoCicloComparado={
+            contadores.cicloComparado
+              ? nomeDoCiclo(contadores.cicloComparado.numero, lerPagadores())
+              : null
+          }
+          categorias={categorias ?? []}
+        />
+      )}
 
       {totalEmRevisao > 0 && (
         <p
@@ -202,47 +254,42 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
         ) : (
           <GraficoGastoDiario
             gastos={gastos}
-            inicio={ciclo.inicio}
-            fim={ciclo.fim}
-            cota={
-              dinheiro && dinheiro.ciclo.inicio === ciclo.inicio
-                ? dinheiro.cotaDoDia
-                : null
-            }
-            hoje={comCota ? hoje : null}
+            inicio={periodo.inicio}
+            fim={periodo.fim}
+            cota={cota ?? contadores?.cota ?? null}
+            hoje={noCicloDeHoje || periodo.ciclo === null ? hoje : null}
             titulo={tituloDoGrafico}
+            naoUteis={naoUteis ?? []}
           />
         )}
-        {!anteriorAoEscolhido ? (
+        {!anterior || !periodo.ciclo ? (
           gastoPorConta
         ) : somaAtual === null || somaAnterior === null ? (
           <BlocoIndisponivel
-            titulo={`Ciclo ${ciclo.numero} vs ciclo anterior`}
+            titulo={`Ciclo ${periodo.ciclo.numero} vs ciclo anterior`}
             rotulo="Comparativo com o ciclo anterior"
           />
         ) : (
           <CicloContraAnterior
             atual={somaAtual}
             anterior={somaAnterior}
-            numero={ciclo.numero}
+            numero={periodo.ciclo.numero}
           />
         )}
       </div>
 
-      {anteriorAoEscolhido && gastoPorConta}
+      {anterior && periodo.ciclo && gastoPorConta}
 
       {movimentos === null ? (
         <BlocoIndisponivel titulo="Movimentos" rotulo="Movimentos" />
       ) : (
-        <>
-          <Lista
-            movimentos={movimentos}
-            contas={contas}
-            categorias={categorias}
-            tagsExistentes={(tags ?? []).map((tag) => tag.nome)}
-            tags={tags ?? []}
-          />
-        </>
+        <Lista
+          movimentos={movimentos}
+          contas={contas}
+          categorias={categorias}
+          tagsExistentes={(tags ?? []).map((tag) => tag.nome)}
+          tags={tags ?? []}
+        />
       )}
 
       <nav
@@ -252,15 +299,9 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
         {pagina > 1 && (
           <Link
             className="border-borda bg-superficie rounded-lg border px-3 py-2 text-[13px]"
-            href={{
-              pathname: "/movimentos",
-              query: {
-                ciclo: escolhido,
-                ...(contaEscolhida ? { conta: contaEscolhida } : {}),
-                ...(referencia ? { referencia } : {}),
-                pagina: pagina - 1,
-              },
-            }}
+            href={enderecoDoFiltro("/movimentos", filtro, {
+              pagina: pagina - 1,
+            })}
           >
             Página anterior
           </Link>
@@ -268,15 +309,9 @@ export default async function Movimentos(props: PageProps<"/movimentos">) {
         {(movimentos?.length ?? 0) === limite && (
           <Link
             className="border-borda bg-superficie rounded-lg border px-3 py-2 text-[13px]"
-            href={{
-              pathname: "/movimentos",
-              query: {
-                ciclo: escolhido,
-                ...(contaEscolhida ? { conta: contaEscolhida } : {}),
-                ...(referencia ? { referencia } : {}),
-                pagina: pagina + 1,
-              },
-            }}
+            href={enderecoDoFiltro("/movimentos", filtro, {
+              pagina: pagina + 1,
+            })}
           >
             Próxima página
           </Link>

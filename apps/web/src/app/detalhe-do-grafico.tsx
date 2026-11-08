@@ -1,5 +1,6 @@
 "use client";
 
+import { Crown } from "lucide-react";
 import { Popover } from "radix-ui";
 import { type ReactElement, useState } from "react";
 import type { GastoDoDetalhe } from "./buscar-movimentos";
@@ -23,6 +24,8 @@ export function ColunaComDetalhe({
   valor,
   cota = null,
   maiores,
+  feriado = null,
+  maiorDoPeriodo = false,
   children,
 }: {
   data: string;
@@ -30,6 +33,10 @@ export function ColunaComDetalhe({
   /** Sem cota (ciclo passado), o detalhe não fala de cota. */
   cota?: number | null;
   maiores: GastoDoDetalhe[];
+  /** Nome do feriado do dia, que o eixo só marca com cor. */
+  feriado?: string | null;
+  /** O dia de maior gasto do período, que a barra marca com listras. */
+  maiorDoPeriodo?: boolean;
   /** A barra: é nela que o detalhe se prende. */
   children: ReactElement;
 }) {
@@ -47,7 +54,7 @@ export function ColunaComDetalhe({
         onMouseLeave={() => setAberto(false)}
         onFocus={() => setAberto(true)}
         onBlur={() => setAberto(false)}
-        onClick={() => setAberto((atual) => !atual)}
+        onClick={() => setAberto(true)}
         className="group focus-visible:outline-marca flex h-full w-full min-w-0 cursor-pointer items-end justify-center rounded-t focus-visible:outline-2"
       >
         <Popover.Anchor asChild>{children}</Popover.Anchor>
@@ -62,6 +69,14 @@ export function ColunaComDetalhe({
           className="bg-superficie border-borda text-tinta-2 pointer-events-none z-50 flex w-max max-w-[320px] flex-col gap-0.5 rounded-xl border px-3 py-2.5 text-[12.5px] shadow-lg"
         >
           <b className="text-tinta first-letter:uppercase">{dia}</b>
+          {maiorDoPeriodo && (
+            <span className="text-tinta inline-flex items-center gap-1 font-semibold">
+              <Crown size={13} aria-hidden="true" /> Maior dia do período
+            </span>
+          )}
+          {feriado && (
+            <span className="text-nao-util font-semibold">{feriado}</span>
+          )}
           {valor === 0 ? (
             <>
               <span className="text-positivo text-[14px] font-bold whitespace-nowrap">

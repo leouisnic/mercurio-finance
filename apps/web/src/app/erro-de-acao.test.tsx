@@ -6,8 +6,12 @@ import { CartaoDecidido } from "./recorrencias/cartao";
 
 // A ação devolve o erro como a de verdade faz quando a API responde 503.
 vi.mock("./acoes", () => ({
-  renomearConta: vi.fn(async () => ({ erro: "Não foi possível salvar: a API respondeu com erro 503. O nome digitado foi mantido." })),
-  decidirRecorrencia: vi.fn(async () => ({ erro: "Não foi possível registrar a decisão: a API respondeu com erro 503. O que você preencheu foi mantido." })),
+  renomearConta: vi.fn(async () => ({
+    erro: "Não foi possível salvar: a API respondeu com erro 503. O nome digitado foi mantido.",
+  })),
+  decidirRecorrencia: vi.fn(async () => ({
+    erro: "Não foi possível registrar a decisão: a API respondeu com erro 503. O que você preencheu foi mantido.",
+  })),
 }));
 
 const CONTA: Conta = {
@@ -27,7 +31,9 @@ const CONTA: Conta = {
 
 test("renomear que falha mostra o erro e mantém o nome digitado", async () => {
   render(<CabecalhoDaConta conta={CONTA} subtitulo="Conta corrente" />);
-  fireEvent.click(screen.getByRole("button", { name: "Renomear Conta A (fictícia)" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Renomear Conta A (fictícia)" }),
+  );
   fireEvent.change(screen.getByLabelText("Apelido da conta"), {
     target: { value: "Conta principal" },
   });
@@ -37,9 +43,9 @@ test("renomear que falha mostra o erro e mantém o nome digitado", async () => {
   });
 
   expect((await screen.findByRole("alert")).textContent).toMatch(/erro 503/);
-  expect((screen.getByLabelText("Apelido da conta") as HTMLInputElement).value).toBe(
-    "Conta principal",
-  );
+  expect(
+    (screen.getByLabelText("Apelido da conta") as HTMLInputElement).value,
+  ).toBe("Conta principal");
 });
 
 test("decisão que falha mostra o erro e mantém apelido e categoria", async () => {
@@ -62,14 +68,22 @@ test("decisão que falha mostra o erro e mantém apelido e categoria", async () 
     />,
   );
   fireEvent.click(screen.getByRole("button", { name: "Mudar" }));
-  fireEvent.change(screen.getByLabelText("Apelido"), { target: { value: "Streaming" } });
-  fireEvent.change(screen.getByLabelText("Categoria"), { target: { value: "assinatura" } });
+  fireEvent.change(screen.getByLabelText("Apelido"), {
+    target: { value: "Streaming" },
+  });
+  fireEvent.change(screen.getByLabelText("Categoria"), {
+    target: { value: "assinatura" },
+  });
 
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: "Conta fixa" }));
   });
 
   expect((await screen.findByRole("alert")).textContent).toMatch(/erro 503/);
-  expect((screen.getByLabelText("Apelido") as HTMLInputElement).value).toBe("Streaming");
-  expect((screen.getByLabelText("Categoria") as HTMLSelectElement).value).toBe("assinatura");
+  expect((screen.getByLabelText("Apelido") as HTMLInputElement).value).toBe(
+    "Streaming",
+  );
+  expect((screen.getByLabelText("Categoria") as HTMLSelectElement).value).toBe(
+    "assinatura",
+  );
 });

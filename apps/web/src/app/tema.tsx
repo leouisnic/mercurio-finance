@@ -18,7 +18,8 @@ function sistemaEscuro(): boolean {
 }
 
 function aplicar(escolha: Escolha) {
-  const escuro = escolha === "escuro" || (escolha === "sistema" && sistemaEscuro());
+  const escuro =
+    escolha === "escuro" || (escolha === "sistema" && sistemaEscuro());
   document.documentElement.dataset.tema = escuro ? "escuro" : "claro";
 }
 
@@ -62,7 +63,11 @@ const OPCOES: { valor: Escolha; rotulo: string; icone: typeof Sun }[] = [
 /** Três botões: seguir o sistema, claro ou escuro. A escolha fica no navegador. */
 export function SeletorDeTema() {
   // No servidor não há navegador: começa em "sistema" e acerta ao hidratar.
-  const escolha = useSyncExternalStore(assinar, lerEscolha, () => "sistema" as const);
+  const escolha = useSyncExternalStore(
+    assinar,
+    lerEscolha,
+    () => "sistema" as const,
+  );
 
   useEffect(() => {
     if (escolha !== "sistema") return;
@@ -79,7 +84,11 @@ export function SeletorDeTema() {
   }
 
   return (
-    <div role="group" aria-label="Tema" className="border-borda bg-superficie inline-flex gap-0.5 rounded-[10px] border p-0.5">
+    <div
+      role="group"
+      aria-label="Tema"
+      className="border-borda bg-superficie inline-flex gap-0.5 rounded-[10px] border p-0.5"
+    >
       {OPCOES.map(({ valor, rotulo, icone: Icone }) => (
         <button
           key={valor}
@@ -89,7 +98,9 @@ export function SeletorDeTema() {
           title={rotulo}
           onClick={() => escolher(valor)}
           className={`grid size-8 cursor-pointer place-items-center rounded-[8px] ${
-            escolha === valor ? "bg-marca-clara text-marca-escura" : "text-tinta-3 hover:text-tinta"
+            escolha === valor
+              ? "bg-marca-clara text-marca-escura"
+              : "text-tinta-3 hover:text-tinta"
           }`}
         >
           <Icone size={16} strokeWidth={2} aria-hidden />

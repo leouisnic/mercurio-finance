@@ -3,7 +3,12 @@
 import { type FormEvent, useState, useTransition } from "react";
 import { SeloDoBanco, nomeDaConta } from "../banco";
 import type { Conta } from "../buscar-resumo";
-import { CATEGORIAS, ROTULO_DA_CATEGORIA, type Recorrencia, type StatusRecorrencia } from "../buscar-recorrencias";
+import {
+  CATEGORIAS,
+  ROTULO_DA_CATEGORIA,
+  type Recorrencia,
+  type StatusRecorrencia,
+} from "../buscar-recorrencias";
 import { decidirRecorrencia } from "../acoes";
 import { comoData, diaEMes, moeda } from "../formato";
 
@@ -11,7 +16,10 @@ import { comoData, diaEMes, moeda } from "../formato";
  * A Pluggy descreve como "Transferência enviada|Nome": o que importa para
  * reconhecer a cobrança é o nome, e o tipo vira contexto.
  */
-export function partesDaDescricao(descricao: string): { nome: string; tipo: string | null } {
+export function partesDaDescricao(descricao: string): {
+  nome: string;
+  tipo: string | null;
+} {
   const [tipo, ...resto] = descricao.split("|");
   const nome = resto.join("|").trim();
   return nome ? { nome, tipo: tipo.trim() } : { nome: descricao, tipo: null };
@@ -20,21 +28,35 @@ export function partesDaDescricao(descricao: string): { nome: string; tipo: stri
 function mesesEntre(de: string, ate: string): number {
   const inicio = comoData(de);
   const fim = comoData(ate);
-  return (fim.getFullYear() - inicio.getFullYear()) * 12 + fim.getMonth() - inicio.getMonth();
+  return (
+    (fim.getFullYear() - inicio.getFullYear()) * 12 +
+    fim.getMonth() -
+    inicio.getMonth()
+  );
 }
 
-function Identificacao({ recorrencia, conta }: { recorrencia: Recorrencia; conta?: Conta }) {
+function Identificacao({
+  recorrencia,
+  conta,
+}: {
+  recorrencia: Recorrencia;
+  conta?: Conta;
+}) {
   const { nome, tipo } = partesDaDescricao(recorrencia.descricao);
   // "no Nubank", "no cartão Nubank": o apelido já diz o que é e entra como está.
   const onde = conta
-    ? (conta.apelido ?? `${conta.tipo === "CREDIT" ? "cartão " : ""}${nomeDaConta(conta)}`)
+    ? (conta.apelido ??
+      `${conta.tipo === "CREDIT" ? "cartão " : ""}${nomeDaConta(conta)}`)
     : recorrencia.contaId;
   const principal = recorrencia.apelido ? nome : tipo;
   return (
     <div className="flex min-w-0 items-center gap-3">
       {conta && <SeloDoBanco conta={conta} tamanho={36} />}
       <span className="flex min-w-0 flex-col leading-tight">
-        <span className="truncate text-base font-semibold" title={recorrencia.descricao}>
+        <span
+          className="truncate text-base font-semibold"
+          title={recorrencia.descricao}
+        >
           {recorrencia.apelido ?? nome}
         </span>
         <span className="text-tinta-2 truncate text-[13px]">
@@ -72,7 +94,10 @@ function useDecisao() {
 
 function ErroDaDecisao({ erro }: { erro: string | null }) {
   return erro ? (
-    <p role="alert" className="bg-alerta-fundo text-alerta rounded-[9px] px-3 py-2 text-[13px]">
+    <p
+      role="alert"
+      className="bg-alerta-fundo text-alerta rounded-[9px] px-3 py-2 text-[13px]"
+    >
       {erro}
     </p>
   ) : null;
@@ -83,7 +108,13 @@ const BOTAO =
 const NEUTRO = `${BOTAO} border-borda bg-superficie text-tinta-2 hover:bg-superficie-2`;
 
 /** As quatro decisões. Parcelamento abre o campo de parcelas antes de enviar. */
-function Decisoes({ enviando, recorrencia }: { enviando: boolean; recorrencia: Recorrencia }) {
+function Decisoes({
+  enviando,
+  recorrencia,
+}: {
+  enviando: boolean;
+  recorrencia: Recorrencia;
+}) {
   const [parcelando, setParcelando] = useState(false);
   const campo = `parcelas-${recorrencia.id}`;
 
@@ -103,14 +134,30 @@ function Decisoes({ enviando, recorrencia }: { enviando: boolean; recorrencia: R
           type="button"
           aria-expanded={parcelando}
           onClick={() => setParcelando((atual) => !atual)}
-          className={parcelando ? `${BOTAO} border-marca bg-marca-clara text-marca` : NEUTRO}
+          className={
+            parcelando
+              ? `${BOTAO} border-marca bg-marca-clara text-marca`
+              : NEUTRO
+          }
         >
           Parcelamento
         </button>
-        <button type="submit" name="status" value="encerrada" disabled={enviando} className={NEUTRO}>
+        <button
+          type="submit"
+          name="status"
+          value="encerrada"
+          disabled={enviando}
+          className={NEUTRO}
+        >
           Encerrada
         </button>
-        <button type="submit" name="status" value="rejeitada" disabled={enviando} className={NEUTRO}>
+        <button
+          type="submit"
+          name="status"
+          value="rejeitada"
+          disabled={enviando}
+          className={NEUTRO}
+        >
           Não é recorrência
         </button>
       </div>
@@ -143,18 +190,30 @@ function Decisoes({ enviando, recorrencia }: { enviando: boolean; recorrencia: R
 }
 
 /** Uma candidata para decidir: quem cobra, quanto, há quanto tempo. */
-export function CartaoPendente({ recorrencia, conta }: { recorrencia: Recorrencia; conta?: Conta }) {
+export function CartaoPendente({
+  recorrencia,
+  conta,
+}: {
+  recorrencia: Recorrencia;
+  conta?: Conta;
+}) {
   const { erro, enviando, enviar } = useDecisao();
 
   return (
-    <form onSubmit={enviar} className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border p-4">
+    <form
+      onSubmit={enviar}
+      className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border p-4"
+    >
       <input type="hidden" name="id" value={recorrencia.id} />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <Identificacao recorrencia={recorrencia} conta={conta} />
         <span className="flex flex-col sm:items-end">
-          <span className="num text-gasto text-xl font-bold">{moeda(recorrencia.valorMedio)}</span>
+          <span className="num text-gasto text-xl font-bold">
+            {moeda(recorrencia.valorMedio)}
+          </span>
           <span className="text-tinta-2 text-[13px]">
-            {recorrencia.ocorrencias} cobranças, de {diaEMes(recorrencia.primeiraData)} a{" "}
+            {recorrencia.ocorrencias} cobranças, de{" "}
+            {diaEMes(recorrencia.primeiraData)} a{" "}
             {diaEMes(recorrencia.ultimaData)}
           </span>
         </span>
@@ -165,7 +224,10 @@ export function CartaoPendente({ recorrencia, conta }: { recorrencia: Recorrenci
   );
 }
 
-const ESTADO: Record<Exclude<StatusRecorrencia, "pendente">, { rotulo: string; classe: string }> = {
+const ESTADO: Record<
+  Exclude<StatusRecorrencia, "pendente">,
+  { rotulo: string; classe: string }
+> = {
   aprovada: { rotulo: "Conta fixa", classe: "bg-positivo-fundo text-positivo" },
   parcelamento: { rotulo: "Parcelamento", classe: "bg-marca-clara text-marca" },
   encerrada: { rotulo: "Encerrada", classe: "bg-borda-sutil text-tinta-2" },
@@ -173,17 +235,27 @@ const ESTADO: Record<Exclude<StatusRecorrencia, "pendente">, { rotulo: string; c
 };
 
 function detalheDaDecidida(recorrencia: Recorrencia): string {
-  if (recorrencia.status === "encerrada" || recorrencia.status === "rejeitada") {
+  if (
+    recorrencia.status === "encerrada" ||
+    recorrencia.status === "rejeitada"
+  ) {
     return `última em ${diaEMes(recorrencia.ultimaData)}`;
   }
   return `todo dia ${Number(recorrencia.ultimaData.slice(8, 10))}`;
 }
 
 /** Uma já decidida: o estado à vista e o caminho para mudar. */
-export function CartaoDecidido({ recorrencia, conta }: { recorrencia: Recorrencia; conta?: Conta }) {
+export function CartaoDecidido({
+  recorrencia,
+  conta,
+}: {
+  recorrencia: Recorrencia;
+  conta?: Conta;
+}) {
   const { erro, enviando, enviar } = useDecisao();
   const [mudando, setMudando] = useState(false);
-  const estado = ESTADO[recorrencia.status as Exclude<StatusRecorrencia, "pendente">];
+  const estado =
+    ESTADO[recorrencia.status as Exclude<StatusRecorrencia, "pendente">];
   const campo = `recorrencia-${recorrencia.id}`;
   const faltam =
     recorrencia.status === "parcelamento" && recorrencia.fimPrevisto
@@ -192,13 +264,20 @@ export function CartaoDecidido({ recorrencia, conta }: { recorrencia: Recorrenci
   const total = faltam === null ? null : recorrencia.ocorrencias + faltam;
 
   return (
-    <form onSubmit={enviar} className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border p-4">
+    <form
+      onSubmit={enviar}
+      className="bg-superficie border-borda flex flex-col gap-3.5 rounded-2xl border p-4"
+    >
       <input type="hidden" name="id" value={recorrencia.id} />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <Identificacao recorrencia={recorrencia} conta={conta} />
         <span className="flex flex-col sm:items-end">
-          <span className="num text-tinta text-xl font-bold">{moeda(recorrencia.valorMedio)}</span>
-          <span className="text-tinta-2 text-[13px]">{detalheDaDecidida(recorrencia)}</span>
+          <span className="num text-tinta text-xl font-bold">
+            {moeda(recorrencia.valorMedio)}
+          </span>
+          <span className="text-tinta-2 text-[13px]">
+            {detalheDaDecidida(recorrencia)}
+          </span>
         </span>
       </div>
 
@@ -222,14 +301,19 @@ export function CartaoDecidido({ recorrencia, conta }: { recorrencia: Recorrenci
               {recorrencia.ocorrencias} de {total} pagas
             </span>
             <span>
-              termina em {recorrencia.fimPrevisto.slice(5, 7)}/{recorrencia.fimPrevisto.slice(0, 4)}
+              termina em {recorrencia.fimPrevisto.slice(5, 7)}/
+              {recorrencia.fimPrevisto.slice(0, 4)}
             </span>
           </p>
         </div>
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <span className={`${estado.classe} rounded-full px-3 py-1 text-[13px] font-bold`}>{estado.rotulo}</span>
+        <span
+          className={`${estado.classe} rounded-full px-3 py-1 text-[13px] font-bold`}
+        >
+          {estado.rotulo}
+        </span>
         <button
           type="button"
           aria-expanded={mudando}

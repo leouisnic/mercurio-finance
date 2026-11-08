@@ -11,23 +11,23 @@
 @theme {
   --font-sans: var(--font-sora), system-ui, sans-serif;
 
-  --color-fundo: oklch(97.5% 0.005 278);
+  --color-fundo: oklch(95% 0.008 278);
   --color-superficie: oklch(100% 0 0);
-  --color-superficie-2: oklch(98.5% 0.004 278);
-  --color-superficie-3: oklch(98% 0.006 278);
+  --color-superficie-2: oklch(97% 0.006 278);
+  --color-superficie-3: oklch(96.5% 0.008 278);
 
-  --color-borda: oklch(91% 0.01 278);
-  --color-borda-sutil: oklch(94% 0.008 278);
+  --color-borda: oklch(84% 0.015 278);
+  --color-borda-sutil: oklch(89% 0.012 278);
 
-  --color-tinta: oklch(22% 0.03 278);
-  --color-tinta-2: oklch(44% 0.03 278);
-  --color-tinta-3: oklch(50% 0.025 278);
+  --color-tinta: oklch(18% 0.035 278);
+  --color-tinta-2: oklch(36% 0.035 278);
+  --color-tinta-3: oklch(44% 0.03 278);
   --color-tinta-4: oklch(64% 0.015 278);
 
   /* Índigo do símbolo: marca, ciclo e item ativo, nada além. */
   --color-marca: oklch(36% 0.12 278);
   --color-marca-escura: oklch(30% 0.11 278);
-  --color-marca-clara: oklch(93% 0.03 278);
+  --color-marca-clara: oklch(90% 0.045 278);
   /* Fundo do grupo de um item do menu com as páginas de dentro dele. */
   --color-marca-suave: oklch(96.5% 0.015 278);
 
@@ -58,6 +58,11 @@
   --color-caixinha: oklch(64% 0.13 75);
   --color-caixinha-texto: oklch(48% 0.1 70);
   --color-caixinha-fundo: oklch(95% 0.05 85);
+
+  /* Magenta: dia não útil (fim de semana e feriado) no eixo dos gráficos e no calendário.
+     Longe do dourado dos dias de ouro e do índigo e do vermelho das barras. */
+  --color-nao-util: oklch(47% 0.2 345);
+  --color-sobre-nao-util: oklch(100% 0 0);
 
   /* Amarelo: dado que não carregou. Não é erro do usuário nem gasto. */
   --color-aviso: oklch(45% 0.12 75);
@@ -112,6 +117,9 @@
   --color-caixinha: oklch(78% 0.13 82);
   --color-caixinha-texto: oklch(85% 0.11 85);
   --color-caixinha-fundo: oklch(30% 0.05 85);
+
+  --color-nao-util: oklch(78% 0.13 345);
+  --color-sobre-nao-util: oklch(18% 0.03 345);
 
   --color-aviso: oklch(86% 0.1 80);
   --color-aviso-forte: oklch(92% 0.07 85);

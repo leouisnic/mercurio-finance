@@ -1,17 +1,14 @@
 import { CalendarDays, PiggyBank, Wallet } from "lucide-react";
 import type { DinheiroLivre } from "../buscar-dinheiro-livre";
-import { moeda } from "../formato";
+import { comSinal, moeda } from "../formato";
 import { Info } from "../info";
-
-function comSinal(valor: number): string {
-  return valor < 0 ? `- ${moeda(-valor)}` : `+ ${moeda(valor)}`;
-}
 
 /** O número que a tela inicial responde primeiro: quanto dá para gastar hoje. */
 export function HojeDaParaGastar({ dinheiro }: { dinheiro: DinheiroLivre }) {
   const { hojeDisponivel, gastoHoje, cotaDoDia, cofrinho } = dinheiro;
   const podiaHoje = gastoHoje + hojeDisponivel;
-  const usado = podiaHoje > 0 ? Math.min(100, (gastoHoje / podiaHoje) * 100) : 100;
+  const usado =
+    podiaHoje > 0 ? Math.min(100, (gastoHoje / podiaHoje) * 100) : 100;
   const estourou = hojeDisponivel < 0;
 
   return (
@@ -56,8 +53,8 @@ export function HojeDaParaGastar({ dinheiro }: { dinheiro: DinheiroLivre }) {
           />
         </div>
         <div className="text-tinta-2 flex justify-between text-[13px]">
-          <span>gasto hoje {moeda(gastoHoje)}</span>
-          <span>de {moeda(Math.max(podiaHoje, 0))}</span>
+          <span>Gasto hoje {moeda(gastoHoje)}</span>
+          <span>De {moeda(Math.max(podiaHoje, 0))}</span>
         </div>
       </div>
 
@@ -84,9 +81,16 @@ export function HojeDaParaGastar({ dinheiro }: { dinheiro: DinheiroLivre }) {
           <span className="flex flex-col">
             <span className="text-tinta-2 flex items-center gap-1 text-[13px]">
               Cofrinho
-              <Info sobre="cofrinho" texto="Sobra ou falta dos dias anteriores do ciclo." />
+              <Info
+                sobre="cofrinho"
+                texto="Sobra ou falta dos dias anteriores do ciclo."
+              />
             </span>
-            <b className={`num text-base ${cofrinho < 0 ? "text-alerta" : "text-caixinha-texto"}`}>{comSinal(cofrinho)}</b>
+            <b
+              className={`num text-base ${cofrinho < 0 ? "text-alerta" : "text-caixinha-texto"}`}
+            >
+              {comSinal(cofrinho)}
+            </b>
           </span>
         </div>
       </div>

@@ -159,6 +159,23 @@ test("marcar dois com uma tag grava na API e o filtro mostra o total", async ({
     quantidade: 2,
   });
 
+  await page.goto(`/movimentos?com_tag=${tag.id}&referencia=2026-08-10`);
+  const filtros = page.getByRole("group", { name: "Filtros" });
+  await filtros.getByRole("button", { name: "Só viagem Exemplo" }).click();
+  await page.getByRole("tab", { name: "Esconder" }).click();
+  await expect(page).toHaveURL(new RegExp(`[?&]sem_tag=${tag.id}(?:&|$)`));
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(`[?&]com_tag=${tag.id}(?:&|$)`));
+  await page.keyboard.press("Escape");
+  await filtros.getByRole("button", { name: "Só viagem Exemplo" }).click();
+  await expect(page.getByRole("tab", { name: "Mostrar só" })).toHaveAttribute("aria-selected", "true");
+  await page.goForward();
+  await expect(page).toHaveURL(new RegExp(`[?&]sem_tag=${tag.id}(?:&|$)`));
+  await page.keyboard.press("Escape");
+  await filtros.getByRole("button", { name: "Sem viagem Exemplo" }).click();
+  await expect(page.getByRole("tab", { name: "Esconder" })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Escape");
+
   await page.goto("/movimentos/tags");
   await page
     .getByRole("region", { name: "Suas tags" })
@@ -196,6 +213,11 @@ test("criar tag com teto pela tela grava na API e o cartão mostra quanto falta"
   const janela = page.getByRole("dialog", { name: "Nova tag" });
   await janela.getByRole("textbox").fill("viagem Planejada");
   await janela.getByRole("button", { name: /3\.000/ }).click();
+  await janela.getByRole("button", { name: "Escolher datas", exact: true }).click();
+  await janela.getByRole("button", { name: "De: escolher" }).click();
+  await page.getByRole("button", { name: /10 de agosto de 2026/ }).click();
+  await janela.getByRole("button", { name: "Até: escolher" }).click();
+  await page.getByRole("button", { name: /20 de agosto de 2026/ }).click();
   await janela.getByRole("button", { name: "Criar tag" }).click();
   await expect(janela).toHaveCount(0);
 
@@ -204,8 +226,25 @@ test("criar tag com teto pela tela grava na API e o cartão mostra quanto falta"
     nome: "viagem Planejada",
     teto: "3000.00",
     quantidade: 0,
+    inicio: "2026-08-10",
+    fim: "2026-08-20",
   });
   await expect(page.getByRole("region", { name: "Suas tags" })).toContainText(
     "Faltam R$ 3.000,00 de R$ 3.000,00",
   );
+});
+
+test("o calendário do feriado salva a data e o pagador escolhidos", async ({ page, request }) => {
+  await page.goto("/ajustes");
+  await page.getByRole("button", { name: "Novo feriado" }).click();
+  const formulario = page.getByRole("form", { name: "Novo feriado" });
+  await formulario.getByLabel("Nome", { exact: true }).fill("Aniversário Cidade A");
+  await formulario.getByRole("button", { name: "Data: escolher" }).click();
+  await page.getByRole("button", { name: /20 de agosto de 2026/ }).click();
+  await formulario.getByRole("checkbox", { name: /Empresa A/ }).check();
+  await formulario.getByRole("button", { name: "Salvar feriado" }).click();
+  await expect(page.getByText("Aniversário Cidade A", { exact: true })).toBeVisible();
+  expect(await (await request.get(`${API}/feriados`)).json()).toEqual([
+    expect.objectContaining({ data: "2026-08-20", muda_ciclo_1: true, muda_ciclo_2: false }),
+  ]);
 });

@@ -27,18 +27,30 @@ test("escolher o escuro troca a página e fica guardado", () => {
 
   expect(document.documentElement.dataset.tema).toBe("escuro");
   expect(localStorage.getItem("tema")).toBe("escuro");
-  expect(screen.getByRole("button", { name: "Tema escuro" }).getAttribute("aria-pressed")).toBe("true");
+  expect(
+    screen
+      .getByRole("button", { name: "Tema escuro" })
+      .getAttribute("aria-pressed"),
+  ).toBe("true");
 });
 
 test("voltar a seguir o sistema esquece a escolha e usa o tema do sistema", () => {
   sistemaEscuro = true;
   localStorage.setItem("tema", "claro");
   render(<SeletorDeTema />);
-  expect(screen.getByRole("button", { name: "Tema claro" }).getAttribute("aria-pressed")).toBe("true");
+  expect(
+    screen
+      .getByRole("button", { name: "Tema claro" })
+      .getAttribute("aria-pressed"),
+  ).toBe("true");
 
   fireEvent.click(screen.getByRole("button", { name: "Seguir o sistema" }));
 
   expect(localStorage.getItem("tema")).toBeNull();
   expect(document.documentElement.dataset.tema).toBe("escuro");
-  expect(screen.getByRole("button", { name: "Seguir o sistema" }).getAttribute("aria-pressed")).toBe("true");
+  expect(
+    screen
+      .getByRole("button", { name: "Seguir o sistema" })
+      .getAttribute("aria-pressed"),
+  ).toBe("true");
 });

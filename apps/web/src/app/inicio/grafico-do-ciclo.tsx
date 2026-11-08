@@ -1,12 +1,21 @@
 import { ChartColumn } from "lucide-react";
+import { type DiaNaoUtil, marcaDoDia } from "../buscar-feriados";
 import type { GastoDoDetalhe } from "../buscar-movimentos";
 import { ColunaComDetalhe } from "../detalhe-do-grafico";
-import { comoData, diaEMes, moeda, moedaCurta } from "../formato";
+import { maiorDia, mediaPorDia, projecao } from "../analise-do-grafico";
+import {
+  AreaDaProjecao,
+  DiaDoEixo,
+  LegendaDosDias,
+  LinhaDaCota,
+  LinhaDaMedia,
+} from "../dias-do-grafico";
+import { BARRA_DA_PROJECAO, LISTRAS_DO_MAIOR_DIA } from "../estilos-do-grafico";
+import { comoData, diaEMes, moeda } from "../formato";
 import { Info } from "../info";
 
 type Dia = {
   data: string;
-  rotulo: string;
   valor: number;
   futuro: boolean;
   maiores: GastoDoDetalhe[];
@@ -14,9 +23,9 @@ type Dia = {
 
 /** A cor diz o tipo do dia, e o valor escrito e a legenda dizem o mesmo: cor
  *  nunca é o único sinal. */
-function corDoDia(valor: number, cota: number): string {
+function corDoDia(valor: number, cota: number | null): string {
   if (valor === 0) return "bg-caixinha";
-  return valor > cota ? "bg-alerta-forte" : "bg-marca";
+  return cota !== null && valor > cota ? "bg-alerta-forte" : "bg-marca";
 }
 
 function diasDoCiclo(inicio: string, fim: string): string[] {
@@ -55,9 +64,10 @@ const CORTE =
   "repeating-linear-gradient(135deg, var(--color-superficie) 0 3px, transparent 3px 6px)";
 
 /**
- * Gasto de cada dia do ciclo contra a cota: dourado sem gasto, índigo dentro
- * da cota, vermelho acima. Os dias que ainda não chegaram ficam vazios, para o
- * eixo mostrar o ciclo inteiro.
+ * Gasto de cada dia contra a cota: dourado sem gasto, índigo dentro da cota,
+ * vermelho acima. Os dias que ainda não chegaram ficam vazios, para o eixo
+ * mostrar o período inteiro. Sem cota (outro período ou com filtro), não há
+ * linha nem vermelho.
  */
 export function GraficoDoCiclo({
   inicio,
@@ -65,20 +75,21 @@ export function GraficoDoCiclo({
   hoje,
   cota,
   gastos,
+  naoUteis = [],
 }: {
   inicio: string;
   fim: string;
   hoje: string;
-  cota: number;
+  cota: number | null;
   gastos: { data: string; total: number; maiores?: GastoDoDetalhe[] }[];
+  naoUteis?: DiaNaoUtil[];
 }) {
   const porDia = new Map(gastos.map((gasto) => [gasto.data, gasto]));
-  const cotaVisivel = Math.max(cota, 0);
+  const cotaVisivel = cota === null ? null : Math.max(cota, 0);
   const dados: Dia[] = diasDoCiclo(inicio, fim).map((data) => {
     const futuro = data > hoje;
     return {
       data,
-      rotulo: data === hoje ? "hoje" : data.slice(8, 10),
       valor: futuro ? 0 : (porDia.get(data)?.total ?? 0),
       futuro,
       maiores: porDia.get(data)?.maiores ?? [],
@@ -87,10 +98,13 @@ export function GraficoDoCiclo({
   const passados = dados.filter((dia) => !dia.futuro);
   const teto = tetoDaEscala(
     passados.map((dia) => dia.valor),
-    cotaVisivel,
+    cotaVisivel ?? 0,
   );
   const algumCortado = passados.some((dia) => dia.valor > teto);
-  const alturaDaCota = (cotaVisivel / teto) * 100;
+  const media = mediaPorDia(passados);
+  const doMaior = maiorDia(passados);
+  const futuros = dados.length - passados.length;
+  const previsto = projecao(passados, futuros);
 
   return (
     <section
@@ -104,13 +118,13 @@ export function GraficoDoCiclo({
         <h2 className="text-sm font-bold">Gasto por dia</h2>
         <Info
           sobre="gasto por dia"
-          texto="Sem contas fixas e fatura. A linha tracejada é a cota."
+          texto={
+            cotaVisivel === null
+              ? "Sem contas fixas e fatura."
+              : "Sem contas fixas e fatura. Passe o mouse ou toque num dia para ver o detalhe, e na área tracejada para ver a projeção."
+          }
         />
       </div>
-
-      <span className="bg-marca-clara text-marca self-start rounded-full px-3 py-1 text-[13px] font-bold">
-        Cota do dia <span className="num">{moeda(cota)}</span>
-      </span>
 
       <div className="relative pt-[26px]">
         <div
@@ -119,17 +133,52 @@ export function GraficoDoCiclo({
             gridTemplateColumns: `repeat(${dados.length}, minmax(0, 1fr))`,
           }}
         >
-          <div
-            className="border-marca pointer-events-none absolute inset-x-0 z-10 border-t-2 border-dashed"
-            style={{ bottom: `${alturaDaCota}%` }}
-          />
+          {cotaVisivel !== null && (
+            <LinhaDaCota
+              cota={cotaVisivel}
+              style={{ bottom: `${(cotaVisivel / teto) * 100}%` }}
+            />
+          )}
+          {media !== null && media > 0 && (
+            <LinhaDaMedia
+              media={media}
+              style={{ bottom: `${(Math.min(media, teto) / teto) * 100}%` }}
+            />
+          )}
+          {previsto && (
+            <AreaDaProjecao
+              projecao={previsto.total}
+              ritmo={previsto.ritmo}
+              style={{
+                left: `${(passados.length / dados.length) * 100}%`,
+                right: 0,
+                bottom: 0,
+                height: `${Math.max(3, (Math.min(previsto.ritmo, teto) / teto) * 100)}%`,
+              }}
+            />
+          )}
           {dados.map((dia) => {
             if (dia.futuro) {
-              return <div key={dia.data} className="border-borda border-b" />;
+              return (
+                <div
+                  key={dia.data}
+                  className="border-borda flex items-end justify-center border-b"
+                >
+                  {previsto && previsto.ritmo > 0 && (
+                    <span
+                      aria-hidden
+                      className="block w-[70%] max-w-[30px] rounded-t"
+                      style={{
+                        ...BARRA_DA_PROJECAO,
+                        height: `${(Math.min(previsto.ritmo, teto) / teto) * 100}%`,
+                      }}
+                    />
+                  )}
+                </div>
+              );
             }
             const cortado = dia.valor > teto;
             const altura = (Math.min(dia.valor, teto) / teto) * 100;
-            const passou = dia.valor > cotaVisivel;
             return (
               <div
                 key={dia.data}
@@ -140,26 +189,21 @@ export function GraficoDoCiclo({
                   valor={dia.valor}
                   cota={cotaVisivel}
                   maiores={dia.maiores}
+                  feriado={marcaDoDia(naoUteis, dia.data) ?? null}
+                  maiorDoPeriodo={dia.data === doMaior}
                 >
                   <span
                     className={`relative block w-[70%] max-w-[30px] rounded-t transition-opacity group-hover:opacity-80 ${corDoDia(dia.valor, cotaVisivel)}`}
-                    style={{ height: `${Math.max(altura, 3)}%` }}
+                    style={{
+                      height: `${Math.max(altura, 3)}%`,
+                      ...(dia.data === doMaior ? LISTRAS_DO_MAIOR_DIA : {}),
+                    }}
                   >
                     {cortado && (
                       <span
                         className="absolute inset-x-[-3px] top-3.5 h-2"
                         style={{ background: CORTE }}
                       />
-                    )}
-                    {dia.valor > 0 && (
-                      // No celular não cabe valor em toda barra: fica só nas que passaram da cota.
-                      <span
-                        className={`num bg-superficie absolute -top-5 left-1/2 z-20 -translate-x-1/2 rounded px-1 text-[11px] font-bold whitespace-nowrap ${
-                          passou ? "text-alerta" : "text-tinta-2 max-sm:hidden"
-                        }`}
-                      >
-                        {moedaCurta(dia.valor)}
-                      </span>
                     )}
                   </span>
                 </ColunaComDetalhe>
@@ -174,54 +218,30 @@ export function GraficoDoCiclo({
           }}
         >
           {dados.map((dia, indice) => (
-            <span
+            <DiaDoEixo
               key={dia.data}
-              className={`text-center text-xs ${dia.rotulo === "hoje" ? "text-marca font-bold" : "text-tinta-3"} ${
-                dia.rotulo === "hoje" || indice % 3 === 0
-                  ? ""
-                  : "max-sm:invisible"
-              }`}
-            >
-              {dia.rotulo}
-            </span>
+              data={dia.data}
+              hoje={hoje}
+              marca={marcaDoDia(naoUteis, dia.data)}
+              // No celular não cabe um número por dia: fica um a cada três, e a letra em todos.
+              escondidoNoCelular={indice % 3 !== 0}
+            />
           ))}
         </div>
       </div>
 
-      <div
-        className="text-tinta-2 flex flex-wrap gap-x-[18px] gap-y-1.5 text-sm"
-        aria-hidden
-      >
-        <span className="flex items-center gap-1.5">
-          <i className="bg-caixinha inline-block size-[11px] rounded-[3px]" />
-          Sem gasto
-        </span>
-        <span className="flex items-center gap-1.5">
-          <i className="bg-marca inline-block size-[11px] rounded-[3px]" />
-          Dentro da cota
-        </span>
-        <span className="flex items-center gap-1.5">
-          <i className="bg-alerta-forte inline-block size-[11px] rounded-[3px]" />
-          Passou da cota
-        </span>
-        {algumCortado && (
-          <span className="flex items-center gap-1.5">
-            <i
-              className="inline-block size-[11px] rounded-[3px]"
-              style={{
-                background:
-                  "repeating-linear-gradient(135deg, var(--color-alerta-forte) 0 3px, var(--color-superficie) 3px 5px)",
-              }}
-            />
-            Fora da escala
-          </span>
-        )}
-      </div>
+      <LegendaDosDias
+        comCota={cotaVisivel !== null}
+        foraDaEscala={algumCortado}
+      />
 
       {/* Tabela com sr-only ignora a largura e alarga a página no celular. */}
       <div className="sr-only">
         <table>
-          <caption>Gasto por dia do ciclo, cota de {moeda(cota)}</caption>
+          <caption>
+            Gasto por dia
+            {cotaVisivel !== null ? `, cota de ${moeda(cotaVisivel)}` : ""}
+          </caption>
           <thead>
             <tr>
               <th scope="col">Dia</th>
@@ -234,7 +254,12 @@ export function GraficoDoCiclo({
                 <td>{diaEMes(dia.data)}</td>
                 <td>
                   {moeda(dia.valor)}
-                  {dia.valor > cota ? ", acima da cota" : ""}
+                  {cotaVisivel !== null && dia.valor > cotaVisivel
+                    ? ", acima da cota"
+                    : ""}
+                  {marcaDoDia(naoUteis, dia.data)
+                    ? `, ${marcaDoDia(naoUteis, dia.data)}`
+                    : ""}
                 </td>
               </tr>
             ))}

@@ -2,10 +2,15 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { ContaParaClassificar, SUBPAGINAS, estaNaPagina } from "./movimentos/abas";
+import {
+  ContaParaClassificar,
+  SUBPAGINAS,
+  estaNaPagina,
+} from "./movimentos/abas";
 import { SeletorDeTema } from "./tema";
+import { enderecoDaAnalise } from "./filtro-da-barra";
 
 type Item = {
   href: string;
@@ -70,6 +75,20 @@ const ITENS: Item[] = [
       </svg>
     ),
   },
+  {
+    href: "/ajustes",
+    rotulo: "Ajustes",
+    icone: (
+      <svg viewBox="0 0 24 24" stroke="currentColor" {...traco}>
+        <path d="M4 6 L20 6" />
+        <path d="M4 12 L20 12" />
+        <path d="M4 18 L20 18" />
+        <circle cx="9" cy="6" r="2" fill="var(--color-superficie)" />
+        <circle cx="15" cy="12" r="2" fill="var(--color-superficie)" />
+        <circle cx="7" cy="18" r="2" fill="var(--color-superficie)" />
+      </svg>
+    ),
+  },
 ];
 
 function Item({ item, ativo }: { item: Item; ativo: boolean }) {
@@ -107,7 +126,7 @@ function Item({ item, ativo }: { item: Item; ativo: boolean }) {
   );
 }
 
-/** No celular, a barra embaixo: as quatro telas ao alcance do polegar. */
+/** No celular, a barra embaixo: as telas ao alcance do polegar. Com cinco itens, o rótulo vai a 11 px para "Recorrências" caber sem encostar no vizinho. */
 function ItemDoCelular({ item, ativo }: { item: Item; ativo: boolean }) {
   const conteudo = (
     <>
@@ -116,14 +135,20 @@ function ItemDoCelular({ item, ativo }: { item: Item; ativo: boolean }) {
       >
         <span className="size-5">{item.icone}</span>
       </span>
-      <span className="text-[12px]">{item.rotulo.split(" ")[0]}</span>
+      <span className="text-[11px] tracking-[-0.2px]">
+        {item.rotulo.split(" ")[0]}
+      </span>
     </>
   );
   const classe = "flex flex-1 flex-col items-center justify-center gap-0.5";
 
   if (item.futura) {
     return (
-      <span aria-disabled title="Ainda não construída" className={`${classe} text-tinta-4`}>
+      <span
+        aria-disabled
+        title="Ainda não construída"
+        className={`${classe} text-tinta-4`}
+      >
         {conteudo}
       </span>
     );
@@ -142,13 +167,21 @@ function ItemDoCelular({ item, ativo }: { item: Item; ativo: boolean }) {
 
 /** A tela do item: Movimentos continua marcado nas páginas de dentro dele. */
 function estaEm(caminho: string, href: string): boolean {
-  return href === "/" ? caminho === "/" : caminho === href || caminho.startsWith(`${href}/`);
+  return href === "/"
+    ? caminho === "/"
+    : caminho === href || caminho.startsWith(`${href}/`);
 }
 
 /** As páginas de dentro de Movimentos, só os títulos recuados, à vista
  *  enquanto se está em Movimentos. A principal é o próprio item, e a aberta
  *  ganha fundo de superfície dentro do bloco tingido. */
-function Submenu({ caminho, paraClassificar }: { caminho: string; paraClassificar: number | null }) {
+function Submenu({
+  caminho,
+  paraClassificar,
+}: {
+  caminho: string;
+  paraClassificar: number | null;
+}) {
   return (
     <div className="flex flex-col gap-0.5 px-1 pt-0.5 pb-1">
       {SUBPAGINAS.slice(1).map((pagina) => {
@@ -159,11 +192,15 @@ function Submenu({ caminho, paraClassificar }: { caminho: string; paraClassifica
             href={pagina.href}
             aria-current={ativa ? "page" : undefined}
             className={`flex items-center justify-between gap-2 rounded-[9px] py-2 pr-2.5 pl-[34px] text-[13px] ${
-              ativa ? "bg-superficie text-marca-escura font-semibold" : "text-tinta-2 hover:bg-superficie font-medium"
+              ativa
+                ? "bg-superficie text-marca-escura font-semibold"
+                : "text-tinta-2 hover:bg-superficie font-medium"
             }`}
           >
             {pagina.rotulo}
-            {pagina.href === "/movimentos/classificar" && <ContaParaClassificar total={paraClassificar} />}
+            {pagina.href === "/movimentos/classificar" && (
+              <ContaParaClassificar total={paraClassificar} />
+            )}
           </Link>
         );
       })}
@@ -171,8 +208,15 @@ function Submenu({ caminho, paraClassificar }: { caminho: string; paraClassifica
   );
 }
 
-export function BarraLateral({ paraClassificar = null }: { paraClassificar?: number | null }) {
+export function BarraLateral({
+  paraClassificar = null,
+}: {
+  paraClassificar?: number | null;
+}) {
   const caminho = usePathname();
+  const parametros = new URLSearchParams(useSearchParams().toString());
+  const comFiltro = (item: Item) => ({ ...item, href: enderecoDaAnalise(caminho, item.href, parametros) });
+  const inicio = enderecoDaAnalise(caminho, "/", parametros);
 
   return (
     <>
@@ -180,11 +224,27 @@ export function BarraLateral({ paraClassificar = null }: { paraClassificar?: num
         aria-label="Navegação principal"
         className="bg-superficie-2 border-borda sticky top-0 flex h-dvh w-[232px] shrink-0 flex-col border-r px-4 py-6 max-md:hidden"
       >
-        <Link href="/" className="flex items-center gap-2.5 px-2 pt-1 pb-7">
+        <Link href={inicio} className="flex items-center gap-2.5 px-2 pt-1 pb-7">
           {/* A ilustração índigo some no fundo escuro: lá entra a versão prateada. */}
-          <Image src="/marca/ilustracao.png" alt="" width={40} height={40} loading="eager" className="dark:hidden" />
-          <Image src="/marca/ilustracao-escura.png" alt="" width={40} height={40} loading="eager" className="hidden dark:block" />
-          <span className="text-[18px] font-bold tracking-[0.1px]">Mercúrio</span>
+          <Image
+            src="/marca/ilustracao.png"
+            alt=""
+            width={40}
+            height={40}
+            loading="eager"
+            className="dark:hidden"
+          />
+          <Image
+            src="/marca/ilustracao-escura.png"
+            alt=""
+            width={40}
+            height={40}
+            loading="eager"
+            className="hidden dark:block"
+          />
+          <span className="text-[18px] font-bold tracking-[0.1px]">
+            Mercúrio
+          </span>
         </Link>
 
         <div className="flex flex-col gap-0.5">
@@ -194,10 +254,12 @@ export function BarraLateral({ paraClassificar = null }: { paraClassificar?: num
               // Aberto, o item e as páginas de dentro dele formam um bloco
               // tingido, para o submenu não se confundir com os itens principais.
               className={`flex flex-col ${
-                item.href === "/movimentos" && estaEm(caminho, item.href) ? "bg-marca-suave rounded-[11px]" : ""
+                item.href === "/movimentos" && estaEm(caminho, item.href)
+                  ? "bg-marca-suave rounded-[11px]"
+                  : ""
               }`}
             >
-              <Item item={item} ativo={estaEm(caminho, item.href)} />
+              <Item item={comFiltro(item)} ativo={estaEm(caminho, item.href)} />
               {item.href === "/movimentos" && estaEm(caminho, item.href) && (
                 <Submenu caminho={caminho} paraClassificar={paraClassificar} />
               )}
@@ -211,9 +273,23 @@ export function BarraLateral({ paraClassificar = null }: { paraClassificar?: num
       </nav>
 
       <header className="bg-superficie-2 border-borda sticky top-0 z-20 flex h-14 items-center justify-between border-b px-4 md:hidden">
-        <Link href="/" className="flex items-center gap-2">
-          <Image src="/marca/icone.png" alt="" width={26} height={26} loading="eager" className="dark:hidden" />
-          <Image src="/marca/icone-escuro.png" alt="" width={26} height={26} loading="eager" className="hidden dark:block" />
+        <Link href={inicio} className="flex items-center gap-2">
+          <Image
+            src="/marca/icone.png"
+            alt=""
+            width={26}
+            height={26}
+            loading="eager"
+            className="dark:hidden"
+          />
+          <Image
+            src="/marca/icone-escuro.png"
+            alt=""
+            width={26}
+            height={26}
+            loading="eager"
+            className="hidden dark:block"
+          />
           <span className="text-base font-bold">Mercúrio</span>
         </Link>
         <SeletorDeTema />
@@ -224,7 +300,11 @@ export function BarraLateral({ paraClassificar = null }: { paraClassificar?: num
         className="bg-superficie border-borda fixed inset-x-0 bottom-0 z-20 flex h-16 border-t md:hidden"
       >
         {ITENS.map((item) => (
-          <ItemDoCelular key={item.href} item={item} ativo={estaEm(caminho, item.href)} />
+          <ItemDoCelular
+            key={item.href}
+            item={comFiltro(item)}
+            ativo={estaEm(caminho, item.href)}
+          />
         ))}
       </nav>
     </>

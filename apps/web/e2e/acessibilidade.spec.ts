@@ -10,7 +10,7 @@ async function violacoes(page: import("@playwright/test").Page) {
   return violations.map(({ id, nodes }) => ({ id, alvos: nodes.map((node) => node.target) }));
 }
 
-for (const tela of ["/", "/movimentos", "/recorrencias"]) {
+for (const tela of ["/", "/movimentos", "/recorrencias", "/ajustes"]) {
   test(`${tela} sem violação automática de WCAG A e AA`, async ({ page }) => {
     await page.goto(tela);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

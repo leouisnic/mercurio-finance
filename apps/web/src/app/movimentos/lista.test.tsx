@@ -48,7 +48,12 @@ test("despesa sai em laranja com sinal de menos, receita em verde com mais", () 
     <Lista
       movimentos={[
         movimento({ id: 1, tipo: "despesa", valor: 65 }),
-        movimento({ id: 2, tipo: "receita", valor: 2500, descricao: "Pagamento recebido" }),
+        movimento({
+          id: 2,
+          tipo: "receita",
+          valor: 2500,
+          descricao: "Pagamento recebido",
+        }),
       ]}
       contas={CONTAS}
     />,
@@ -61,7 +66,13 @@ test("despesa sai em laranja com sinal de menos, receita em verde com mais", () 
 test("transferência própria não ganha sinal nem cor de gasto", () => {
   render(
     <Lista
-      movimentos={[movimento({ tipo: "aporte_titular", valor: 340.04, descricao: "Pagamento recebido" })]}
+      movimentos={[
+        movimento({
+          tipo: "aporte_titular",
+          valor: 340.04,
+          descricao: "Pagamento recebido",
+        }),
+      ]}
       contas={CONTAS}
     />,
   );
@@ -74,7 +85,12 @@ test("transferência própria não ganha sinal nem cor de gasto", () => {
 test("pagamento de fatura avisa que está fora das somas de gasto", () => {
   render(
     <Lista
-      movimentos={[movimento({ pagamentoDeFatura: "detectado", descricao: "Pagamento de fatura" })]}
+      movimentos={[
+        movimento({
+          pagamentoDeFatura: "detectado",
+          descricao: "Pagamento de fatura",
+        }),
+      ]}
       contas={CONTAS}
     />,
   );
@@ -84,16 +100,24 @@ test("pagamento de fatura avisa que está fora das somas de gasto", () => {
 
 test("pagamento de fatura descartado volta a ser gasto comum, sem aviso", () => {
   render(
-    <Lista movimentos={[movimento({ pagamentoDeFatura: "descartado" })]} contas={CONTAS} />,
+    <Lista
+      movimentos={[movimento({ pagamentoDeFatura: "descartado" })]}
+      contas={CONTAS}
+    />,
   );
 
   expect(screen.queryByText(/fora das somas de gasto/)).toBeNull();
 });
 
 test("possível duplicidade informa que o valor continua no total", () => {
-  render(<Lista movimentos={[movimento({ duplicadoPossivel: true })]} contas={CONTAS} />);
+  render(
+    <Lista
+      movimentos={[movimento({ duplicadoPossivel: true })]}
+      contas={CONTAS}
+    />,
+  );
 
-  expect(screen.getByText(/possível duplicidade/)).toBeDefined();
+  expect(screen.getByText(/Possível duplicidade/)).toBeDefined();
 });
 
 test("a conta aparece com o nome do banco, não com o nome cru da Pluggy", () => {
@@ -112,7 +136,10 @@ test("marcar dois e aplicar uma tag manda os dois para a API e limpa a seleção
   marcarVarios.mockResolvedValue({ erro: null });
   render(
     <Lista
-      movimentos={[movimento({ id: 1, descricao: "Pousada" }), movimento({ id: 2, descricao: "Restaurante" })]}
+      movimentos={[
+        movimento({ id: 1, descricao: "Pousada" }),
+        movimento({ id: 2, descricao: "Restaurante" }),
+      ]}
       contas={CONTAS}
       tags={[
         {
@@ -134,19 +161,30 @@ test("marcar dois e aplicar uma tag manda os dois para a API e limpa a seleção
   );
 
   fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar Pousada" }));
-  fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar Restaurante" }));
+  fireEvent.click(
+    screen.getByRole("checkbox", { name: "Selecionar Restaurante" }),
+  );
   expect(screen.getByText("2 selecionados")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Marcar com tag" }));
   // A tag existente aparece com ícone, como na escolha de categoria.
   fireEvent.click(await screen.findByRole("radio", { name: "viagem Exemplo" }));
   fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
 
-  await waitFor(() => expect(marcarVarios).toHaveBeenCalledWith([1, 2], { tag: "viagem Exemplo" }));
+  await waitFor(() =>
+    expect(marcarVarios).toHaveBeenCalledWith([1, 2], {
+      tag: "viagem Exemplo",
+    }),
+  );
   await waitFor(() => expect(screen.queryByText("2 selecionados")).toBeNull());
 });
 
 test("a tag do movimento aparece na linha", () => {
-  render(<Lista movimentos={[movimento({ tags: ["viagem Exemplo"] })]} contas={CONTAS} />);
+  render(
+    <Lista
+      movimentos={[movimento({ tags: ["viagem Exemplo"] })]}
+      contas={CONTAS}
+    />,
+  );
 
   expect(screen.getByText("viagem Exemplo")).toBeTruthy();
 });
@@ -155,7 +193,10 @@ test("categoria para vários usa a mesma lista com ícones e manda a escolhida",
   marcarVarios.mockResolvedValue({ erro: null });
   render(
     <Lista
-      movimentos={[movimento({ id: 1, descricao: "Pousada" }), movimento({ id: 2, descricao: "Restaurante" })]}
+      movimentos={[
+        movimento({ id: 1, descricao: "Pousada" }),
+        movimento({ id: 2, descricao: "Restaurante" }),
+      ]}
       contas={CONTAS}
       categorias={[
         { id: "viagem", nome: "Viagem", icone: "Plane", cor: 220 },
@@ -169,18 +210,30 @@ test("categoria para vários usa a mesma lista com ícones e manda a escolhida",
   fireEvent.click(screen.getByRole("radio", { name: "Viagem" }));
   fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
 
-  await waitFor(() => expect(marcarVarios).toHaveBeenCalledWith([1, 2], { categoria: "viagem" }));
+  await waitFor(() =>
+    expect(marcarVarios).toHaveBeenCalledWith([1, 2], { categoria: "viagem" }),
+  );
 });
 
 test("a busca de tag que não acha nada oferece criar", async () => {
   marcarVarios.mockResolvedValue({ erro: null });
-  render(<Lista movimentos={[movimento({ id: 1, descricao: "Pousada" })]} contas={CONTAS} tags={[]} />);
+  render(
+    <Lista
+      movimentos={[movimento({ id: 1, descricao: "Pousada" })]}
+      contas={CONTAS}
+      tags={[]}
+    />,
+  );
 
   fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar Pousada" }));
   fireEvent.click(screen.getByRole("button", { name: "Marcar com tag" }));
-  fireEvent.change(await screen.findByLabelText("Buscar ou criar tag"), { target: { value: "viagem Nova" } });
+  fireEvent.change(await screen.findByLabelText("Buscar ou criar tag"), {
+    target: { value: "viagem Nova" },
+  });
   fireEvent.click(screen.getByRole("button", { name: 'Criar "viagem Nova"' }));
   fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
 
-  await waitFor(() => expect(marcarVarios).toHaveBeenCalledWith([1], { tag: "viagem Nova" }));
+  await waitFor(() =>
+    expect(marcarVarios).toHaveBeenCalledWith([1], { tag: "viagem Nova" }),
+  );
 });

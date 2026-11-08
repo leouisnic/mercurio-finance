@@ -1,4 +1,8 @@
-import { buscarRecorrencias, type Recorrencia, type StatusRecorrencia } from "../buscar-recorrencias";
+import {
+  buscarRecorrencias,
+  type Recorrencia,
+  type StatusRecorrencia,
+} from "../buscar-recorrencias";
 import { buscarResumo } from "../buscar-resumo";
 import { FaixaDeFalha, FalhaTotal } from "../indisponivel";
 import { Info } from "../info";
@@ -6,9 +10,17 @@ import { AbasDeRecorrencias, type Aba } from "./abas";
 import { CartaoDecidido, CartaoPendente } from "./cartao";
 
 const ABAS: { chave: StatusRecorrencia; rotulo: string; vazio: string }[] = [
-  { chave: "pendente", rotulo: "Para decidir", vazio: "Nada esperando decisão." },
+  {
+    chave: "pendente",
+    rotulo: "Para decidir",
+    vazio: "Nada esperando decisão.",
+  },
   { chave: "aprovada", rotulo: "Contas fixas", vazio: "Nenhuma conta fixa." },
-  { chave: "parcelamento", rotulo: "Parcelamentos", vazio: "Nenhum parcelamento." },
+  {
+    chave: "parcelamento",
+    rotulo: "Parcelamentos",
+    vazio: "Nenhum parcelamento.",
+  },
   { chave: "encerrada", rotulo: "Encerradas", vazio: "Nenhuma encerrada." },
   { chave: "rejeitada", rotulo: "Não é recorrência", vazio: "Nenhuma." },
 ];
@@ -26,7 +38,10 @@ function Titulo() {
 }
 
 export default async function Recorrencias() {
-  const [recorrencias, resumo] = await Promise.all([buscarRecorrencias(), buscarResumo()]);
+  const [recorrencias, resumo] = await Promise.all([
+    buscarRecorrencias(),
+    buscarResumo(),
+  ]);
 
   if (recorrencias === null) {
     return (
@@ -37,7 +52,9 @@ export default async function Recorrencias() {
     );
   }
 
-  const contaPor = new Map((resumo?.contas ?? []).map((conta) => [conta.id, conta]));
+  const contaPor = new Map(
+    (resumo?.contas ?? []).map((conta) => [conta.id, conta]),
+  );
   const porEstado = (status: StatusRecorrencia): Recorrencia[] =>
     recorrencias.filter((recorrencia) => recorrencia.status === status);
 

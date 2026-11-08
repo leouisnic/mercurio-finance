@@ -9,16 +9,23 @@
  * do painel espera.
  */
 
-export const FINANCE_API_URL = process.env.FINANCE_API_URL ?? "http://localhost:8000";
+export const FINANCE_API_URL =
+  process.env.FINANCE_API_URL ?? "http://localhost:8000";
 
 export async function buscarJson<T>(
   caminho: string,
-  parametros: Record<string, string | number | undefined> = {},
+  parametros: Record<
+    string,
+    string | number | boolean | undefined | (string | number)[]
+  > = {},
 ): Promise<T | null> {
+  // Lista vira o parâmetro repetido (`?conta_id=a&conta_id=b`), que é como a API lê.
   const query = new URLSearchParams();
   for (const [chave, valor] of Object.entries(parametros)) {
-    if (valor !== undefined) {
-      query.set(chave, String(valor));
+    for (const item of Array.isArray(valor) ? valor : [valor]) {
+      if (item !== undefined) {
+        query.append(chave, String(item));
+      }
     }
   }
   const busca = query.size > 0 ? `?${query}` : "";

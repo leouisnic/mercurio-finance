@@ -170,7 +170,7 @@ test("criar tag com atalho de teto manda os dados e fecha", async () => {
   const fechar = vi.fn();
   render(
     <ProvedorDeDicas>
-      <FormularioDeTag fechar={fechar} />
+      <FormularioDeTag hoje="2026-08-10" fechar={fechar} />
     </ProvedorDeDicas>,
   );
 
