@@ -46,19 +46,24 @@ export function ColunaComDetalhe({
 
   return (
     <Popover.Root open={aberto} onOpenChange={setAberto}>
-      <button
-        type="button"
-        aria-label={`${dia}: ${moeda(valor)}`}
-        aria-expanded={aberto}
-        onMouseEnter={() => setAberto(true)}
-        onMouseLeave={() => setAberto(false)}
-        onFocus={() => setAberto(true)}
-        onBlur={() => setAberto(false)}
-        onClick={() => setAberto(true)}
-        className="group focus-visible:outline-marca flex h-full w-full min-w-0 cursor-pointer items-end justify-center rounded-t focus-visible:outline-2"
-      >
-        <Popover.Anchor asChild>{children}</Popover.Anchor>
-      </button>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          aria-label={`${dia}: ${moeda(valor)}`}
+          onMouseEnter={() => setAberto(true)}
+          onMouseLeave={() => setAberto(false)}
+          onFocus={() => setAberto(true)}
+          onBlur={() => setAberto(false)}
+          onClick={(evento) => {
+            // O foco pode abrir antes do clique. O toggle do gatilho fecharia o detalhe.
+            evento.preventDefault();
+            setAberto(true);
+          }}
+          className="group focus-visible:outline-marca flex h-full w-full min-w-0 cursor-pointer items-end justify-center rounded-t focus-visible:outline-2"
+        >
+          <Popover.Anchor asChild>{children}</Popover.Anchor>
+        </button>
+      </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
           side="top"
