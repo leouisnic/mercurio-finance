@@ -204,6 +204,33 @@ test("a moldura do calendário mantém respiro ao rolar até Aplicar", async ({ 
 test.describe("gráficos por toque", () => {
   test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
 
+  test("as barras aguardam a hidratação antes de aceitar o primeiro toque", async ({ page }) => {
+    for (const caminho of ["/", "/movimentos?referencia=2026-08-10"]) {
+      let releaseScripts!: () => void;
+      const scriptsReady = new Promise<void>((resolve) => {
+        releaseScripts = resolve;
+      });
+      await page.route("**/_next/**/*.js", async (route) => {
+        await scriptsReady;
+        await route.continue();
+      });
+      try {
+        await page.goto(caminho, { waitUntil: "commit" });
+        const grafico = page.getByRole("region", { name: caminho === "/" ? "Gasto por dia e cota" : "Gasto por dia", exact: true });
+        const dia = grafico.getByRole("button", { name: /07\/08/ });
+        await expect(dia).toBeVisible();
+        await expect(dia).toBeDisabled();
+        const firstTap = dia.tap();
+        releaseScripts();
+        await firstTap;
+        await expect(page.getByRole("dialog").filter({ hasText: "Maior dia do período" })).toBeVisible();
+      } finally {
+        releaseScripts();
+        await page.unrouteAll({ behavior: "wait" });
+      }
+    }
+  });
+
   test("o detalhe fica sobre a barra e a projeção abre no primeiro toque", async ({ page }) => {
     for (const caminho of ["/", "/movimentos?referencia=2026-08-10"]) {
       await page.goto(caminho);

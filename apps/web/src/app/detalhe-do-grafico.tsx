@@ -2,7 +2,7 @@
 
 import { Crown } from "lucide-react";
 import { Popover } from "radix-ui";
-import { type ReactElement, useState } from "react";
+import { type ReactElement, useState, useSyncExternalStore } from "react";
 import type { GastoDoDetalhe } from "./buscar-movimentos";
 import { comoData, moeda } from "./formato";
 
@@ -11,6 +11,11 @@ const DIA = new Intl.DateTimeFormat("pt-BR", {
   day: "2-digit",
   month: "2-digit",
 });
+
+// A hidratação troca o snapshot uma vez, sem uma fonte externa para observar.
+function subscribeHydration() {
+  return () => {};
+}
 
 /**
  * A coluna de um dia num gráfico de gasto, com o detalhe no padrão do
@@ -41,6 +46,7 @@ export function ColunaComDetalhe({
   children: ReactElement;
 }) {
   const [aberto, setAberto] = useState(false);
+  const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
   const dia = DIA.format(comoData(data)).replace(".", "");
   const acima = cota !== null ? valor - cota : 0;
 
@@ -49,6 +55,7 @@ export function ColunaComDetalhe({
       <Popover.Trigger asChild>
         <button
           type="button"
+          disabled={!hydrated}
           aria-label={`${dia}: ${moeda(valor)}`}
           onMouseEnter={() => setAberto(true)}
           onMouseLeave={() => setAberto(false)}

@@ -4,10 +4,17 @@ import { defineConfig, devices } from "@playwright/test";
 // Windows localhost pode resolver primeiro para ::1.
 const FINANCE_API_URL = "http://127.0.0.1:8100";
 const PAINEL_URL = "http://127.0.0.1:3100";
+const maxWorkers = process.env.PLAYWRIGHT_MAX_WORKERS;
+const workers = maxWorkers === undefined ? undefined : Number(maxWorkers);
+
+if (workers !== undefined && (!Number.isInteger(workers) || workers < 1)) {
+  throw new Error("PLAYWRIGHT_MAX_WORKERS deve ser um inteiro positivo.");
+}
 
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
+  workers,
   reporter: "list",
   use: {
     baseURL: PAINEL_URL,

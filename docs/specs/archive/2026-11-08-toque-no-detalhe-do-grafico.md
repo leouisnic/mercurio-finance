@@ -12,6 +12,11 @@ O botão externo ao Popover não registra seu gatilho, e o Radix o considera uma
 externa. O evento de fechamento pode ocorrer depois da abertura pelo clique.
 A sequência exata do primeiro toque que falhou na CI ainda não foi rastreada.
 
+A CI de `7476f55` repetiu a falha do primeiro toque. Com os scripts locais retidos,
+o teste de navegador confirmou que o botão renderizado no servidor continua habilitado.
+A hipótese de perda de interação antes da hidratação passa a ter reprodução controlada
+da disponibilidade indevida do botão. A sequência exata da falha da CI continua em aberto.
+
 ## Resultado esperado
 
 Tocar na barra abre seu detalhe e repetir o toque o mantém aberto. Mouse, foco,
@@ -19,7 +24,9 @@ Escape e interação fora da barra continuam funcionando no Início e em Movimen
 
 ## Escopo
 
-Corrigir o gatilho de `ColunaComDetalhe` e ampliar a regressão de toque existente.
+Corrigir o gatilho de `ColunaComDetalhe`, aguardar sua hidratação para habilitá-lo
+e ampliar a regressão de toque existente. Permitir limitar os workers no ambiente local
+para executar a validação completa com pouca memória, preservando o padrão sem a variável.
 
 ### Ficou de fora
 
@@ -48,9 +55,22 @@ A reprodução com o detalhe já aberto demonstra que existe também uma falha p
 O gesto de toque já faz a rolagem e resolve o alvo durante suas verificações.
 [Playwright Locator.tap](https://playwright.dev/docs/api/class-locator#locator-tap).
 
+React 19.2.8 usa `getServerSnapshot` no servidor e na hidratação inicial. O snapshot
+do cliente permite habilitar o controle após essa etapa. Aplicação do contrato conferida
+via Context7 e fonte oficial. [React useSyncExternalStore](https://react.dev/reference/react/useSyncExternalStore).
+
+O encerramento das rotas espera os handlers retidos terminarem.
+[Playwright Page.unrouteAll](https://playwright.dev/docs/api/class-page#page-unroute-all).
+
+O número de workers pode ser configurado. A versão instalada 1.62.1 resolve o padrão
+pela quantidade de CPUs, independente da afinidade do processo.
+[Playwright TestConfig.workers](https://playwright.dev/docs/api/class-testconfig#test-config-workers).
+
 ## Como provar
 
 - A regressão ampliada falha antes da correção e passa depois nos dois gráficos.
+- Reter scripts locais demonstra o botão desabilitado no HTML inicial. O primeiro
+  gesto aguarda a liberação dos scripts e abre o detalhe nos dois gráficos.
 - Reverter o gatilho deve voltar a derrubar a regressão.
 - Conferir abertura por mouse e teclado, Escape e toque fora, com dados fictícios.
 - Rodar a suíte completa, obter revisão independente e acompanhar a CI do ajuste.
@@ -62,7 +82,7 @@ Nenhuma. A aparência aprovada, o alvo de toque e a âncora na barra são preser
 ## Validações obrigatórias
 
 ```json
-{"versao": 2, "natureza": "produto", "mudanca": ["logica", "tela"], "aprovacoes": [], "locais": [{"id": "suite", "prova": "suite", "comando": ["uv", "run", "python", "scripts/validar.py", "--e2e"], "limite_s": 900}], "declaradas": {"regressao": "Segundo toque na barra com o detalhe aberto falhou antes da correcao. Primeiro toque e repeticao passaram oito vezes depois nos dois graficos.", "mutacao": "Retirar apenas preventDefault fez o teste falhar no primeiro toque. Fonte restaurada byte a byte em finally.", "borda": "Regressao ampliada passou com Escape, toque em outra barra, foco, Enter, mouse e saida do ponteiro.", "diff": "Ajuste restrito ao gatilho e sua regressao, preservando o trabalho publicado. Revisao independente conferiu o comportamento do Radix.", "tela": "Oito capturas ficticias inspecionadas no build em 390 e 1366 px, nos dois temas. Ancora acima da barra e balao dentro da largura da janela, com assercoes de geometria. Capturas e script temporarios apagados."}, "aceitacoes": []}
+{"versao": 2, "natureza": "produto", "mudanca": ["logica", "tela"], "aprovacoes": [], "locais": [{"id": "suite", "prova": "suite", "comando": ["uv", "run", "python", "scripts/validar.py", "--e2e"], "limite_s": 900}], "declaradas": {"regressao": "Segundo toque na barra com o detalhe aberto falhou antes da correcao. Primeiro toque e repeticao passaram oito vezes depois nos dois graficos. Gate de scripts confirmou controle habilitado indevidamente antes da hidratacao. Gate e interacao completa passaram quatro repeticoes cada apos disabled por snapshot.", "mutacao": "Retirar apenas preventDefault fez o teste falhar no primeiro toque. Fonte restaurada byte a byte em finally. Retirar apenas disabled derrubou o gate em toBeDisabled. Fonte restaurada byte a byte em finally.", "borda": "Regressao ampliada passou com Escape, toque em outra barra, foco, Enter, mouse e saida do ponteiro. SSR desabilitado, primeiro gesto iniciado antes de liberar os scripts, rotas liberadas e encerradas em finally nas duas paginas. Configuracao efetiva por --list confirmou 6 workers sem variavel, 1 e 2 com a variavel. Zero, negativo, texto e fracao foram rejeitados antes dos testes.", "diff": "Ajuste restrito ao gatilho e sua regressao, preservando o trabalho publicado. Revisao independente conferiu o comportamento do Radix.", "tela": "Oito capturas ficticias inspecionadas no build em 390 e 1366 px, nos dois temas. Ancora acima da barra e balao dentro da largura da janela, com assercoes de geometria. Capturas e script temporarios apagados. Inspecao repetida apos a protecao de hidratacao, com oito novas capturas e quatro testes de geometria aprovados."}, "aceitacoes": []}
 ```
 
 ## Riscos
@@ -91,22 +111,50 @@ fictícia local e da CI.
   substituído durante a hidratação. O teste passa a usar a rolagem do próprio `tap`,
   preservando as verificações de interação e posição, sem espera fixa.
 - A segunda execução encontrou encerramento do Chromium ao criar uma página. A máquina
-  tinha cerca de 600 MiB de memória livre após a execução. A repetição limita a afinidade
-  do processo de validação a quatro CPUs, e o Playwright usa dois workers. O ambiente
-  também usa `VITEST_MAX_WORKERS=2`.
+  tinha cerca de 600 MiB de memória livre após a execução. A repetição limitou a afinidade
+  do processo de validação a quatro CPUs. A suposição de que isso reduziria o Playwright
+  a dois workers foi corrigida depois pela leitura da versão instalada, que usa a
+  quantidade de CPUs. O ambiente também usa `VITEST_MAX_WORKERS=2`.
 - A suíte completa passou com esse limite, pelo contrato de fechamento da spec.
   A revisão independente conferiu gatilho, regressão e remoção da rolagem redundante,
   sem achados bloqueadores.
+- A spec foi reaberta após a CI de `7476f55` repetir a falha do primeiro toque.
+  O teste com scripts retidos falhou por encontrar o botão habilitado no HTML inicial.
+- O botão agora aguarda a hidratação com o snapshot de servidor falso e o do cliente
+  verdadeiro. O gate de scripts e a regressão completa de interação passaram quatro
+  repetições cada. Retirar somente `disabled` derrubou o gate na asserção esperada,
+  com restauração byte a byte da fonte.
+- A inspeção visual foi repetida no build com a proteção de hidratação. As quatro
+  verificações de geometria passaram e as oito capturas foram conferidas e apagadas.
+- A revalidação completa encontrou uma página encerrada pelo Chromium e falhas em
+  navegações já cobertas. Os dois testes de toque passaram nessa execução. A memória
+  livre medida após a execução era cerca de 529 MiB. Reduzir a afinidade para duas CPUs
+  também manteve o paralelismo padrão. A configuração passa a aceitar
+  `PLAYWRIGHT_MAX_WORKERS`, e a execução local usa o valor 1, mantendo a suíte inteira.
+
+- A leitura da configuração efetiva por `--list` confirmou seis workers sem a
+  variável, um com o valor 1 e dois com o valor 2. Zero, negativo, texto e fração
+  foram rejeitados. A nova execução usa `PLAYWRIGHT_MAX_WORKERS=1` e
+  `VITEST_MAX_WORKERS=2`, sem limitar a afinidade de CPU.
+- A suíte completa passou com esses limites confirmados na configuração efetiva.
+  A revisão independente conferiu a proteção de hidratação, o gate, a opção local
+  de workers e a correção do registro de execução, sem bloqueios.
 
 ## Lições
 
 - Abrir um Popover por estado não registra o botão como gatilho. O primeiro toque e
   o toque com o detalhe já aberto precisam de cobertura no navegador.
+- Controle renderizado no servidor precisa refletir sua disponibilidade de interação.
+  Gate de scripts mede a janela anterior à hidratação sem adicionar espera fixa.
+- Liberar rotas retidas e aguardar seus handlers evita que o encerramento do teste
+  responda à mesma requisição duas vezes.
+- Afinidade do processo não define o paralelismo do Playwright 1.62.1. Conferir a
+  quantidade resolvida de workers, em vez de inferi-la da quantidade de CPUs disponíveis.
 
 ## Registro do fechamento
 
-Conferido em: 2026-11-08T00:31:11.109741-03:00
-Conteúdo validado: sha256:cc0f456e2259fab1fe3d5e66c2664543557486e293e44a1fcfe4307256b6d866
-Contrato: sha256:519fab9c71ee8510e3076e22960e91fe7d6aeb41a9a24a974d095ba7465e5cd4
+Conferido em: 2026-11-08T10:53:27.556218-03:00
+Conteúdo validado: sha256:07b7cf24781f9716897c4c508e3e83ec7426db693886fc9c8119e29af1ebbe3c
+Contrato: sha256:fbf0eb9a41ee41419559e420ec54aacdabbf5d94292b71e043f399970dc35bad
 
 - A suíte terminou com código 0 pelo comando `["uv", "run", "python", "scripts/validar.py", "--e2e"]`.
