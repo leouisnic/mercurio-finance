@@ -46,6 +46,8 @@ PARES = [
     ("caixinha-texto", "superficie", TEXTO),
     ("caixinha-texto", "superficie-2", TEXTO),
     ("caixinha-texto", "caixinha-fundo", TEXTO),
+    ("guardado", "superficie-2", TEXTO),
+    ("guardado", "guardado-fundo", TEXTO),
     ("sobre-nao-util", "nao-util", TEXTO),
     ("tinta", "borda", TEXTO),
     ("aviso", "aviso-fundo", TEXTO),

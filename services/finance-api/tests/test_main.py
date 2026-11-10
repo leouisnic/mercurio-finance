@@ -1171,6 +1171,81 @@ def test_dinheiro_livre_soma_exclui_fatura_e_conta_fixa(
         "2026-10-09": "173.70",
     }
 
+    assert corpo["guardado_no_ciclo"] == "0"
+    assert corpo["guardado_em"] is None
+    # O primeiro movimento é de 02/10: nenhum ciclo completo antes dele.
+    assert corpo["da_para_guardar"] is None
+    assert corpo["falta_para_fechar"] == "0"
+
+
+def _propria(identificador: str, data: str, valor: float, tipo: str, categoria: str, conta: str = "corrente") -> dict:
+    return {
+        "data": data,
+        "valor": valor,
+        "descricao": f"Movimentação própria {identificador}",
+        "conta_id": conta,
+        "tipo": tipo,
+        "identificador_externo": identificador,
+        "categoria_id": categoria,
+    }
+
+
+def test_dinheiro_livre_reconhece_aplicacao_e_recomenda_pelo_historico(semear_contas, semear_movimentos) -> None:
+    """Ciclo de 05/10 a 14/10, hoje 10/10. Aplicação de 650 hoje na conta
+    corrente: livre 1.350 - 400 = 950; (950 + 400 + 650) / 10 = 200 no começo;
+    cota 200 - 650 / 5 = 70; cofrinho 5 x 200 - 400 = 600; hoje 670.
+    Ciclos completos: 04/09 a 14/09 com 220 em 11 dias (20 por dia) e 15/09 a
+    04/10 com 600 em 20 dias (30 por dia); mediana 25; 950 - 25 x 5 = 825,
+    arredondado para 820."""
+    semear_contas(
+        [
+            {"id": "corrente", "nome": "Conta fictícia", "tipo": "BANK", "saldo": 1350.00},
+            {"id": "cartao", "nome": "Cartão fictício", "tipo": "CREDIT", "saldo": 400.00},
+        ]
+    )
+    semear_movimentos(
+        processar_movimentos(
+            pd.DataFrame(
+                [
+                    _despesa("h1", "2026-09-04", 220.00, "Mercado de setembro"),
+                    _despesa("h2", "2026-09-20", 600.00, "Loja de setembro"),
+                    _despesa("g1", "2026-10-05", 400.00, "Mercado"),
+                    _propria("apl", "2026-10-10", 650.00, "retirada_titular", "03010000"),
+                    # Fora do guardado: transferência comum, aplicação vista no
+                    # cartão e rendimento.
+                    _propria("trf", "2026-10-08", 100.00, "retirada_titular", "04000000"),
+                    _propria("apc", "2026-10-09", 50.00, "retirada_titular", "03010000", conta="cartao"),
+                    _propria("ren", "2026-10-09", 5.00, "aporte_titular", "03060000"),
+                ]
+            )
+        ),
+        Proveniencia.PLUGGY.value,
+    )
+
+    corpo = client.get("/dinheiro-livre", params={"hoje": "2026-10-10"}).json()
+
+    assert corpo["livre"] == "950.00"
+    assert corpo["cota_do_dia"] == "70.00"
+    assert corpo["cofrinho"] == "600.00"
+    assert corpo["hoje_disponivel"] == "670.00"
+    assert corpo["guardado_no_ciclo"] == "650.00"
+    assert corpo["guardado_em"] == "2026-10-10"
+    assert corpo["da_para_guardar"] == "820.00"
+
+
+def test_dinheiro_livre_negativo_mostra_zero_e_a_falta(semear_contas) -> None:
+    semear_contas(
+        [
+            {"id": "corrente", "nome": "Conta fictícia", "tipo": "BANK", "saldo": 500.00},
+            {"id": "cartao", "nome": "Cartão fictício", "tipo": "CREDIT", "saldo": 550.00},
+        ]
+    )
+
+    corpo = client.get("/dinheiro-livre", params={"hoje": "2026-10-10"}).json()
+
+    assert corpo["livre"] == "-50.00"
+    assert corpo["hoje_disponivel"] == "0"
+    assert corpo["falta_para_fechar"] == "50.00"
 
 def _recorrencia_gravada(sessao_de_teste_factory, descricao: str, ultima: date, status: str = "pendente") -> int:
     async def gravar() -> int:

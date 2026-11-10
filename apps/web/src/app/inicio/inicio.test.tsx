@@ -39,6 +39,10 @@ const DINHEIRO: DinheiroLivre = {
   cofrinho: 600,
   gastoHoje: 0,
   hojeDisponivel: 868.74,
+  guardadoNoCiclo: 0,
+  guardadoEm: null,
+  daParaGuardar: null,
+  faltaParaFechar: 0,
   gastosPorDia: [],
 };
 
@@ -72,7 +76,15 @@ test("hoje mostra o disponível, a cota e o cofrinho da conta da spec", () => {
   expect(bloco.getByText("+ R$ 600,00")).toBeDefined();
 });
 
-test("gasto acima do que o ciclo comporta aparece negativo e com aviso", () => {
+function quadros() {
+  return within(
+    screen.getByRole("region", { name: "Hoje dá para gastar" }),
+  ).getAllByText(
+    /^(Cota do dia|Cofrinho|Guardado no ciclo|Dá para guardar|Falta para fechar|Próximo pagamento)$/,
+  );
+}
+
+test("gasto acima do que o dia comporta aparece negativo, sem mudar os quadros", () => {
   montar(
     <HojeDaParaGastar
       dinheiro={{
@@ -86,9 +98,66 @@ test("gasto acima do que o ciclo comporta aparece negativo e com aviso", () => {
 
   expect(screen.getByText("- R$ 120,00")).toBeDefined();
   expect(screen.getByText("- R$ 388,74")).toBeDefined();
-  expect(screen.getByRole("status").textContent).toMatch(
-    /além do que o ciclo comporta/,
+  expect(quadros()).toHaveLength(4);
+});
+
+test("sem histórico, dá para guardar diz isso em vez de mostrar zero", () => {
+  montar(<HojeDaParaGastar dinheiro={DINHEIRO} />);
+
+  expect(screen.getByText("Sem histórico")).toBeDefined();
+  expect(screen.getByText("Guardado no ciclo")).toBeDefined();
+});
+
+test("a recomendação aparece no quadro e o guardado traz a data ao lado", () => {
+  montar(
+    <HojeDaParaGastar
+      dinheiro={{
+        ...DINHEIRO,
+        daParaGuardar: 650,
+        guardadoNoCiclo: 350,
+        guardadoEm: "2026-10-10",
+      }}
+    />,
   );
+
+  expect(screen.getByText("R$ 650,00")).toBeDefined();
+  expect(screen.getByText("R$ 350,00")).toBeDefined();
+  expect(screen.getByText("10/10")).toBeDefined();
+});
+
+test("resgate de outro ciclo não mostra guardado negativo", () => {
+  montar(
+    <HojeDaParaGastar
+      dinheiro={{ ...DINHEIRO, guardadoNoCiclo: -300, daParaGuardar: 100 }}
+    />,
+  );
+
+  expect(screen.getByText("R$ 0,00")).toBeDefined();
+  expect(screen.queryByText("- R$ 300,00")).toBeNull();
+});
+
+test("livre negativo mostra zero, a falta e o próximo pagamento no lugar de cota e cofrinho", () => {
+  montar(
+    <HojeDaParaGastar
+      dinheiro={{
+        ...DINHEIRO,
+        livre: -50,
+        hojeDisponivel: 0,
+        faltaParaFechar: 50,
+        daParaGuardar: 0,
+      }}
+    />,
+  );
+
+  const bloco = within(
+    screen.getByRole("region", { name: "Hoje dá para gastar" }),
+  );
+  expect(bloco.getByText("R$ 50,00")).toBeDefined();
+  expect(bloco.getByText("15/10")).toBeDefined();
+  expect(bloco.getByText("Em 5 dias")).toBeDefined();
+  expect(bloco.queryByText("Cota do dia")).toBeNull();
+  expect(bloco.queryByText("Cofrinho")).toBeNull();
+  expect(quadros()).toHaveLength(4);
 });
 
 test("a composição mostra cada parte do saldo e as contas fixas com a data", () => {

@@ -26,6 +26,10 @@ export type DinheiroLivre = {
   cofrinho: number;
   gastoHoje: number;
   hojeDisponivel: number;
+  guardadoNoCiclo: number;
+  guardadoEm: string | null;
+  daParaGuardar: number | null;
+  faltaParaFechar: number;
   gastosPorDia: { data: string; total: number; maiores: GastoDoDetalhe[] }[];
 };
 
@@ -51,6 +55,10 @@ type Resposta = {
   cofrinho: string;
   gasto_hoje: string;
   hoje_disponivel: string;
+  guardado_no_ciclo: string;
+  guardado_em: string | null;
+  da_para_guardar: string | null;
+  falta_para_fechar: string;
   gastos_por_dia: {
     data: string;
     total: string;
@@ -89,6 +97,11 @@ export async function buscarDinheiroLivre(
     cofrinho: paraNumero(corpo.cofrinho),
     gastoHoje: paraNumero(corpo.gasto_hoje),
     hojeDisponivel: paraNumero(corpo.hoje_disponivel),
+    guardadoNoCiclo: paraNumero(corpo.guardado_no_ciclo),
+    guardadoEm: corpo.guardado_em,
+    daParaGuardar:
+      corpo.da_para_guardar === null ? null : paraNumero(corpo.da_para_guardar),
+    faltaParaFechar: paraNumero(corpo.falta_para_fechar),
     gastosPorDia: corpo.gastos_por_dia.map((dia) => ({
       data: dia.data,
       total: paraNumero(dia.total),

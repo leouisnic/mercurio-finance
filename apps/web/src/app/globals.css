@@ -54,10 +54,17 @@
   --color-fixa: oklch(42% 0.13 20);
   --color-fixa-fundo: oklch(95% 0.03 20);
 
-  /* Dourado: dinheiro guardado (cofrinho e caixinha). Não é gasto nem enfeite. */
+  /* Dourado: sobra da cota que ficou na conta (cofrinho). Não é gasto nem enfeite. */
   --color-caixinha: oklch(64% 0.13 75);
   --color-caixinha-texto: oklch(48% 0.1 70);
   --color-caixinha-fundo: oklch(95% 0.05 85);
+
+  /* Verde-água: dinheiro aplicado no banco neste ciclo, escolhido no mockup da
+     spec do dinheiro livre e do plano do ciclo. Dourado aqui ficaria igual ao
+     vermelho de alerta para quem não distingue verde e vermelho, e azul colaria
+     no roxo da marca; as medições estão na spec. */
+  --color-guardado: oklch(46% 0.1 200);
+  --color-guardado-fundo: oklch(94% 0.04 200);
 
   /* Magenta: dia não útil (fim de semana e feriado) no eixo dos gráficos e no calendário.
      Longe do dourado dos dias de ouro e do índigo e do vermelho das barras. */
@@ -117,6 +124,9 @@
   --color-caixinha: oklch(78% 0.13 82);
   --color-caixinha-texto: oklch(85% 0.11 85);
   --color-caixinha-fundo: oklch(30% 0.05 85);
+
+  --color-guardado: oklch(82% 0.1 200);
+  --color-guardado-fundo: oklch(31% 0.05 200);
 
   --color-nao-util: oklch(78% 0.13 345);
   --color-sobre-nao-util: oklch(18% 0.03 345);

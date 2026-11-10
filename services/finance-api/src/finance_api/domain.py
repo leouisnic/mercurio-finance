@@ -517,6 +517,13 @@ class DinheiroLivreOut(BaseModel):
     cofrinho: Decimal
     gasto_hoje: Decimal
     hoje_disponivel: Decimal
+    # Aplicado menos resgatado no ciclo; negativo quando o resgate é de
+    # dinheiro guardado em outro ciclo.
+    guardado_no_ciclo: Decimal
+    guardado_em: date | None
+    # Nulo quando ainda não há ciclos completos suficientes para estimar.
+    da_para_guardar: Decimal | None
+    falta_para_fechar: Decimal
     gastos_por_dia: list[GastoDoDiaOut]
 
 

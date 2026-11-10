@@ -15,7 +15,11 @@ from datetime import date, datetime
 from decimal import Decimal
 
 import pandas as pd
-from ingestion_worker.pluggy import CATEGORIA_ID_PAGAMENTO_DE_FATURA
+from ingestion_worker.pluggy import (
+    CATEGORIA_ID_PAGAMENTO_DE_FATURA,
+    CATEGORIA_ID_RENDIMENTO,
+    PREFIXO_CATEGORIA_INVESTIMENTO,
+)
 from sqlalchemy import Numeric, and_, case, cast, delete, exists, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -426,11 +430,30 @@ async def agregar_fluxo_por_conta(
     return [tuple(linha) for linha in resultado.all()]
 
 
-async def entradas_do_dinheiro_livre(
-    sessao: AsyncSession, *, inicio: date, hoje: date
-) -> tuple[Decimal, Decimal, list[RecorrenciaAprovada], list[CompromissoAtivo], dict[date, Decimal]]:
-    """O que `finance_api.dinheiro_livre.calcular` precisa, lido do banco:
-    `(saldo_contas, cartao_usado, recorrencias, compromissos, gastos_por_dia)`.
+@dataclass(frozen=True)
+class EntradasDoDinheiroLivre:
+    saldo_contas: Decimal
+    cartao_usado: Decimal
+    recorrencias: list[RecorrenciaAprovada]
+    compromissos: list[CompromissoAtivo]
+    gastos_por_dia: dict[date, Decimal]
+    guardado_por_dia: dict[date, Decimal]
+
+
+def _e_aplicacao_ou_resgate():
+    """Aplicação ou resgate na conta corrente, pela categoria da Pluggy: a mesma
+    regra de `ingestion_worker.pluggy.e_movimento_de_investimento`. Rendimento
+    fica de fora porque é dinheiro novo, não dinheiro guardado."""
+    return and_(
+        MovimentoORM.tipo.in_(("retirada_titular", "aporte_titular")),
+        MovimentoORM.categoria_id.startswith(PREFIXO_CATEGORIA_INVESTIMENTO),
+        MovimentoORM.categoria_id != CATEGORIA_ID_RENDIMENTO,
+        MovimentoORM.conta_id.in_(select(ContaORM.id).where(ContaORM.tipo == "BANK")),
+    )
+
+
+async def entradas_do_dinheiro_livre(sessao: AsyncSession, *, inicio: date, hoje: date) -> EntradasDoDinheiroLivre:
+    """O que `finance_api.dinheiro_livre.calcular` precisa, lido do banco.
 
     Gasto do dia a dia é despesa sem pagamento de fatura e sem conta fixa:
     as duas já são descontadas à parte, e contá-las de novo tiraria o mesmo
@@ -466,7 +489,19 @@ async def entradas_do_dinheiro_livre(
         )
     ).all()
 
-    return (
+    # Valor gravado é sempre positivo; aplicação guarda e resgate devolve.
+    guardado = (
+        await sessao.execute(
+            select(
+                MovimentoORM.data,
+                func.sum(case((MovimentoORM.tipo == "retirada_titular", MovimentoORM.valor), else_=-MovimentoORM.valor)),
+            )
+            .where(MovimentoORM.data >= inicio, MovimentoORM.data <= hoje, _e_aplicacao_ou_resgate())
+            .group_by(MovimentoORM.data)
+        )
+    ).all()
+
+    return EntradasDoDinheiroLivre(
         saldos.get("BANK") or zero,
         saldos.get("CREDIT") or zero,
         [
@@ -483,7 +518,32 @@ async def entradas_do_dinheiro_livre(
             for compromisso in ativos
         ],
         {data: total for data, total in gastos},
+        {data: total for data, total in guardado},
     )
+
+
+async def medias_do_dia_a_dia(sessao: AsyncSession, ciclos: list[Ciclo]) -> list[Decimal]:
+    """Gasto do dia a dia por dia de cada ciclo, só dos ciclos que começam
+    depois do primeiro movimento gravado: ciclo anterior ao histórico daria
+    média zero e puxaria a estimativa para baixo."""
+    primeiro = await primeiro_movimento(sessao)
+    if primeiro is None:
+        return []
+    medias = []
+    for ciclo in ciclos:
+        if ciclo.inicio < primeiro:
+            continue
+        total = await sessao.scalar(
+            select(func.coalesce(func.sum(MovimentoORM.valor), 0)).where(
+                MovimentoORM.tipo == "despesa",
+                MovimentoORM.data >= ciclo.inicio,
+                MovimentoORM.data <= ciclo.fim,
+                _nao_e_pagamento_de_fatura(),
+                ~_e_conta_fixa(),
+            )
+        )
+        medias.append(Decimal(total) / ((ciclo.fim - ciclo.inicio).days + 1))
+    return medias
 
 
 async def lancamentos_para_deteccao(sessao: AsyncSession) -> list[LancamentoObservado]:

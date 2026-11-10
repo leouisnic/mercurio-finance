@@ -153,6 +153,10 @@ const DINHEIRO = {
   cofrinho: 1060.5,
   gastoHoje: 65,
   hojeDisponivel: 1303.7,
+  guardadoNoCiclo: 0,
+  guardadoEm: null,
+  daParaGuardar: null,
+  faltaParaFechar: 0,
   gastosPorDia: [{ data: "2026-08-07", total: 300 }],
 };
 

@@ -42,8 +42,12 @@ from finance_api.contadores import (
     gasto_ate_o_dia,
 )
 from finance_api.db import async_session, obter_sessao
+from finance_api.dinheiro_livre import (
+    CICLOS_DA_ESTIMATIVA,
+    contas_fixas_pendentes,
+    estimar_dia_a_dia,
+)
 from finance_api.dinheiro_livre import calcular as calcular_dinheiro_livre
-from finance_api.dinheiro_livre import contas_fixas_pendentes
 from finance_api.domain import (
     BarraDoCicloOut,
     CategoriaIn,
@@ -128,6 +132,7 @@ from finance_api.repositorio import (
     listar_tags,
     maiores_por_dia,
     marcar_em_lote,
+    medias_do_dia_a_dia,
     obter_compromisso,
     primeiro_movimento,
     tags_dos_movimentos,
@@ -757,20 +762,23 @@ async def dinheiro_livre(
     demonstração e os testes fixarem a data."""
     dia = hoje or date.today()  # noqa: DTZ011 (ciclo é data civil, sem fuso)
     ciclo = ciclo_de(dia)
-    saldo, cartao, recorrencias, compromissos, gastos = await entradas_do_dinheiro_livre(
-        sessao, inicio=ciclo.inicio, hoje=dia
-    )
+    entradas = await entradas_do_dinheiro_livre(sessao, inicio=ciclo.inicio, hoje=dia)
     maiores = await maiores_por_dia(sessao, inicio=ciclo.inicio, fim=dia, sem_conta_fixa=True)
+    completos = [ciclo_anterior(ciclo)]
+    while len(completos) < CICLOS_DA_ESTIMATIVA:
+        completos.append(ciclo_anterior(completos[-1]))
     resultado = calcular_dinheiro_livre(
         hoje=dia,
         inicio=ciclo.inicio,
         fim=ciclo.fim,
-        saldo_contas=saldo,
-        cartao_usado=cartao,
+        saldo_contas=entradas.saldo_contas,
+        cartao_usado=entradas.cartao_usado,
         contas_fixas=contas_fixas_pendentes(
-            recorrencias, compromissos, hoje=dia, inicio=ciclo.inicio, fim=ciclo.fim
+            entradas.recorrencias, entradas.compromissos, hoje=dia, inicio=ciclo.inicio, fim=ciclo.fim
         ),
-        gastos_por_dia=gastos,
+        gastos_por_dia=entradas.gastos_por_dia,
+        guardado_por_dia=entradas.guardado_por_dia,
+        estimativa_por_dia=estimar_dia_a_dia(await medias_do_dia_a_dia(sessao, completos)),
     )
     # Só o dia de verdade guarda a cota: com `hoje` fixado (demonstração e
     # testes), o saldo de agora reconstruiria a cota de outro ciclo errado.
@@ -792,6 +800,10 @@ async def dinheiro_livre(
         cofrinho=resultado.cofrinho,
         gasto_hoje=resultado.gasto_hoje,
         hoje_disponivel=resultado.hoje_disponivel,
+        guardado_no_ciclo=resultado.guardado_no_ciclo,
+        guardado_em=resultado.guardado_em,
+        da_para_guardar=resultado.da_para_guardar,
+        falta_para_fechar=resultado.falta_para_fechar,
         gastos_por_dia=[
             GastoDoDiaOut(
                 data=data,

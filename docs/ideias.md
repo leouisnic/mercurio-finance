@@ -179,13 +179,13 @@ Por quê: As telas de dados não têm filtro e o dono escreve mês e ano no nome
 
 ## Plano do ciclo
 
-Estado: virou leva (`docs/specs/2026-11-07-dinheiro-livre-e-plano-do-ciclo.md`)
+Estado: adiada
 
-Adiada em: 2026-10-29
+Adiada em: 2026-11-09
 
-Gatilho: junto com "Dinheiro livre quando estoura", que mexe no mesmo número.
+Gatilho: um ciclo que não fecha por causa de uma conta grande conhecida, ou o dono pedir o aviso do próximo ciclo.
 
-Por quê: O livre desconta só as contas fixas que vencem até o fim do ciclo atual. Aprovado para detalhamento: sugerir cobertura das despesas futuras por regras, mostrar a justificativa e o impacto na cota diária. Renda prevista é editável, com atalho por cálculo de trabalho. A política de aplicação, os parâmetros e o visual serão definidos na spec.
+Por quê: O livre desconta só as contas fixas que vencem até o fim do ciclo atual. O plano do próximo ciclo (renda prevista com atalho por cálculo de trabalho, MEI, projeção por data e reserva) foi detalhado na spec de 07/11 e tirado da leva: o histórico mostra que cada ciclo é pago pela própria renda e o dono não quer a cota reduzida por suposição. Se voltar, volta só como aviso, sem mexer na cota. As regras já decididas estão na [spec](specs/2026-11-07-dinheiro-livre-e-plano-do-ciclo.md), em "Ficou de fora".
 
 O [mapa das specs](specs/2026-11-07-dinheiro-livre-e-plano-do-ciclo.md) organiza os
 desdobramentos aprovados para detalhamento. Metas e desejos, reservas e despesas
