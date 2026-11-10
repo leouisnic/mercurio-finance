@@ -22,6 +22,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from finance_api.db import Base
@@ -64,6 +65,14 @@ class MovimentoORM(Base):
         UniqueConstraint(
             "fingerprint", "identificador_externo", name="uq_movimentos_fingerprint_id"
         ),
+        # Na Pluggy o ID é a identidade da transação: ela altera data e valor
+        # mantendo o ID, e a alteração atualiza a linha em vez de criar outra.
+        Index(
+            "uq_movimentos_pluggy_id",
+            "identificador_externo",
+            unique=True,
+            postgresql_where=text("proveniencia = 'pluggy'"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -94,7 +103,28 @@ class MovimentoORM(Base):
         ForeignKey("categorias.id"), nullable=True, index=True
     )
     origem_da_categoria: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # Compra em outra moeda: `valor` é o que a instituição cobrou em reais, e
+    # estes guardam a moeda e o valor de origem. Nulos em reais.
+    moeda_original: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    valor_original: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class MovimentoRemovidoORM(Base):
+    """Movimento que a Pluggy deixou de devolver. Sai de `movimentos`, e com
+    isso de todas as somas, mas não some: `dados` guarda a linha e as tags
+    para restaurar se o mesmo ID voltar."""
+
+    __tablename__ = "movimentos_removidos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    conta_id: Mapped[str] = mapped_column(String(100), index=True)
+    identificador_externo: Mapped[str | None] = mapped_column(String(200), nullable=True, index=True)
+    data: Mapped[date] = mapped_column(Date)
+    valor: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    tipo: Mapped[str] = mapped_column(String(30))
+    dados: Mapped[dict] = mapped_column(JSONB)
+    removido_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class CategoriaORM(Base):

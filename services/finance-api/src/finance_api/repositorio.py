@@ -20,7 +20,21 @@ from ingestion_worker.pluggy import (
     CATEGORIA_ID_RENDIMENTO,
     PREFIXO_CATEGORIA_INVESTIMENTO,
 )
-from sqlalchemy import Numeric, and_, case, cast, delete, exists, func, or_, select, update
+from sqlalchemy import (
+    Numeric,
+    String,
+    and_,
+    case,
+    cast,
+    delete,
+    exists,
+    func,
+    literal_column,
+    or_,
+    select,
+    text,
+    update,
+)
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -44,6 +58,7 @@ from finance_api.models import (
     ContaORM,
     CotaDoCicloORM,
     MovimentoORM,
+    MovimentoRemovidoORM,
     MovimentoTagORM,
     RecorrenciaORM,
     RegraDeCategoriaORM,
@@ -170,16 +185,35 @@ async def listar_contas(sessao: AsyncSession) -> list[ContaORM]:
     return list(resultado.scalars().all())
 
 
+PROVENIENCIA_PLUGGY = "pluggy"
+# O que a Pluggy pode mudar numa transação que mantém o ID. Categoria própria,
+# origem dela, tags e decisão de fatura são do dono e ficam fora.
+CAMPOS_QUE_A_PLUGGY_ATUALIZA = (
+    "data",
+    "valor",
+    "descricao",
+    "tipo",
+    "fingerprint",
+    "duplicado_possivel",
+    "categoria",
+    "categoria_id",
+    "moeda_original",
+    "valor_original",
+)
+
+
 async def inserir_movimentos(
     sessao: AsyncSession, extrato: pd.DataFrame, proveniencia: str
 ) -> int:
-    """Insere os movimentos de um extrato já processado.
+    """Insere os movimentos de um extrato já processado e devolve quantos
+    são novos.
 
-    Ignora duplicidade confirmada (mesma linha de origem reimportada) via
-    `ON CONFLICT DO NOTHING` na constraint única do banco
-    (`fingerprint`, `identificador_externo`), então rodar a mesma
-    importação mais de uma vez é seguro e não duplica saldo. A conta
-    referenciada (`conta_id`) precisa já existir em `contas` (upsert
+    Da Pluggy, o ID é a identidade: transação que voltou alterada atualiza a
+    mesma linha, e uma que tinha sido removida volta com a categoria e as
+    tags do dono. De outra origem, ignora duplicidade confirmada (mesma linha
+    reimportada) pela constraint (`fingerprint`, `identificador_externo`).
+    Depois, marca possível duplicidade também contra o que já estava gravado.
+    A conta referenciada (`conta_id`) precisa já existir em `contas` (upsert
     antes, ver `upsert_contas`), por causa da chave estrangeira.
     """
     if extrato.empty:
@@ -199,17 +233,142 @@ async def inserir_movimentos(
             # Só a Pluggy categoriza; CSV e XML de NFS-e vêm sem isso.
             "categoria": _texto_ou_none(linha.get("categoria")),
             "categoria_id": _texto_ou_none(linha.get("categoria_id")),
+            "moeda_original": _texto_ou_none(linha.get("moeda_original")),
+            "valor_original": _decimal_ou_none(linha.get("valor_original")),
         }
         for linha in extrato.to_dict("records")
     ]
 
-    instrucao = pg_insert(MovimentoORM).values(valores)
-    instrucao = instrucao.on_conflict_do_nothing(
-        constraint="uq_movimentos_fingerprint_id"
-    )
-    resultado = await sessao.execute(instrucao)
+    novos = 0
+    # Só a linha da Pluggy com ID tem identidade; sem ID, vale a regra antiga
+    # do fingerprint com o identificador.
+    pela_identidade = [
+        valor for valor in valores if proveniencia == PROVENIENCIA_PLUGGY and valor["identificador_externo"]
+    ]
+    pelo_fingerprint = [valor for valor in valores if valor not in pela_identidade]
+    if pela_identidade:
+        # O mesmo ID duas vezes no lote faria o upsert tocar a linha duas
+        # vezes, o que o Postgres recusa; vale a última versão.
+        unicos = list({valor["identificador_externo"]: valor for valor in pela_identidade}.values())
+        await _restaurar_removidos(sessao, [valor["identificador_externo"] for valor in unicos])
+        instrucao = pg_insert(MovimentoORM).values(unicos)
+        instrucao = instrucao.on_conflict_do_update(
+            index_elements=["identificador_externo"],
+            index_where=text("proveniencia = 'pluggy'"),
+            set_={campo: instrucao.excluded[campo] for campo in CAMPOS_QUE_A_PLUGGY_ATUALIZA},
+        ).returning(literal_column("(xmax = 0)"))
+        novos += sum(1 for (inserido,) in (await sessao.execute(instrucao)).all() if inserido)
+    if pelo_fingerprint:
+        instrucao = pg_insert(MovimentoORM).values(pelo_fingerprint)
+        instrucao = instrucao.on_conflict_do_nothing(constraint="uq_movimentos_fingerprint_id")
+        novos += (await sessao.execute(instrucao)).rowcount or 0
+
+    await _marcar_duplicidade_entre_lotes(sessao)
     await sessao.commit()
-    return resultado.rowcount or 0
+    return novos
+
+
+async def _marcar_duplicidade_entre_lotes(sessao: AsyncSession) -> None:
+    """Fingerprint igual com identificador diferente é possível duplicidade,
+    mesmo quando as duas linhas chegaram em sincronizações separadas. As duas
+    ficam marcadas e continuam no total; a revisão decide."""
+    repetidos = (
+        select(MovimentoORM.fingerprint)
+        .group_by(MovimentoORM.fingerprint)
+        .having(func.count(func.distinct(func.coalesce(MovimentoORM.identificador_externo, cast(MovimentoORM.id, String)))) > 1)
+    )
+    await sessao.execute(
+        update(MovimentoORM)
+        .where(MovimentoORM.fingerprint.in_(repetidos), MovimentoORM.duplicado_possivel.is_(False))
+        .values(duplicado_possivel=True)
+    )
+
+
+def _linha_como_dados(movimento: MovimentoORM, tags: list[int]) -> dict:
+    return {
+        "conta_id": movimento.conta_id,
+        "data": movimento.data.isoformat(),
+        "valor": str(movimento.valor),
+        "descricao": movimento.descricao,
+        "tipo": movimento.tipo,
+        "proveniencia": movimento.proveniencia,
+        "identificador_externo": movimento.identificador_externo,
+        "fingerprint": movimento.fingerprint,
+        "duplicado_possivel": movimento.duplicado_possivel,
+        "categoria": movimento.categoria,
+        "categoria_id": movimento.categoria_id,
+        "pagamento_de_fatura": movimento.pagamento_de_fatura,
+        "categoria_propria": movimento.categoria_propria,
+        "origem_da_categoria": movimento.origem_da_categoria,
+        "moeda_original": movimento.moeda_original,
+        "valor_original": None if movimento.valor_original is None else str(movimento.valor_original),
+        "criado_em": movimento.criado_em.isoformat(),
+        "tags": tags,
+    }
+
+
+async def remover_ausentes_da_pluggy(
+    sessao: AsyncSession, *, conta_id: str, devolvidos: set[str], desde: date
+) -> int:
+    """Tira de `movimentos` o que a Pluggy deixou de devolver para a conta,
+    só a partir de `desde`, a data mais antiga que ela devolveu: antes disso
+    a ausência é só o limite de histórico dela, não remoção. A linha vai para
+    `movimentos_removidos` com as tags e volta se o ID reaparecer."""
+    ausentes = (
+        await sessao.execute(
+            select(MovimentoORM).where(
+                MovimentoORM.conta_id == conta_id,
+                MovimentoORM.proveniencia == PROVENIENCIA_PLUGGY,
+                MovimentoORM.data >= desde,
+                MovimentoORM.identificador_externo.not_in(devolvidos),
+            )
+        )
+    ).scalars().all()
+    for movimento in ausentes:
+        tags = (
+            await sessao.execute(select(MovimentoTagORM.tag_id).where(MovimentoTagORM.movimento_id == movimento.id))
+        ).scalars().all()
+        sessao.add(
+            MovimentoRemovidoORM(
+                id=movimento.id,
+                conta_id=movimento.conta_id,
+                identificador_externo=movimento.identificador_externo,
+                data=movimento.data,
+                valor=movimento.valor,
+                tipo=movimento.tipo,
+                dados=_linha_como_dados(movimento, list(tags)),
+            )
+        )
+        await sessao.delete(movimento)
+    await sessao.commit()
+    return len(ausentes)
+
+
+async def _restaurar_removidos(sessao: AsyncSession, identificadores: list[str]) -> None:
+    """Devolve a `movimentos`, com o mesmo id, a categoria e as tags, o que
+    tinha sido removido e a Pluggy voltou a mandar. O upsert que vem depois
+    põe os dados novos por cima."""
+    removidos = (
+        await sessao.execute(
+            select(MovimentoRemovidoORM).where(MovimentoRemovidoORM.identificador_externo.in_(identificadores))
+        )
+    ).scalars().all()
+    for removido in removidos:
+        dados = dict(removido.dados)
+        tags = dados.pop("tags")
+        dados["data"] = date.fromisoformat(dados["data"])
+        dados["valor"] = Decimal(dados["valor"])
+        dados["valor_original"] = None if dados["valor_original"] is None else Decimal(dados["valor_original"])
+        dados["criado_em"] = datetime.fromisoformat(dados["criado_em"])
+        await sessao.execute(pg_insert(MovimentoORM).values(id=removido.id, **dados))
+        if tags:
+            await sessao.execute(
+                pg_insert(MovimentoTagORM)
+                .values([{"movimento_id": removido.id, "tag_id": tag} for tag in tags])
+                .on_conflict_do_nothing()
+            )
+        await sessao.delete(removido)
+    await sessao.flush()
 
 
 def _e_conta_fixa():

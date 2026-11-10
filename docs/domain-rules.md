@@ -23,15 +23,31 @@ despesas consolidadas.
 
 ## Conciliação e duplicidade
 
-O fingerprint usa conta, data, valor, descrição e tipo normalizados. O
-identificador externo nunca é suficiente sozinho.
+O fingerprint usa conta, data, valor, descrição e tipo normalizados.
 
-- Mesmo fingerprint e mesmo identificador: duplicidade confirmada, descartada
-  na inserção.
-- Mesmo fingerprint e identificador diferente: possível duplicidade, mantida
-  no total e sinalizada como valor em revisão.
+- Da Pluggy, o ID é a identidade: uma transação é uma linha. Quando a Pluggy
+  altera data, valor, descrição ou tipo mantendo o ID (a compra que sai de
+  pendente, por exemplo), a mesma linha é atualizada, e categoria própria, tags
+  e decisão de fatura do dono ficam.
+- Transação que a Pluggy deixa de devolver, dentro do intervalo que ela
+  devolveu para a conta, sai de `movimentos` para `movimentos_removidos`, com as
+  tags, e volta se o ID reaparecer. Conta sem nenhuma transação devolvida não
+  remove nada.
+- De outra origem, o identificador externo nunca é suficiente sozinho: mesmo
+  fingerprint e mesmo identificador é duplicidade confirmada, descartada na
+  inserção.
+- Mesmo fingerprint e identificador diferente: possível duplicidade, mantida no
+  total e sinalizada como valor em revisão, também entre importações
+  diferentes.
 
 Possíveis duplicidades não participam da detecção automática de recorrência.
+
+## Moeda
+
+O valor é sempre em reais. Compra em outra moeda vale o que a instituição
+cobrou em reais (`amountInAccountCurrency` da Pluggy), e a moeda e o valor de
+origem ficam em `moeda_original` e `valor_original`. Sem o valor em reais, a
+transação espera a próxima sincronização: câmbio nunca é estimado.
 
 ## Pagamento de fatura
 

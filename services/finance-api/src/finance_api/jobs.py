@@ -6,6 +6,7 @@ Cada job cria sua própria sessão do banco: roda num processo separado do
 
 import asyncio
 from collections.abc import Callable, Coroutine
+from datetime import date, datetime
 
 import pandas as pd
 from mercurio_domain import Proveniencia
@@ -18,6 +19,7 @@ from finance_api.repositorio import (
     inserir_movimentos,
     lancamentos_para_deteccao,
     marcar_pagamentos_de_fatura,
+    remover_ausentes_da_pluggy,
     salvar_recorrencias_detectadas,
     upsert_contas,
 )
@@ -97,13 +99,28 @@ def job_sincronizar_pluggy() -> dict[str, int]:
 
     contas: list[dict] = []
     movimentos: list[dict] = []
+    aguardando_conversao = 0
+    # Por conta: os IDs que a Pluggy devolveu e a data mais antiga entre eles,
+    # para saber o que ela deixou de mandar sem confundir com o limite de
+    # histórico dela.
+    devolvidos: dict[str, tuple[set[str], date]] = {}
     for item_id in PLUGGY_ITEM_IDS:
         for conta in listar_contas(api_key, item_id):
             contas.append(mapear_conta(conta))
-            for transacao in listar_transacoes(api_key, conta["id"]):
-                movimentos.append(mapear_para_movimento(transacao))
+            transacoes = listar_transacoes(api_key, conta["id"])
+            if transacoes:
+                devolvidos[conta["id"]] = (
+                    {transacao["id"] for transacao in transacoes},
+                    min(datetime.fromisoformat(transacao["date"]).date() for transacao in transacoes),
+                )
+            for transacao in transacoes:
+                movimento = mapear_para_movimento(transacao)
+                if movimento is None:
+                    aguardando_conversao += 1
+                else:
+                    movimentos.append(movimento)
 
-    async def gravar() -> tuple[int, int, int]:
+    async def gravar() -> tuple[int, int, int, int]:
         async with async_session() as sessao:
             await upsert_contas(sessao, contas)
 
@@ -113,6 +130,11 @@ def job_sincronizar_pluggy() -> dict[str, int]:
                 inseridos = await inserir_movimentos(
                     sessao, extrato, proveniencia=Proveniencia.PLUGGY.value
                 )
+            removidos = 0
+            for conta_id, (ids, desde) in devolvidos.items():
+                removidos += await remover_ausentes_da_pluggy(
+                    sessao, conta_id=conta_id, devolvidos=ids, desde=desde
+                )
 
             # Antes da detecção, de propósito: pagamento de fatura marcado
             # aqui sai da conta de despesa e não vira recorrência falsa.
@@ -121,13 +143,15 @@ def job_sincronizar_pluggy() -> dict[str, int]:
             await classificar_movimentos(sessao)
             candidatas = detectar_recorrencias(await lancamentos_para_deteccao(sessao))
             recorrencias = await salvar_recorrencias_detectadas(sessao, candidatas)
-            return inseridos, faturas, recorrencias
+            return inseridos, removidos, faturas, recorrencias
 
-    inseridos, faturas, recorrencias = rodar(gravar)
+    inseridos, removidos, faturas, recorrencias = rodar(gravar)
     return {
         "contas": len(contas),
         "transacoes_encontradas": len(movimentos),
         "inseridos": inseridos,
+        "removidos_pela_pluggy": removidos,
+        "aguardando_conversao": aguardando_conversao,
         "pagamentos_de_fatura_detectados": faturas,
         "recorrencias_detectadas": recorrencias,
     }

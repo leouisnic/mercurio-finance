@@ -29,6 +29,7 @@ CATEGORIA_ID_PAGAMENTO_DE_FATURA = "05100000"
 # dividends", rendimento, que é dinheiro novo e continua receita.
 PREFIXO_CATEGORIA_INVESTIMENTO = "03"
 CATEGORIA_ID_RENDIMENTO = "03060000"
+MOEDA_DA_CONTA = "BRL"
 
 
 class RespostaPluggyInvalida(ValueError):
@@ -128,12 +129,26 @@ def e_movimento_de_investimento(categoria_id: str | None) -> bool:
     )
 
 
-def mapear_para_movimento(transacao: dict) -> dict:
+def mapear_para_movimento(transacao: dict) -> dict | None:
     """Converte uma transação da Pluggy para o formato que
     `finance_api.repositorio.inserir_movimentos` espera (mesmo shape que
     `ingestion_worker.extrato.carregar_extrato` produz). `conta_id` vem
-    direto do `accountId` da própria transação, sem mapeamento externo."""
-    valor = float(transacao["amount"])
+    direto do `accountId` da própria transação, sem mapeamento externo.
+
+    Compra em outra moeda vale o que a instituição cobrou em reais
+    (`amountInAccountCurrency`); o valor e a moeda de origem ficam guardados.
+    Sem esse valor, devolve `None`: câmbio inventado seria número errado, e a
+    Pluggy costuma mandar o valor em reais quando a compra é lançada.
+    """
+    moeda = transacao.get("currencyCode") or MOEDA_DA_CONTA
+    valor_original = None
+    if moeda == MOEDA_DA_CONTA:
+        valor = float(transacao["amount"])
+    elif transacao.get("amountInAccountCurrency") is not None:
+        valor = float(transacao["amountInAccountCurrency"])
+        valor_original = abs(float(transacao["amount"]))
+    else:
+        return None
     categoria = transacao.get("category")
     categoria_id = transacao.get("categoryId")
     saiu_dinheiro = _saiu_dinheiro(transacao)
@@ -165,6 +180,8 @@ def mapear_para_movimento(transacao: dict) -> dict:
         "identificador_externo": transacao["id"],
         "categoria": categoria,
         "categoria_id": categoria_id,
+        "moeda_original": None if valor_original is None else moeda,
+        "valor_original": valor_original,
     }
 
 

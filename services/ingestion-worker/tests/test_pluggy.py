@@ -120,6 +120,56 @@ def test_mapear_para_movimento(transacao: dict, tipo_esperado: str, valor_espera
     assert movimento["descricao"] == transacao["description"]
 
 
+def test_compra_em_outra_moeda_vale_o_cobrado_em_reais() -> None:
+    """Fictício: USD 12,00 cobrados como R$ 60,00 no cartão."""
+    movimento = pluggy.mapear_para_movimento(
+        {
+            "id": "u1",
+            "accountId": "conta-cartao",
+            "date": "2026-08-20T10:00:00.000Z",
+            "description": "Assinatura fictícia",
+            "amount": 12.0,
+            "amountInAccountCurrency": 60.0,
+            "currencyCode": "USD",
+            "type": "DEBIT",
+        }
+    )
+
+    assert (movimento["valor"], movimento["moeda_original"], movimento["valor_original"]) == (60.0, "USD", 12.0)
+
+
+def test_compra_em_outra_moeda_sem_valor_em_reais_nao_entra() -> None:
+    movimento = pluggy.mapear_para_movimento(
+        {
+            "id": "u2",
+            "accountId": "conta-cartao",
+            "date": "2026-08-20T10:00:00.000Z",
+            "description": "Assinatura fictícia",
+            "amount": 12.0,
+            "currencyCode": "USD",
+            "type": "DEBIT",
+        }
+    )
+
+    assert movimento is None
+
+
+def test_compra_em_reais_nao_guarda_moeda_original() -> None:
+    movimento = pluggy.mapear_para_movimento(
+        {
+            "id": "u3",
+            "accountId": "conta-cartao",
+            "date": "2026-08-20T10:00:00.000Z",
+            "description": "Mercado fictício",
+            "amount": 35.0,
+            "currencyCode": "BRL",
+            "type": "DEBIT",
+        }
+    )
+
+    assert (movimento["valor"], movimento["moeda_original"], movimento["valor_original"]) == (35.0, None, None)
+
+
 def test_compra_no_cartao_e_despesa_apesar_do_valor_positivo() -> None:
     """No cartão a Pluggy inverte o sinal: compra vem positiva com
     `type=DEBIT`. Decidir pelo sinal classificava compra como receita, que

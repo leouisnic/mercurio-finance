@@ -18,6 +18,7 @@ from finance_api.models import (
     CotaDoCicloORM,
     FeriadoORM,
     MovimentoORM,
+    MovimentoRemovidoORM,
     RecorrenciaORM,
     RegraDeCategoriaORM,
     TagORM,
@@ -58,6 +59,7 @@ async def _limpar_movimentos() -> None:
         # Tudo que aponta para contas primeiro: as três tabelas têm chave
         # estrangeira para `contas`. As categorias ficam: vêm da migração.
         await sessao.execute(delete(MovimentoORM))
+        await sessao.execute(delete(MovimentoRemovidoORM))
         await sessao.execute(delete(FeriadoORM))
         await sessao.execute(delete(CotaDoCicloORM))
         await sessao.execute(delete(RegraDeCategoriaORM))
