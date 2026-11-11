@@ -12,11 +12,8 @@ import {
 } from "react";
 import { classificarMovimento, criarCategoria, definirTags } from "../acoes";
 import { useLadoDoBalao } from "../lado-do-balao";
-import {
-  type Categoria,
-  type Movimento,
-  levaCategoria,
-} from "../buscar-movimentos";
+import type { Categoria, Movimento } from "../buscar-movimentos";
+import { levaCategoria } from "../leva-categoria";
 import { partesDaDescricao } from "../recorrencias/cartao";
 import {
   BolaDaCategoria,

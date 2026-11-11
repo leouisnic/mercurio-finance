@@ -9,6 +9,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
+from finance_api import config
 from finance_api.categorias import (
     DO_MOBILLS,
     TRADUCAO_DA_PLUGGY,
@@ -24,7 +25,7 @@ from finance_api.repositorio import classificar_movimentos
 from ingestion_worker.extrato import processar_movimentos
 from mercurio_domain import Proveniencia
 
-client = TestClient(app)
+client = TestClient(app, headers={"Authorization": f"Bearer {config.FINANCE_API_TOKEN}"})
 
 PIX_PARA_ANA = "Transferência enviada|Ana Exemplo"
 PIX_PARA_BRUNO = "Transferência enviada|Bruno Exemplo"

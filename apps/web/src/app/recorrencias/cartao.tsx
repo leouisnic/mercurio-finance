@@ -3,12 +3,11 @@
 import { type FormEvent, useState, useTransition } from "react";
 import { SeloDoBanco, nomeDaConta } from "../banco";
 import type { Conta } from "../buscar-resumo";
+import type { Recorrencia, StatusRecorrencia } from "../buscar-recorrencias";
 import {
   CATEGORIAS,
   ROTULO_DA_CATEGORIA,
-  type Recorrencia,
-  type StatusRecorrencia,
-} from "../buscar-recorrencias";
+} from "../categorias-de-recorrencia";
 import { decidirRecorrencia } from "../acoes";
 import { comoData, diaEMes, moeda } from "../formato";
 

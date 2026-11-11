@@ -5,6 +5,7 @@ from decimal import Decimal
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
+from finance_api import config
 from finance_api.compromissos import somar_meses
 from finance_api.main import app
 from finance_api.models import ContaORM, MovimentoORM, RecorrenciaORM
@@ -13,7 +14,7 @@ from ingestion_worker.extrato import carregar_extrato, processar_movimentos
 from mercurio_domain import Proveniencia
 from sqlalchemy import update
 
-client = TestClient(app)
+client = TestClient(app, headers={"Authorization": f"Bearer {config.FINANCE_API_TOKEN}"})
 
 # Todo teste deste arquivo toca o banco de teste; os de test_domain.py não.
 pytestmark = pytest.mark.usefixtures("banco_de_teste_limpo")

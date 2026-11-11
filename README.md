@@ -68,6 +68,7 @@ Start the API on the test database, seeded with a fictional statement:
 ```
 uv sync --all-packages
 $env:DATABASE_URL = "postgresql+asyncpg://mercurio:mercurio@127.0.0.1:5432/mercurio_test"
+$env:FINANCE_API_TOKEN = "demo-token"
 uv run --package finance-api alembic -c services/finance-api/alembic.ini upgrade head
 uv run --package finance-api python -m finance_api.seed
 uv run --package finance-api uvicorn finance_api.main:app --port 8100
@@ -79,6 +80,7 @@ In another terminal, start the dashboard:
 cd apps/web
 npm install
 $env:FINANCE_API_URL = "http://127.0.0.1:8100"
+$env:FINANCE_API_TOKEN = "demo-token"
 $env:MERCURIO_HOJE = "2026-08-10"
 $env:PAGADOR_CICLO_1 = "Empresa A"
 $env:PAGADOR_CICLO_2 = "Empresa B"

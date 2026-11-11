@@ -18,6 +18,18 @@ chaves privadas, tokens e extratos também não entram no Git. Os padrões comun
 de certificados e chaves estão bloqueados no `.gitignore` e no validador de
 conteúdo.
 
+## Token da API
+
+A API recusa com 401 toda rota sem `Authorization: Bearer` com o token, menos
+`/health`, mesmo escutando só em `127.0.0.1`, e não sobe sem token configurado.
+O token fica em `FINANCE_API_TOKEN` no `.env`, fora do Git; o atalho do Mercúrio
+gera um na primeira vez (`scripts/token-da-api.ps1`). Só o servidor do painel o
+lê, e `api.ts` tem `import "server-only"` para a compilação falhar se um
+componente do navegador o importar. Testes e e2e usam tokens fictícios.
+
+Para trocar: apagar o valor de `FINANCE_API_TOKEN` no `.env`, clicar em
+"Desligar" no ícone do Mercúrio e abrir pelo atalho de novo, que gera outro.
+
 ## Rede
 
 Postgres e Redis publicam portas somente em `127.0.0.1`. As credenciais de

@@ -7,6 +7,7 @@ from decimal import Decimal
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
+from finance_api import config
 from finance_api.ciclo import ciclo_anterior, ciclo_de, ciclo_seguinte
 from finance_api.main import app
 from finance_api.repositorio import classificar_movimentos
@@ -14,7 +15,7 @@ from finance_api.tags import GastoDaTag, TotaisDoCiclo, analisar, ciclos_do_impa
 from ingestion_worker.extrato import processar_movimentos
 from mercurio_domain import Proveniencia
 
-client = TestClient(app)
+client = TestClient(app, headers={"Authorization": f"Bearer {config.FINANCE_API_TOKEN}"})
 D = Decimal
 
 

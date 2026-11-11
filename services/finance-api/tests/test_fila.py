@@ -7,6 +7,7 @@ sessionmaker de teste; sem isso, o job gravaria no banco real).
 
 import pytest
 from fastapi.testclient import TestClient
+from finance_api import config
 from finance_api.config import REDIS_URL
 from finance_api.jobs import job_reimportar_seed
 from finance_api.main import app
@@ -15,7 +16,7 @@ from rq import Queue, SimpleWorker
 
 pytestmark = pytest.mark.usefixtures("banco_de_teste_limpo")
 
-client = TestClient(app)
+client = TestClient(app, headers={"Authorization": f"Bearer {config.FINANCE_API_TOKEN}"})
 
 
 @pytest.fixture

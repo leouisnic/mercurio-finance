@@ -27,6 +27,11 @@ TEST_DATABASE_URL = os.environ.get(
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
 
+# Segredo que o servidor do painel manda em toda chamada. Sem ele a API não
+# sobe: aberta, qualquer processo desta máquina leria e mudaria o dado. Ver
+# docs/security.md, que tem o passo de troca.
+FINANCE_API_TOKEN = os.environ.get("FINANCE_API_TOKEN")
+
 PLUGGY_CLIENT_ID = os.environ.get("PLUGGY_CLIENT_ID")
 PLUGGY_CLIENT_SECRET = os.environ.get("PLUGGY_CLIENT_SECRET")
 

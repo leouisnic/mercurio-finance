@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { FINANCE_API_URL } from "./api";
+import { chamarApi } from "./api";
 
 /** O que a tela precisa saber de uma ação: `erro` nulo é sucesso. */
 export type ResultadoDaAcao = { erro: string | null };
@@ -16,7 +16,7 @@ async function enviar(
   init: RequestInit,
 ): Promise<string | null> {
   try {
-    const resposta = await fetch(`${FINANCE_API_URL}${caminho}`, {
+    const resposta = await chamarApi(`${caminho}`, {
       ...init,
       cache: "no-store",
     });
@@ -194,7 +194,7 @@ export async function criarCategoria(dados: {
   cor: number;
 }): Promise<ResultadoDaAcao & { id: string | null }> {
   try {
-    const resposta = await fetch(`${FINANCE_API_URL}/categorias`, {
+    const resposta = await chamarApi(`/categorias`, {
       method: "POST",
       headers: JSON_HEADERS,
       body: JSON.stringify(dados),
@@ -235,8 +235,8 @@ export async function salvarTag(
   id?: number,
 ): Promise<ResultadoDaAcao> {
   try {
-    const resposta = await fetch(
-      `${FINANCE_API_URL}/tags${id ? `/${id}` : ""}`,
+    const resposta = await chamarApi(
+      `/tags${id ? `/${id}` : ""}`,
       {
         method: id ? "PATCH" : "POST",
         headers: JSON_HEADERS,
@@ -309,8 +309,8 @@ export async function salvarFeriado(
   id?: number,
 ): Promise<ResultadoDaAcao & { mudaCicloPassado: boolean }> {
   try {
-    const resposta = await fetch(
-      `${FINANCE_API_URL}/feriados${id ? `/${id}` : ""}`,
+    const resposta = await chamarApi(
+      `/feriados${id ? `/${id}` : ""}`,
       {
         method: id ? "PUT" : "POST",
         headers: JSON_HEADERS,

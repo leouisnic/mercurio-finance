@@ -1,5 +1,5 @@
 import { ChartColumn } from "lucide-react";
-import { type DiaNaoUtil, marcaDoDia } from "../buscar-feriados";
+import { type DiaNaoUtil, marcaDoDia } from "../dia-nao-util";
 import type { GastoDoDetalhe } from "../buscar-movimentos";
 import { ColunaComDetalhe } from "../detalhe-do-grafico";
 import { maiorDia, mediaPorDia, projecao } from "../analise-do-grafico";

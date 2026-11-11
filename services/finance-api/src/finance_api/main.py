@@ -19,18 +19,20 @@ fictício) antes de rodar em desenvolvimento sem Pluggy configurado.
 Nenhuma credencial, extrato real ou dado pessoal é usado neste módulo.
 """
 
-from collections.abc import AsyncIterator
+import secrets
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
 from decimal import Decimal
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from rq.exceptions import NoSuchJobError
 from rq.job import Job
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from finance_api import feriados
+from finance_api import config, feriados
 from finance_api.categorias import chave_do_destinatario
 from finance_api.centavos import centavos
 from finance_api.ciclo import Ciclo, ciclo_anterior, ciclo_de, ciclo_seguinte, dias_nao_uteis
@@ -146,9 +148,22 @@ from finance_api.tags import analisar, ciclos_do_impacto
 # faria o aviso crescer sem mudar número nenhum.
 CICLOS_NA_FILA = 6
 
+# Só diz que a API está de pé, sem dado: o atalho e o e2e esperam por ela
+# antes de ter o token.
+ROTAS_SEM_TOKEN = frozenset({"/health"})
+
+
+def exigir_token_configurado() -> None:
+    if not config.FINANCE_API_TOKEN:
+        raise RuntimeError(
+            "FINANCE_API_TOKEN não está configurado no .env: a API não sobe sem token. "
+            "O atalho do Mercúrio gera um; à mão, veja docs/security.md."
+        )
+
 
 @asynccontextmanager
 async def _ciclo_de_vida(_: FastAPI) -> AsyncIterator[None]:
+    exigir_token_configurado()
     # O calendário só conhece os feriados da cidade depois desta carga.
     async with async_session() as sessao:
         await feriados.recarregar(sessao)
@@ -162,6 +177,26 @@ app = FastAPI(
     lifespan=_ciclo_de_vida,
 )
 app.include_router(feriados.rotas)
+
+
+@app.middleware("http")
+async def exigir_token(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    """Middleware, e não dependência por rota, para rota nova já nascer
+    protegida. Comparação em tempo constante, para o tempo de resposta não
+    dizer quantos caracteres do token estavam certos."""
+    if request.url.path in ROTAS_SEM_TOKEN:
+        return await call_next(request)
+    esperado = config.FINANCE_API_TOKEN or ""
+    recebido = request.headers.get("authorization", "")
+    if not esperado or not secrets.compare_digest(recebido.encode(), f"Bearer {esperado}".encode()):
+        return JSONResponse(
+            {"detail": "Token da API ausente ou inválido."},
+            status_code=401,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return await call_next(request)
 
 
 def _recorrencia_out(recorrencia: RecorrenciaORM) -> RecorrenciaOut:

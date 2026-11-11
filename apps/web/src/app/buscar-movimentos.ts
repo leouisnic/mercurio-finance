@@ -110,15 +110,6 @@ export type ResumoDaTag = Tag & {
   } | null;
 };
 
-/** Só receita e despesa levam categoria, e pagamento de fatura não. */
-export function levaCategoria(movimento: Movimento): boolean {
-  return (
-    ["despesa", "receita"].includes(movimento.tipo) &&
-    (movimento.pagamentoDeFatura === null ||
-      movimento.pagamentoDeFatura === "descartado")
-  );
-}
-
 /**
  * O ciclo de pagamento que contém `referencia`, mais o anterior e o
  * seguinte. Quem calcula é o finance-api: a regra depende do calendário de

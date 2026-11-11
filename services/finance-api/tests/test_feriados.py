@@ -10,10 +10,11 @@ from datetime import date
 
 import pytest
 from fastapi.testclient import TestClient
+from finance_api import config
 from finance_api.ciclo import FeriadoLocal, definir_feriados_locais, dias_nao_uteis, p1, p2
 from finance_api.main import app
 
-client = TestClient(app)
+client = TestClient(app, headers={"Authorization": f"Bearer {config.FINANCE_API_TOKEN}"})
 
 # Dia de P1 e de P2 de cada mês, calculados com o calendário de antes desta
 # leva, que só tinha os feriados nacionais.

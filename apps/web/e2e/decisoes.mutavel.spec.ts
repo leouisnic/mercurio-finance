@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { COM_TOKEN } from "./token";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 
@@ -57,7 +58,7 @@ test("decidir como parcelamento grava o fim na API e muda a candidata de aba", a
   await expect(parcelamentos.getByText("3 de 6 pagas")).toBeVisible();
 
   const [gravada] = await (
-    await request.get(`${API}/recorrencias?status=parcelamento`)
+    await request.get(`${API}/recorrencias?status=parcelamento`, COM_TOKEN)
   ).json();
   // Três parcelas depois da última cobrança vista, mês a mês.
   const ultima = new Date(`${gravada.ultima_data}T00:00:00`);
@@ -117,7 +118,7 @@ test("classificar para todos grava a categoria na API e tira da fila", async ({
 
   await expect(fila.getByText("Pagamento cliente Alfa")).toHaveCount(0);
   await expect(fila.getByText("Pagamento cliente Beta")).toBeVisible();
-  const movimentos = await (await request.get(`${API}/movimentos`)).json();
+  const movimentos = await (await request.get(`${API}/movimentos`, COM_TOKEN)).json();
   const alfa = movimentos.find(
     (movimento: { descricao: string }) =>
       movimento.descricao === "Pagamento cliente Alfa",
@@ -128,7 +129,7 @@ test("classificar para todos grava a categoria na API e tira da fila", async ({
   });
   expect(
     await (
-      await request.get(`${API}/movimentos/para-classificar?hoje=2026-08-10`)
+      await request.get(`${API}/movimentos/para-classificar?hoje=2026-08-10`, COM_TOKEN)
     ).json(),
   ).toEqual({ total: 1 });
 });
@@ -152,7 +153,7 @@ test("marcar dois com uma tag grava na API e o filtro mostra o total", async ({
   await balao.getByRole("button", { name: "Aplicar" }).click();
   await expect(acoes).toHaveCount(0);
 
-  const [tag] = await (await request.get(`${API}/tags`)).json();
+  const [tag] = await (await request.get(`${API}/tags`, COM_TOKEN)).json();
   expect(tag).toMatchObject({
     nome: "viagem Exemplo",
     gasto: "480.50",
@@ -221,7 +222,7 @@ test("criar tag com teto pela tela grava na API e o cartão mostra quanto falta"
   await janela.getByRole("button", { name: "Criar tag" }).click();
   await expect(janela).toHaveCount(0);
 
-  const [tag] = await (await request.get(`${API}/tags`)).json();
+  const [tag] = await (await request.get(`${API}/tags`, COM_TOKEN)).json();
   expect(tag).toMatchObject({
     nome: "viagem Planejada",
     teto: "3000.00",
@@ -244,7 +245,7 @@ test("o calendário do feriado salva a data e o pagador escolhidos", async ({ pa
   await formulario.getByRole("checkbox", { name: /Empresa A/ }).check();
   await formulario.getByRole("button", { name: "Salvar feriado" }).click();
   await expect(page.getByText("Aniversário Cidade A", { exact: true })).toBeVisible();
-  expect(await (await request.get(`${API}/feriados`)).json()).toEqual([
+  expect(await (await request.get(`${API}/feriados`, COM_TOKEN)).json()).toEqual([
     expect.objectContaining({ data: "2026-08-20", muda_ciclo_1: true, muda_ciclo_2: false }),
   ]);
 });

@@ -1,29 +1,14 @@
 import { buscarJson, paraNumero } from "./api";
+import type { Categoria } from "./categorias-de-recorrencia";
 
-export const CATEGORIAS = [
-  "saude",
-  "familia",
-  "moradia",
-  "assinatura",
-  "transporte",
-  "alimentacao",
-  "outros",
-] as const;
-
-export type Categoria = (typeof CATEGORIAS)[number];
+export {
+  CATEGORIAS,
+  type Categoria,
+  ROTULO_DA_CATEGORIA,
+} from "./categorias-de-recorrencia";
 /** `aprovada` é conta fixa; `rejeitada` é "não é recorrência". */
 export type StatusRecorrencia =
   "pendente" | "aprovada" | "parcelamento" | "encerrada" | "rejeitada";
-
-export const ROTULO_DA_CATEGORIA: Record<Categoria, string> = {
-  saude: "Saúde",
-  familia: "Família",
-  moradia: "Moradia",
-  assinatura: "Assinatura",
-  transporte: "Transporte",
-  alimentacao: "Alimentação",
-  outros: "Outros",
-};
 
 export type Recorrencia = {
   id: number;

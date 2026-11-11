@@ -7,6 +7,7 @@ from decimal import Decimal
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
+from finance_api import config
 from finance_api.contadores import (
     calcular,
     categoria_que_mais_cresceu,
@@ -19,7 +20,7 @@ from finance_api.repositorio import classificar_movimentos, cota_guardada, guard
 from ingestion_worker.extrato import processar_movimentos
 from mercurio_domain import Proveniencia
 
-client = TestClient(app)
+client = TestClient(app, headers={"Authorization": f"Bearer {config.FINANCE_API_TOKEN}"})
 D = Decimal
 
 # Gastos de 28 de setembro a 6 de outubro: com gasto só em 28/9 e 2/10.

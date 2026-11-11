@@ -163,6 +163,10 @@ function Subir($nome, $programa, $argumentos, $pasta) {
         -NoNewWindow -PassThru -RedirectStandardOutput "$logs\$nome.log" -RedirectStandardError "$logs\$nome.erro.log"
 }
 
+# O token da API sai do .env (e nasce lá na primeira vez); a API lê o mesmo
+# arquivo, e o painel recebe pelo ambiente, só no servidor. Depois da
+# compilação de propósito: o cache do Turbopack guardaria o valor.
+$env:FINANCE_API_TOKEN = & (Join-Path $PSScriptRoot "token-da-api.ps1") -ArquivoEnv (Join-Path $raiz ".env")
 $processos = [ordered]@{}
 Passo "subindo a API, o worker e o painel"
 $processos["API"] = Subir "api" "uv" "run --package finance-api uvicorn finance_api.main:app --host 127.0.0.1 --port 8000" $raiz

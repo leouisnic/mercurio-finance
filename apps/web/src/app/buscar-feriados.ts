@@ -1,4 +1,5 @@
 import { buscarJson } from "./api";
+import type { DiaNaoUtil } from "./dia-nao-util";
 
 /** Feriado da cidade cadastrado pelo dono. Os nacionais vêm do calendário da API. */
 export type Feriado = {
@@ -33,8 +34,7 @@ export async function buscarFeriados(): Promise<Feriado[] | null> {
   );
 }
 
-/** Fim de semana e feriado do intervalo; `feriado` é o nome, ou null no fim de semana. */
-export type DiaNaoUtil = { data: string; feriado: string | null };
+export type { DiaNaoUtil };
 
 export async function buscarDiasNaoUteis(
   inicio: string,
@@ -44,13 +44,4 @@ export async function buscarDiasNaoUteis(
     data_inicio: inicio,
     data_fim: fim,
   });
-}
-
-/** O dia na lista de não úteis: undefined se é dia útil, null se é fim de semana, o nome se é feriado. */
-export function marcaDoDia(
-  naoUteis: DiaNaoUtil[],
-  data: string,
-): string | null | undefined {
-  const dia = naoUteis.find((item) => item.data === data);
-  return dia ? dia.feriado : undefined;
 }

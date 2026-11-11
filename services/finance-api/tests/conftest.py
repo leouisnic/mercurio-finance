@@ -3,7 +3,12 @@ contra o banco de desenvolvimento (que vai guardar dado real do Pluggy).
 """
 
 import asyncio
+import os
 from collections.abc import Callable
+
+# Antes de qualquer import do finance_api: o config lê o token ao carregar, e
+# o `.env` da máquina nunca entra na suíte, porque o dotenv não sobrescreve.
+os.environ["FINANCE_API_TOKEN"] = "token-ficticio-dos-testes"
 
 import pandas as pd
 import pytest

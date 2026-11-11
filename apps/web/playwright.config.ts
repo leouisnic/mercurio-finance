@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { FINANCE_API_TOKEN } from "./e2e/token";
 
 // 127.0.0.1 e não localhost: o painel e a API só escutam em IPv4, e no
 // Windows localhost pode resolver primeiro para ::1.
@@ -30,6 +31,7 @@ export default defineConfig({
       cwd: "../..",
       env: {
         ...process.env,
+        FINANCE_API_TOKEN,
         DATABASE_URL: "postgresql+asyncpg://mercurio:mercurio@127.0.0.1:5432/mercurio_test",
       },
       url: `${FINANCE_API_URL}/health`,
@@ -42,6 +44,7 @@ export default defineConfig({
       url: PAINEL_URL,
       env: {
         FINANCE_API_URL,
+        FINANCE_API_TOKEN,
         NEXT_DIST_DIR: ".next-e2e",
         // A base fictícia é de agosto de 2026; fixar o dia mantém o ciclo
         // corrente com movimentos e os números conferíveis à mão.
