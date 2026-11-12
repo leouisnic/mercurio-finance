@@ -1,5 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
-import { FINANCE_API_TOKEN } from "./e2e/token";
+import { gerarHash } from "./scripts/definir-senha.mjs";
+import {
+  FINANCE_API_TOKEN,
+  SEGREDO_DA_SESSAO_DO_E2E,
+  SENHA_DO_E2E,
+  SESSAO_GRAVADA,
+} from "./e2e/token";
 
 // 127.0.0.1 e não localhost: o painel e a API só escutam em IPv4, e no
 // Windows localhost pode resolver primeiro para ::1.
@@ -45,6 +51,8 @@ export default defineConfig({
       env: {
         FINANCE_API_URL,
         FINANCE_API_TOKEN,
+        PAINEL_SENHA_HASH: gerarHash(SENHA_DO_E2E),
+        PAINEL_SEGREDO_DA_SESSAO: SEGREDO_DA_SESSAO_DO_E2E,
         NEXT_DIST_DIR: ".next-e2e",
         // A base fictícia é de agosto de 2026; fixar o dia mantém o ciclo
         // corrente com movimentos e os números conferíveis à mão.
@@ -59,15 +67,22 @@ export default defineConfig({
   // Os testes que gravam na base fictícia só rodam depois que todos os de
   // leitura passaram, em série, e restauram a base antes de cada tentativa:
   // rodando junto, uma recorrência aprovada sumiria da fila que outro teste lê.
+  // Todos entram antes pelo projeto de entrada, que grava a sessão.
   projects: [
     {
-      name: "leitura",
+      name: "entrada",
       use: { ...devices["Desktop Chrome"] },
+      testMatch: /entrar\.setup\.ts$/,
+    },
+    {
+      name: "leitura",
+      use: { ...devices["Desktop Chrome"], storageState: SESSAO_GRAVADA },
       testIgnore: /\.mutavel\.spec\.ts$/,
+      dependencies: ["entrada"],
     },
     {
       name: "mutavel",
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], storageState: SESSAO_GRAVADA },
       testMatch: /\.mutavel\.spec\.ts$/,
       dependencies: ["leitura"],
       fullyParallel: false,

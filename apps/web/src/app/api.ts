@@ -13,15 +13,23 @@
 // servidor do Next lê esta variável, e o `server-only` faz a compilação
 // falhar se um componente do navegador importar este arquivo.
 import "server-only";
+import { temSessao } from "./sessao";
 
 export const FINANCE_API_URL =
   process.env.FINANCE_API_URL ?? "http://localhost:8000";
 
-/** Toda chamada ao finance-api passa por aqui, com o token. */
+/**
+ * Toda chamada ao finance-api passa por aqui, com o token, e só com sessão:
+ * é a barreira que vale também para as ações do servidor, que o proxy
+ * sozinho não garante.
+ */
 export async function chamarApi(
   caminho: string,
   init: RequestInit = {},
 ): Promise<Response> {
+  if (!(await temSessao())) {
+    return new Response(null, { status: 401, statusText: "Sem sessão" });
+  }
   const cabecalhos = new Headers(init.headers);
   cabecalhos.set(
     "Authorization",

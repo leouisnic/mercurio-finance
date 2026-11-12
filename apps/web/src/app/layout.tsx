@@ -6,6 +6,7 @@ import { ProvedorDeDicas } from "./info";
 import { SCRIPT_DO_TEMA } from "./tema";
 import { buscarParaClassificar } from "./buscar-movimentos";
 import { dataDeHoje } from "./hoje";
+import { temSessao } from "./sessao";
 import { Suspense } from "react";
 
 const sora = localFont({
@@ -23,6 +24,24 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Sem sessão só existe a tela de entrada: sem barra lateral e sem chamar a API.
+  if (!(await temSessao())) {
+    return (
+      <html
+        lang="pt-BR"
+        className={`${sora.variable} h-full antialiased`}
+        suppressHydrationWarning
+      >
+        <head>
+          <script dangerouslySetInnerHTML={{ __html: SCRIPT_DO_TEMA }} />
+        </head>
+        <body className="bg-fundo text-tinta min-h-full font-sans">
+          {children}
+        </body>
+      </html>
+    );
+  }
+
   // O número de "Para classificar" do submenu. Falha da API só esconde o número.
   const paraClassificar = await buscarParaClassificar(dataDeHoje());
 

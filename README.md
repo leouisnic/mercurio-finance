@@ -81,15 +81,17 @@ cd apps/web
 npm install
 $env:FINANCE_API_URL = "http://127.0.0.1:8100"
 $env:FINANCE_API_TOKEN = "demo-token"
+$env:PAINEL_SEGREDO_DA_SESSAO = "demo-session-secret"
+$env:PAINEL_SENHA_HASH = node --input-type=module -e "import { gerarHash } from './scripts/definir-senha.mjs'; console.log(gerarHash('demo-password'))"
 $env:MERCURIO_HOJE = "2026-08-10"
 $env:PAGADOR_CICLO_1 = "Empresa A"
 $env:PAGADOR_CICLO_2 = "Empresa B"
 npm run dev -- --port 3100
 ```
 
-- Open `http://127.0.0.1:3100`. The demo reads only the fictional data in `mercurio_test`.
+- Open `http://127.0.0.1:3100` and sign in with `demo-password`. The demo reads only the fictional data in `mercurio_test`.
 - `MERCURIO_HOJE` pins the date: the fictional data is from August 2026, and on any other day the current pay cycle would be empty. `PAGADOR_CICLO_1` and `PAGADOR_CICLO_2` name who pays each cycle; with real data they go in `apps/web/.env.local`, which Git ignores.
-- The dashboard listens only on 127.0.0.1: it has no login yet, so other devices on the network cannot reach it.
+- The dashboard listens only on 127.0.0.1 and asks for a password. With real data, other devices reach it only through Tailscale; see `docs/security.md`.
 - Pytest and Playwright reset that database, so do not run them while using the demo.
 - The Sync button needs Pluggy credentials in `.env` and the queue worker
   (`uv run --package finance-api python -m finance_api.worker`). The demo works without both.

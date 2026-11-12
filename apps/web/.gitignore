@@ -16,6 +16,8 @@
 /playwright-report
 /blob-report
 /playwright/.cache
+# sessão fictícia que o projeto de entrada do e2e grava
+/e2e/.estado/
 
 # next.js
 /.next/

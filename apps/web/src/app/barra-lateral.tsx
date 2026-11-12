@@ -10,6 +10,7 @@ import {
   estaNaPagina,
 } from "./movimentos/abas";
 import { SeletorDeTema } from "./tema";
+import { BotaoSair } from "./botao-sair";
 import { enderecoDaAnalise } from "./filtro-da-barra";
 
 type Item = {
@@ -267,8 +268,9 @@ export function BarraLateral({
           ))}
         </div>
 
-        <div className="mt-auto px-2 pt-6">
+        <div className="mt-auto flex flex-col gap-2 px-2 pt-6">
           <SeletorDeTema />
+          <BotaoSair />
         </div>
       </nav>
 
@@ -292,7 +294,10 @@ export function BarraLateral({
           />
           <span className="text-base font-bold">Mercúrio</span>
         </Link>
-        <SeletorDeTema />
+        <div className="flex items-center gap-2">
+          <SeletorDeTema />
+          <BotaoSair compacto />
+        </div>
       </header>
 
       <nav

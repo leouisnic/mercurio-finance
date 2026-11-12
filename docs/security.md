@@ -23,18 +23,39 @@ conteúdo.
 A API recusa com 401 toda rota sem `Authorization: Bearer` com o token, menos
 `/health`, mesmo escutando só em `127.0.0.1`, e não sobe sem token configurado.
 O token fica em `FINANCE_API_TOKEN` no `.env`, fora do Git; o atalho do Mercúrio
-gera um na primeira vez (`scripts/token-da-api.ps1`). Só o servidor do painel o
+gera um na primeira vez (`scripts/segredo-do-env.ps1`). Só o servidor do painel o
 lê, e `api.ts` tem `import "server-only"` para a compilação falhar se um
 componente do navegador o importar. Testes e e2e usam tokens fictícios.
 
 Para trocar: apagar o valor de `FINANCE_API_TOKEN` no `.env`, clicar em
 "Desligar" no ícone do Mercúrio e abrir pelo atalho de novo, que gera outro.
 
+## Senha do painel
+
+Sem sessão, toda página do painel leva para `/entrar`, e `chamarApi` recusa
+qualquer leitura ou ação antes de chamar a API. A senha fica só como hash scrypt
+em `PAINEL_SENHA_HASH` no `.env`; a sessão é um cookie httpOnly assinado com
+`PAINEL_SEGREDO_DA_SESSAO`, que vale 30 dias por aparelho. Depois de 5 senhas
+erradas, a entrada espera 15 minutos. Testes e e2e usam senha e segredo
+fictícios.
+
+- Definir ou trocar a senha: num PowerShell na raiz do repositório, rodar
+  `node apps\web\scripts\definir-senha.mjs`, digitar a senha duas vezes (ela
+  não aparece) e abrir o Mercúrio de novo pelo atalho. Só o hash vai para o `.env`.
+- Sair de todos os aparelhos: apagar o valor de `PAINEL_SEGREDO_DA_SESSAO` no
+  `.env` e abrir pelo atalho, que gera outro.
+
 ## Rede
 
-Postgres e Redis publicam portas somente em `127.0.0.1`. As credenciais de
-desenvolvimento do Compose não podem ser expostas em interfaces de rede,
+Postgres, Redis, a API e o painel escutam somente em `127.0.0.1`. As credenciais
+de desenvolvimento do Compose não podem ser expostas em interfaces de rede,
 inclusive Tailscale.
+
+Fora desta máquina, o painel só chega pelo Tailscale, aos aparelhos da conta do
+dono, com HTTPS e a senha do painel. Passo único, depois de instalar o Tailscale
+e entrar nele no computador e no celular: `tailscale serve --bg 3001`. O
+endereço `https://<nome-da-máquina>.<tailnet>.ts.net` aparece em
+`tailscale serve status`. Nunca usar `tailscale funnel`, que publica na internet.
 
 ## Acesso de agentes
 
