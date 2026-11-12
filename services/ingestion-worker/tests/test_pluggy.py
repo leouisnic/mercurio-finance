@@ -260,6 +260,28 @@ def test_resgatar_do_investimento_nao_e_receita() -> None:
     assert movimento["tipo"] == "aporte_titular"
 
 
+def test_reserva_do_mercado_pago_e_aplicacao_mesmo_sem_categoria() -> None:
+    """A Pluggy manda a reserva do Mercado Pago como "Other"; o texto é o que
+    diz que o dinheiro foi guardado."""
+    transacao = {
+        **_investimento("DEBIT", "99999999"),
+        "description": "Dinheiro reservado Viagem fictícia",
+        "category": "Other",
+    }
+
+    assert pluggy.mapear_para_movimento(transacao)["tipo"] == "retirada_titular"
+
+
+def test_texto_parecido_no_meio_da_descricao_nao_vira_aplicacao() -> None:
+    transacao = {
+        **_investimento("DEBIT", "99999999"),
+        "description": "Pix para loja Dinheiro reservado fictícia",
+        "category": "Other",
+    }
+
+    assert pluggy.mapear_para_movimento(transacao)["tipo"] == "despesa"
+
+
 def test_rendimento_do_investimento_continua_receita() -> None:
     """Juros e dividendos são dinheiro novo, não o próprio dinheiro voltando."""
     movimento = pluggy.mapear_para_movimento(_investimento("CREDIT", "03060000"))

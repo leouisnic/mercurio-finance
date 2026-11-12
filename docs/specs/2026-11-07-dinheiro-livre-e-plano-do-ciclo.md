@@ -229,8 +229,9 @@ Contrato preliminar, a completar com as provas específicas do modelo aprovado.
 - Se um banco mantiver o dinheiro aplicado dentro do saldo da conta corrente, somar a
   aplicação de volta inflaria o livre. A conferência com aplicação pequena real, antes
   de ligar, mede isso por banco.
-- Aplicação que a Pluggy não categorizar como `03` fica parecendo transferência própria
-  e reduz a cota do ciclo inteiro, como hoje. A tela de Movimentos mostra o tipo.
+- Aplicação que a Pluggy não categorizar como `03` fica parecendo despesa. Aconteceu
+  com a reserva do Mercado Pago, resolvida pelo texto (ver Registro de 12/11); o resgate
+  da reserva ainda não teve exemplo real para conferir o texto.
 - O histórico curto ou com lacunas deixa a recomendação sem base; nesse caso ela some
   com o motivo, em vez de inventar valor.
 
@@ -293,6 +294,13 @@ explícita.
   recomendação pela mediana e o cartão de quatro quadros. `scripts/validar.py --e2e`
   aprovado: Ruff e ESLint limpos, build, 228 Pytest, 100 Vitest e 35 Playwright.
   Cartão conferido na demonstração fictícia no computador, no celular e no escuro.
+- 12/11. Aplicação de teste de R$ 1 na reserva do Mercado Pago conferida depois da
+  sincronização: a Pluggy a mandou como despesa "Other", com a descrição começando por
+  "Dinheiro reservado", e o saldo da conta corrente caiu junto (fechou com os
+  movimentos novos). No Nubank o resgate da caixinha vem com a categoria `03`. O
+  começo da descrição passou a contar como aplicação no worker e no guardado; depois da
+  sincronização a linha virou `retirada_titular` e o ciclo atual mostrou R$ 1,00
+  guardado. Mutação: sem a regra no worker ou no guardado, o teste de cada um falha.
 
 ## Ficou de fora
 

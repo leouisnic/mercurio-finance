@@ -18,6 +18,7 @@ import pandas as pd
 from ingestion_worker.pluggy import (
     CATEGORIA_ID_PAGAMENTO_DE_FATURA,
     CATEGORIA_ID_RENDIMENTO,
+    DESCRICAO_DE_RESERVA,
     PREFIXO_CATEGORIA_INVESTIMENTO,
 )
 from sqlalchemy import (
@@ -600,13 +601,19 @@ class EntradasDoDinheiroLivre:
 
 
 def _e_aplicacao_ou_resgate():
-    """Aplicação ou resgate na conta corrente, pela categoria da Pluggy: a mesma
-    regra de `ingestion_worker.pluggy.e_movimento_de_investimento`. Rendimento
-    fica de fora porque é dinheiro novo, não dinheiro guardado."""
+    """Aplicação ou resgate na conta corrente: a mesma regra de
+    `ingestion_worker.pluggy.e_movimento_de_investimento`, pela categoria da
+    Pluggy ou pelo texto da reserva do Mercado Pago. Rendimento fica de fora
+    porque é dinheiro novo, não dinheiro guardado."""
     return and_(
         MovimentoORM.tipo.in_(("retirada_titular", "aporte_titular")),
-        MovimentoORM.categoria_id.startswith(PREFIXO_CATEGORIA_INVESTIMENTO),
-        MovimentoORM.categoria_id != CATEGORIA_ID_RENDIMENTO,
+        or_(
+            and_(
+                MovimentoORM.categoria_id.startswith(PREFIXO_CATEGORIA_INVESTIMENTO),
+                MovimentoORM.categoria_id != CATEGORIA_ID_RENDIMENTO,
+            ),
+            MovimentoORM.descricao.startswith(DESCRICAO_DE_RESERVA),
+        ),
         MovimentoORM.conta_id.in_(select(ContaORM.id).where(ContaORM.tipo == "BANK")),
     )
 

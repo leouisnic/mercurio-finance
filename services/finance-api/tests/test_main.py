@@ -1234,6 +1234,41 @@ def test_dinheiro_livre_reconhece_aplicacao_e_recomenda_pelo_historico(semear_co
     assert corpo["da_para_guardar"] == "820.00"
 
 
+def test_reserva_do_mercado_pago_conta_como_guardado(semear_contas, semear_movimentos) -> None:
+    """A reserva chega sem categoria de investimento; o texto basta. Mesma conta
+    do teste anterior, sem histórico: cota 70, cofrinho 600, hoje 670."""
+    semear_contas(
+        [
+            {"id": "corrente", "nome": "Conta fictícia", "tipo": "BANK", "saldo": 1350.00},
+            {"id": "cartao", "nome": "Cartão fictício", "tipo": "CREDIT", "saldo": 400.00},
+        ]
+    )
+    semear_movimentos(
+        processar_movimentos(
+            pd.DataFrame(
+                [
+                    _despesa("g1", "2026-10-05", 400.00, "Mercado"),
+                    {
+                        "data": "2026-10-10",
+                        "valor": 650.00,
+                        "descricao": "Dinheiro reservado Viagem fictícia",
+                        "conta_id": "corrente",
+                        "tipo": "retirada_titular",
+                        "identificador_externo": "res",
+                        "categoria_id": "99999999",
+                    },
+                ]
+            )
+        ),
+        Proveniencia.PLUGGY.value,
+    )
+
+    corpo = client.get("/dinheiro-livre", params={"hoje": "2026-10-10"}).json()
+
+    assert (corpo["cota_do_dia"], corpo["cofrinho"], corpo["hoje_disponivel"]) == ("70.00", "600.00", "670.00")
+    assert corpo["guardado_no_ciclo"] == "650.00"
+
+
 def test_dinheiro_livre_negativo_mostra_zero_e_a_falta(semear_contas) -> None:
     semear_contas(
         [

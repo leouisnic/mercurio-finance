@@ -29,6 +29,10 @@ CATEGORIA_ID_PAGAMENTO_DE_FATURA = "05100000"
 # dividends", rendimento, que é dinheiro novo e continua receita.
 PREFIXO_CATEGORIA_INVESTIMENTO = "03"
 CATEGORIA_ID_RENDIMENTO = "03060000"
+# O Mercado Pago manda o dinheiro guardado numa reserva como "Dinheiro
+# reservado <nome da reserva>", e a Pluggy classifica como "Other". Sem esta
+# regra, guardar vira gasto.
+DESCRICAO_DE_RESERVA = "Dinheiro reservado"
 MOEDA_DA_CONTA = "BRL"
 
 
@@ -120,8 +124,11 @@ def _saiu_dinheiro(transacao: dict) -> bool:
     raise RespostaPluggyInvalida("transação sem type DEBIT ou CREDIT")
 
 
-def e_movimento_de_investimento(categoria_id: str | None) -> bool:
-    """Aplicação ou resgate, que não é gasto nem receita."""
+def e_movimento_de_investimento(categoria_id: str | None, descricao: str = "") -> bool:
+    """Aplicação ou resgate, que não é gasto nem receita: pela categoria de
+    investimento da Pluggy, ou pelo texto da reserva do Mercado Pago."""
+    if descricao.startswith(DESCRICAO_DE_RESERVA):
+        return True
     return (
         categoria_id is not None
         and categoria_id.startswith(PREFIXO_CATEGORIA_INVESTIMENTO)
@@ -156,7 +163,7 @@ def mapear_para_movimento(transacao: dict) -> dict | None:
     e_transferencia_propria = (
         categoria_id == CATEGORIA_ID_TRANSFERENCIA_PROPRIA
         or categoria == CATEGORIA_TRANSFERENCIA_PROPRIA
-        or e_movimento_de_investimento(categoria_id)
+        or e_movimento_de_investimento(categoria_id, transacao["description"])
     )
 
     if categoria_id == CATEGORIA_ID_PAGAMENTO_DE_FATURA:

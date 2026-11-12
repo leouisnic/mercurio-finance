@@ -42,6 +42,14 @@ O fingerprint usa conta, data, valor, descrição e tipo normalizados.
 
 Possíveis duplicidades não participam da detecção automática de recorrência.
 
+## Dinheiro guardado
+
+Aplicação e resgate são movimentação própria, nem gasto nem renda. A Pluggy os
+marca com a categoria de investimento (`03`, menos rendimento), exceto a reserva
+do Mercado Pago, que chega como "Other" com o texto "Dinheiro reservado" seguido
+do nome da reserva; esse começo de descrição também conta como aplicação. Na
+cota, o guardado sai só do dia em que aconteceu em diante.
+
 ## Moeda
 
 O valor é sempre em reais. Compra em outra moeda vale o que a instituição
