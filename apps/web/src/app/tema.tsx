@@ -61,7 +61,11 @@ const OPCOES: { valor: Escolha; rotulo: string; icone: typeof Sun }[] = [
 ];
 
 /** Três botões: seguir o sistema, claro ou escuro. A escolha fica no navegador. */
-export function SeletorDeTema() {
+/**
+ * Com `largo`, ocupa a largura toda e divide entre os três botões: é o jeito do
+ * rodapé da barra lateral, onde fica empilhado com o Sair.
+ */
+export function SeletorDeTema({ largo = false }: { largo?: boolean }) {
   // No servidor não há navegador: começa em "sistema" e acerta ao hidratar.
   const escolha = useSyncExternalStore(
     assinar,
@@ -87,7 +91,7 @@ export function SeletorDeTema() {
     <div
       role="group"
       aria-label="Tema"
-      className="border-borda bg-superficie inline-flex gap-0.5 rounded-[10px] border p-0.5"
+      className={`border-borda bg-superficie gap-0.5 rounded-[10px] border p-0.5 ${largo ? "flex w-full" : "inline-flex"}`}
     >
       {OPCOES.map(({ valor, rotulo, icone: Icone }) => (
         <button
@@ -97,7 +101,7 @@ export function SeletorDeTema() {
           aria-pressed={escolha === valor}
           title={rotulo}
           onClick={() => escolher(valor)}
-          className={`grid size-8 cursor-pointer place-items-center rounded-[8px] ${
+          className={`grid h-8 cursor-pointer place-items-center rounded-[8px] ${largo ? "flex-1" : "w-8"} ${
             escolha === valor
               ? "bg-marca-clara text-marca-escura"
               : "text-tinta-3 hover:text-tinta"

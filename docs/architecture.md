@@ -72,7 +72,9 @@ Os principais grupos de endpoints são:
   movimentos de uma vez;
 - ciclos de pagamento;
 - recorrências e compromissos;
-- sincronização assíncrona por Redis e RQ.
+- sincronização assíncrona por Redis e RQ, com uma fila por banco
+  (`mercurio:<banco>`): a demonstração e o e2e, no `mercurio_test`, nunca
+  enfileiram para o worker do banco real, e a suíte do Pytest usa uma fila própria.
 
 ## Integrações
 

@@ -79,6 +79,20 @@ async def _limpar_movimentos() -> None:
     definir_feriados_locais(())
 
 
+@pytest.fixture(autouse=True)
+def fila_isolada(monkeypatch):
+    """Nenhum teste enfileira na fila do banco real, nem por rota chamada sem
+    querer: o teste por rota do token, com a proteção desligada, já deixou
+    sincronizações e importações fictícias lá para o worker real executar."""
+    from finance_api import main
+    from rq import Queue
+
+    fila = Queue("mercurio:pytest", connection=main.fila.connection)
+    monkeypatch.setattr(main, "fila", fila)
+    yield fila
+    fila.empty()
+
+
 @pytest.fixture
 def banco_de_teste_limpo():
     """Não é autouse: só os testes que tocam o banco (test_main.py) pedem

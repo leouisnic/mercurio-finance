@@ -148,6 +148,19 @@ Tailscale e criação da conta são do dono.
   `server` no build. Telas conferidas na demonstração fictícia no computador, no
   celular e no escuro, iguais à opção escolhida.
 
+- 12/11. Antes de abrir o painel pela primeira vez com a senha, a fila do Redis tinha
+  quatro tarefas (duas sincronizações e duas importações do extrato fictício)
+  deixadas pela mutação do teste por rota do token: sem o middleware, o teste chamou
+  `POST /sync/*` na fila real. O worker real gravaria o extrato fictício no banco real.
+  O banco real foi conferido limpo e a fila esvaziada com autorização do dono. Correção:
+  fila por banco (`mercurio:<banco>`) e fila própria para toda a suíte; repetida a
+  mutação, a fila do banco real ficou vazia.
+- 12/11. Entrada conferida no painel real: local e pelo Tailscale, a página leva para
+  `/entrar`, e a senha errada volta "Senha incorreta." pelo endereço `ts.net`, então as
+  ações do servidor passam atrás do `tailscale serve`. O dono entrou pelo celular.
+- 12/11. Rodapé da barra lateral corrigido a pedido do dono: o seletor de tema ocupa a
+  largura com os ícones centralizados, e o Sair tem a mesma largura e altura.
+
 ## Lições
 
 - Editar a `docs/spec.md` muda o hash da aprovação dos módulos e o `guarda-escopo`
@@ -156,3 +169,6 @@ Tailscale e criação da conta são do dono.
   pode ter `import.meta` nem `await` no topo.
 - O Next põe na página um anunciador de rota com `role="alert"`: teste que procura um
   alerta filtra pelo texto.
+- Mutação que desliga uma proteção faz os testes chamarem de verdade o que ela
+  bloqueava: recurso compartilhado (fila, banco) precisa estar isolado na suíte
+  inteira, não só no teste que o usa de propósito.

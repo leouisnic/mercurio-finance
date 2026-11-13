@@ -269,7 +269,7 @@ export function BarraLateral({
         </div>
 
         <div className="mt-auto flex flex-col gap-2 px-2 pt-6">
-          <SeletorDeTema />
+          <SeletorDeTema largo />
           <BotaoSair />
         </div>
       </nav>
