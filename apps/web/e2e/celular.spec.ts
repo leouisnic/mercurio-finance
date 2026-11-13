@@ -63,3 +63,20 @@ test("no celular os balões de marcar vários cabem na tela", async ({ page }) =
     await page.keyboard.press("Escape");
   }
 });
+
+test.describe("tela de toque", () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+
+  test("nenhum campo tem letra menor que 16 px, que faria o iPhone dar zoom", async ({ page }) => {
+    for (const caminho of ["/", "/movimentos", "/movimentos/tags", "/ajustes"]) {
+      await page.goto(caminho);
+      expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true);
+      const tamanhos = await page.evaluate(() =>
+        [...document.querySelectorAll("input, select, textarea")].map((campo) =>
+          parseFloat(getComputedStyle(campo).fontSize),
+        ),
+      );
+      for (const tamanho of tamanhos) expect(tamanho, caminho).toBeGreaterThanOrEqual(16);
+    }
+  });
+});

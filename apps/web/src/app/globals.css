@@ -157,6 +157,18 @@
   color: oklch(var(--categoria-icone) var(--tom));
 }
 
+/* O Safari do iPhone aumenta a tela sozinho quando o campo focado tem letra
+   menor que 16 px, e a página continua com zoom depois: a senha, que foca ao
+   abrir, deixava o painel inteiro aumentado. Em tela de toque, todo campo usa
+   16 px. Fora das camadas do Tailwind, para vencer o tamanho de cada campo. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 body {
   background: var(--color-fundo);
   color: var(--color-tinta);

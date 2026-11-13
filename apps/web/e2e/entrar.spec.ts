@@ -35,3 +35,16 @@ test("entra com a senha e Sair volta para a entrada", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/entrar$/);
 });
+
+test.describe("tela de toque", () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+
+  test("o campo de senha não faz o iPhone dar zoom ao abrir", async ({ page }) => {
+    await page.goto("/entrar");
+    // Sem tela de toque a regra dos 16 px nem vale: o teste não provaria nada.
+    expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true);
+
+    const tamanho = await page.getByLabel("Senha").evaluate((campo) => parseFloat(getComputedStyle(campo).fontSize));
+    expect(tamanho).toBeGreaterThanOrEqual(16);
+  });
+});
