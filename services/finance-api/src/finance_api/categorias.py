@@ -13,6 +13,7 @@ migração. Os ids usados aqui precisam existir lá, e um teste confere.
 from __future__ import annotations
 
 import unicodedata
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
 
@@ -29,6 +30,17 @@ class OrigemDaCategoria(str, Enum):
 
 ORIGENS_DO_DONO = (OrigemDaCategoria.DONO.value, OrigemDaCategoria.MOBILLS.value)
 
+# As categorias que as migrações criam. O resto foi o dono que criou, ou um
+# teste: é o que a limpeza do banco de teste e da demonstração apaga. Pela
+# ordem não dá, porque a das categorias de entrada depende do que já existia
+# no banco quando a migração rodou. Um teste confere esta lista contra a tabela.
+CATEGORIAS_DAS_MIGRACOES = (
+    "alimentacao", "supermercado", "transporte", "saude", "farmacia", "viagem", "hospedagem",
+    "casa", "assinaturas", "educacao", "compras", "vestuario", "lazer", "servicos",
+    "presentes-e-doacoes", "pix-para-pessoas", "investimento-e-reserva", "salario-e-extras",
+    "taxas-e-tarifas", "outros", "rendimentos", "vendas", "presentes-recebidos", "outras-entradas",
+)
+
 # Só receita e despesa pedem categoria. Transferência entre contas do titular
 # e pagamento de fatura movem o próprio dinheiro e não entram em média de gasto.
 TIPOS_CLASSIFICAVEIS = ("despesa", "receita")
@@ -41,7 +53,7 @@ TRADUCAO_DA_PLUGGY = {
     "01": "salario-e-extras",
     "0201": "taxas-e-tarifas",
     "0202": "taxas-e-tarifas",
-    "0306": "investimento-e-reserva",
+    "0306": "rendimentos",
     "07": "servicos",
     "0702": "educacao",
     "0703": "saude",
@@ -134,18 +146,30 @@ class Regra:
 
 
 def decidir(
-    *, tipo: str, fatura: bool, regra: Regra | None, categoria_id_da_pluggy: str | None
+    *,
+    tipo: str,
+    fatura: bool,
+    regra: Regra | None,
+    categoria_id_da_pluggy: str | None,
+    tipos_das_categorias: Mapping[str, str],
 ) -> tuple[str | None, str | None]:
     """Categoria automática e sua origem, para movimento sem escolha do dono.
     `(None, None)` é "para classificar" ou, fora dos tipos classificáveis,
-    "não se aplica"."""
+    "não se aplica".
+
+    A categoria automática tem o tipo do movimento. Receita em categoria de
+    despesa é reembolso e só o dono escolhe: a regra de um destinatário vem
+    dos Pix enviados a ele e marcaria o Pix que ele devolveu."""
     if tipo not in TIPOS_CLASSIFICAVEIS or fatura:
         return None, None
     if regra is not None:
         if regra.categoria is None:
             return None, None
-        return regra.categoria, OrigemDaCategoria.REGRA.value
+        if tipos_das_categorias.get(regra.categoria) == tipo:
+            return regra.categoria, OrigemDaCategoria.REGRA.value
+        # Regra de outro tipo não diz nada deste movimento: segue para a
+        # Pluggy, que reconhece, por exemplo, o rendimento.
     traduzida = traduzir_da_pluggy(categoria_id_da_pluggy)
-    if traduzida is not None:
+    if traduzida is not None and tipos_das_categorias.get(traduzida) == tipo:
         return traduzida, OrigemDaCategoria.PLUGGY.value
     return None, None

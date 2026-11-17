@@ -372,6 +372,33 @@ async def _restaurar_removidos(sessao: AsyncSession, identificadores: list[str])
     await sessao.flush()
 
 
+def _e_reembolso():
+    """Receita que o dono pôs numa categoria de despesa: alguém devolveu parte
+    de um gasto. Abate o gasto e não é renda.
+
+    Receita sem categoria precisa dar falso, não nulo: `NULL IN (...)` é nulo,
+    e a negação dele também, o que tirava da soma de entradas toda receita
+    ainda para classificar."""
+    return and_(
+        MovimentoORM.tipo == "receita",
+        MovimentoORM.categoria_propria.is_not(None),
+        func.coalesce(
+            MovimentoORM.categoria_propria.in_(select(CategoriaORM.id).where(CategoriaORM.tipo == "despesa")),
+            False,
+        ),
+    )
+
+
+def _conta_no_gasto():
+    """O que entra em toda soma de gasto: despesa sem pagamento de fatura, e o
+    reembolso, que entra negativo por `_valor_no_gasto`."""
+    return or_(and_(MovimentoORM.tipo == "despesa", _nao_e_pagamento_de_fatura()), _e_reembolso())
+
+
+def _valor_no_gasto():
+    return case((MovimentoORM.tipo == "receita", -MovimentoORM.valor), else_=MovimentoORM.valor)
+
+
 def _e_conta_fixa():
     """Despesa da mesma conta e descrição de uma recorrência aprovada, a chave
     que a detecção usa. Encerrada entra também: o pagamento dela no ciclo já era
@@ -491,22 +518,27 @@ async def agregar_despesas_por_dia(
     filtro: FiltroDeGasto | None = None,
     sem_conta_fixa: bool = False,
 ) -> list[tuple[date, Decimal, Decimal]]:
-    """Soma `valor` por `data`, só para `tipo == "despesa"`, no intervalo
-    (inclusive nas duas pontas). Pagamento de fatura fica fora, ver
-    `_nao_e_pagamento_de_fatura`."""
+    """Gasto por `data` no intervalo (inclusive nas duas pontas): despesa sem
+    pagamento de fatura, menos reembolso, ver `_conta_no_gasto`. Dia com mais
+    reembolso que gasto fica negativo."""
     consulta = (
         select(
             MovimentoORM.data,
-            func.sum(MovimentoORM.valor),
+            func.sum(_valor_no_gasto()),
             func.sum(
-                case((MovimentoORM.duplicado_possivel.is_(True), MovimentoORM.valor), else_=0)
+                case(
+                    (
+                        and_(MovimentoORM.duplicado_possivel.is_(True), MovimentoORM.tipo == "despesa"),
+                        MovimentoORM.valor,
+                    ),
+                    else_=0,
+                )
             ),
         )
         .where(
-            MovimentoORM.tipo == "despesa",
+            _conta_no_gasto(),
             MovimentoORM.data >= data_inicio,
             MovimentoORM.data <= data_fim,
-            _nao_e_pagamento_de_fatura(),
         )
         .group_by(MovimentoORM.data)
         .order_by(MovimentoORM.data)
@@ -643,12 +675,11 @@ async def entradas_do_dinheiro_livre(sessao: AsyncSession, *, inicio: date, hoje
     e_conta_fixa = _e_conta_fixa()
     gastos = (
         await sessao.execute(
-            select(MovimentoORM.data, func.sum(MovimentoORM.valor))
+            select(MovimentoORM.data, func.sum(_valor_no_gasto()))
             .where(
-                MovimentoORM.tipo == "despesa",
+                _conta_no_gasto(),
                 MovimentoORM.data >= inicio,
                 MovimentoORM.data <= hoje,
-                _nao_e_pagamento_de_fatura(),
                 ~e_conta_fixa,
             )
             .group_by(MovimentoORM.data)
@@ -700,11 +731,10 @@ async def medias_do_dia_a_dia(sessao: AsyncSession, ciclos: list[Ciclo]) -> list
         if ciclo.inicio < primeiro:
             continue
         total = await sessao.scalar(
-            select(func.coalesce(func.sum(MovimentoORM.valor), 0)).where(
-                MovimentoORM.tipo == "despesa",
+            select(func.coalesce(func.sum(_valor_no_gasto()), 0)).where(
+                _conta_no_gasto(),
                 MovimentoORM.data >= ciclo.inicio,
                 MovimentoORM.data <= ciclo.fim,
-                _nao_e_pagamento_de_fatura(),
                 ~_e_conta_fixa(),
             )
         )
@@ -1016,6 +1046,10 @@ async def listar_categorias(sessao: AsyncSession) -> list[CategoriaORM]:
     return list(resultado.scalars().all())
 
 
+async def _tipos_das_categorias(sessao: AsyncSession) -> dict[str, str]:
+    return dict((await sessao.execute(select(CategoriaORM.id, CategoriaORM.tipo))).all())
+
+
 async def carregar_regras(sessao: AsyncSession) -> dict[str, Regra]:
     resultado = await sessao.execute(select(RegraDeCategoriaORM.chave, RegraDeCategoriaORM.categoria_id))
     return {chave: Regra(categoria) for chave, categoria in resultado.all()}
@@ -1028,6 +1062,7 @@ async def classificar_movimentos(sessao: AsyncSession) -> int:
     movimentos antigos que o Mercúrio tinha classificado sozinho. Devolve
     quantos mudaram."""
     regras = await carregar_regras(sessao)
+    tipos_das_categorias = await _tipos_das_categorias(sessao)
     automaticos = (
         await sessao.execute(
             select(
@@ -1054,6 +1089,7 @@ async def classificar_movimentos(sessao: AsyncSession) -> int:
             fatura=linha.pagamento_de_fatura in ("detectado", "confirmado"),
             regra=regras.get(chave_do_destinatario(linha.descricao)),
             categoria_id_da_pluggy=linha.categoria_id,
+            tipos_das_categorias=tipos_das_categorias,
         )
         if (categoria, origem) != (linha.categoria_propria, linha.origem_da_categoria):
             mudancas.append({"id": linha.id, "categoria_propria": categoria, "origem_da_categoria": origem})
@@ -1104,8 +1140,16 @@ async def _escolher(
     e reclassifica uma vez só, mesmo marcando vários."""
     if movimento.tipo not in TIPOS_CLASSIFICAVEIS:
         raise CategoriaInvalida("só receita e despesa levam categoria")
+    tipo_da_categoria = await sessao.scalar(select(CategoriaORM.tipo).where(CategoriaORM.id == categoria))
+    if movimento.tipo == "despesa" and tipo_da_categoria != "despesa":
+        raise CategoriaInvalida("despesa só leva categoria de despesa")
     movimento.categoria_propria = categoria
     movimento.origem_da_categoria = OrigemDaCategoria.DONO.value
+    if movimento.tipo != tipo_da_categoria:
+        # Reembolso vale só para este movimento. As regras do destinatário
+        # nasceram dos Pix enviados a ele; mexer nelas por causa do Pix que
+        # ele devolveu mudaria os próximos enviados.
+        return
     chave = chave_do_destinatario(movimento.descricao)
     if todos_do_destinatario:
         instrucao = pg_insert(RegraDeCategoriaORM).values(
@@ -1160,7 +1204,9 @@ async def corrigir_categoria(
     return movimento
 
 
-async def criar_categoria(sessao: AsyncSession, nome: str, icone: str, cor: int) -> CategoriaORM:
+async def criar_categoria(
+    sessao: AsyncSession, nome: str, icone: str, cor: int, tipo: str = "despesa"
+) -> CategoriaORM:
     """Categoria nova do dono, no fim da lista. O id sai do nome sem acento,
     com número no fim quando já existe."""
     nome = nome.strip()
@@ -1173,7 +1219,7 @@ async def criar_categoria(sessao: AsyncSession, nome: str, icone: str, cor: int)
     while id_ in ids:
         id_, numero = f"{base}-{numero}", numero + 1
     ordem = (await sessao.scalar(select(func.max(CategoriaORM.ordem)))) or 0
-    categoria = CategoriaORM(id=id_, nome=nome, icone=icone, cor=cor, ordem=ordem + 1)
+    categoria = CategoriaORM(id=id_, nome=nome, icone=icone, cor=cor, ordem=ordem + 1, tipo=tipo)
     sessao.add(categoria)
     await sessao.commit()
     return categoria
@@ -1269,20 +1315,10 @@ async def tags_dos_movimentos(sessao: AsyncSession, ids: list[int]) -> dict[int,
 
 
 def _gasto():
-    """Quanto saiu: despesa sem pagamento de fatura, como no gasto por dia."""
+    """Quanto saiu: despesa sem pagamento de fatura, menos reembolso, como no
+    gasto por dia."""
     return cast(
-        func.coalesce(
-            func.sum(
-                case(
-                    (
-                        and_(MovimentoORM.tipo == "despesa", _nao_e_pagamento_de_fatura()),
-                        MovimentoORM.valor,
-                    ),
-                    else_=0,
-                )
-            ),
-            0,
-        ),
+        func.coalesce(func.sum(case((_conta_no_gasto(), _valor_no_gasto()), else_=0)), 0),
         Numeric(12, 2),
     )
 
@@ -1369,15 +1405,12 @@ async def apagar_tag(sessao: AsyncSession, tag_id: int) -> bool:
 
 
 async def gastos_da_tag(sessao: AsyncSession, tag_id: int) -> list[GastoDaTag]:
-    """As despesas marcadas com a tag, sem pagamento de fatura."""
+    """As despesas marcadas com a tag, sem pagamento de fatura, e os
+    reembolsos marcados com ela, negativos."""
     resultado = await sessao.execute(
-        select(MovimentoORM.data, MovimentoORM.valor, MovimentoORM.descricao, MovimentoORM.categoria_propria)
+        select(MovimentoORM.data, _valor_no_gasto(), MovimentoORM.descricao, MovimentoORM.categoria_propria)
         .join(MovimentoTagORM, MovimentoTagORM.movimento_id == MovimentoORM.id)
-        .where(
-            MovimentoTagORM.tag_id == tag_id,
-            MovimentoORM.tipo == "despesa",
-            _nao_e_pagamento_de_fatura(),
-        )
+        .where(MovimentoTagORM.tag_id == tag_id, _conta_no_gasto())
     )
     return [GastoDaTag(*linha) for linha in resultado.all()]
 
@@ -1391,8 +1424,8 @@ async def totais_dos_ciclos(sessao: AsyncSession, ciclos: list[Ciclo]) -> dict[C
     resultado = await sessao.execute(
         select(
             MovimentoORM.data,
-            func.sum(case((and_(MovimentoORM.tipo == "despesa", _nao_e_pagamento_de_fatura()), MovimentoORM.valor), else_=0)),
-            func.sum(case((MovimentoORM.tipo == "receita", MovimentoORM.valor), else_=0)),
+            func.sum(case((_conta_no_gasto(), _valor_no_gasto()), else_=0)),
+            func.sum(case((and_(MovimentoORM.tipo == "receita", ~_e_reembolso()), MovimentoORM.valor), else_=0)),
         )
         .where(MovimentoORM.data >= inicio, MovimentoORM.data <= fim)
         .group_by(MovimentoORM.data)
@@ -1438,14 +1471,14 @@ async def maiores_por_dia(
 
 
 async def gasto_da_categoria(sessao: AsyncSession, categoria: str, *, inicio: date, fim: date) -> Decimal:
-    """Despesas de uma categoria do Mercúrio no intervalo, sem fatura."""
+    """Gasto de uma categoria do Mercúrio no intervalo, sem fatura e menos
+    reembolso."""
     return await sessao.scalar(
-        select(func.coalesce(func.sum(MovimentoORM.valor), 0)).where(
+        select(func.coalesce(func.sum(_valor_no_gasto()), 0)).where(
             MovimentoORM.categoria_propria == categoria,
-            MovimentoORM.tipo == "despesa",
+            _conta_no_gasto(),
             MovimentoORM.data >= inicio,
             MovimentoORM.data <= fim,
-            _nao_e_pagamento_de_fatura(),
         )
     ) or Decimal(0)
 
@@ -1474,12 +1507,12 @@ async def gasto_por_categoria_no_periodo(
     filtro: FiltroDeGasto | None = None,
     sem_conta_fixa: bool = False,
 ) -> dict[str, Decimal]:
-    """Despesa por categoria do Mercúrio no intervalo, sem fatura; sem
-    categoria fica de fora, porque não dá nome ao cartão."""
+    """Gasto por categoria do Mercúrio no intervalo, sem fatura e menos
+    reembolso; sem categoria fica de fora, porque não dá nome ao cartão."""
     consulta = (
-        select(MovimentoORM.categoria_propria, func.sum(MovimentoORM.valor))
+        select(MovimentoORM.categoria_propria, func.sum(_valor_no_gasto()))
         .where(
-            MovimentoORM.tipo == "despesa",
+            _conta_no_gasto(),
             MovimentoORM.data >= inicio,
             MovimentoORM.data <= fim,
             MovimentoORM.categoria_propria.is_not(None),

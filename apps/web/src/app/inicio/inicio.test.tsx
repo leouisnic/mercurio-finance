@@ -108,6 +108,17 @@ test("sem histórico, dá para guardar diz isso em vez de mostrar zero", () => {
   expect(screen.getByText("Guardado no ciclo")).toBeDefined();
 });
 
+test("média negativa mostra falta de estimativa com histórico existente", () => {
+  montar(
+    <HojeDaParaGastar
+      dinheiro={{ ...DINHEIRO, savingsSuggestionReason: "negative_estimate" }}
+    />,
+  );
+
+  expect(screen.getByText("Sem estimativa")).toBeDefined();
+  expect(screen.queryByText("Sem histórico")).toBeNull();
+});
+
 test("a recomendação aparece no quadro e o guardado traz a data ao lado", () => {
   montar(
     <HojeDaParaGastar

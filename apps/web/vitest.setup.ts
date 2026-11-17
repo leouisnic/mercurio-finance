@@ -21,6 +21,33 @@ vi.mock("next/headers", () => ({
   headers: async () => new Headers(),
 }));
 
+// O jsdom não tem `matchMedia`. Por padrão a tela é de computador; o teste
+// que precisa do celular troca `globalThis.telaDeCelularDeTeste`.
+declare global {
+  var telaDeCelularDeTeste: boolean;
+}
+
+beforeEach(() => {
+  globalThis.telaDeCelularDeTeste = false;
+  if (
+    typeof window !== "undefined" &&
+    !("matchMedia" in window && vi.isMockFunction(window.matchMedia))
+  ) {
+    window.matchMedia = vi.fn((consulta: string) => ({
+      matches: consulta.includes("max-width")
+        ? globalThis.telaDeCelularDeTeste
+        : false,
+      media: consulta,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+  }
+});
+
 beforeEach(async () => {
   const { assinarSessao } = await import("./src/app/sessao");
   globalThis.cookieDaSessaoDeTeste = assinarSessao(

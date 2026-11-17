@@ -215,6 +215,7 @@ class CategoriaOut(BaseModel):
     nome: str
     icone: str = Field(description="Nome do ícone no lucide-react.")
     cor: int = Field(description="Tom da cor, de 0 a 359.")
+    tipo: Literal["despesa", "receita"]
 
 
 class CategoriaIn(BaseModel):
@@ -224,6 +225,7 @@ class CategoriaIn(BaseModel):
     nome: str = Field(min_length=1, max_length=60)
     icone: str = Field(pattern=r"^[A-Za-z0-9]{1,40}$")
     cor: int = Field(ge=0, le=359)
+    tipo: Literal["despesa", "receita"] = "despesa"
 
     @field_validator("nome")
     @classmethod
@@ -521,8 +523,9 @@ class DinheiroLivreOut(BaseModel):
     # dinheiro guardado em outro ciclo.
     guardado_no_ciclo: Decimal
     guardado_em: date | None
-    # Nulo quando ainda não há ciclos completos suficientes para estimar.
+    # Nulo quando o histórico não permite uma estimativa válida.
     da_para_guardar: Decimal | None
+    savings_suggestion_reason: Literal["insufficient_history", "negative_estimate"] | None = None
     falta_para_fechar: Decimal
     gastos_por_dia: list[GastoDoDiaOut]
 

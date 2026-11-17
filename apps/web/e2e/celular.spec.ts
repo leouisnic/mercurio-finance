@@ -80,3 +80,28 @@ test.describe("tela de toque", () => {
     }
   });
 });
+
+test.describe("escolha de categoria no celular", () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+
+  test("abre em tela cheia e o Salvar fica à vista com a lista rolada", async ({ page }) => {
+    await page.goto("/movimentos");
+    await page.getByRole("button", { name: /^Categoria de .*Alterar$/ }).first().click();
+
+    const escolha = page.getByRole("dialog");
+    await expect(escolha).toBeVisible();
+    const caixa = await escolha.boundingBox();
+    expect(caixa!.width).toBeGreaterThanOrEqual(390 - 1);
+    expect(caixa!.height).toBeGreaterThanOrEqual(844 - 1);
+
+    const salvar = escolha.getByRole("button", { name: "Salvar" });
+    await expect(salvar).toBeInViewport();
+    await escolha
+      .getByRole("radiogroup", { name: "Categoria" })
+      .evaluate((lista) => lista.scrollTo(0, lista.scrollHeight));
+    await expect(salvar).toBeInViewport();
+
+    await escolha.getByRole("button", { name: "Fechar" }).click();
+    await expect(escolha).toHaveCount(0);
+  });
+});

@@ -199,8 +199,8 @@ test("categoria para vários usa a mesma lista com ícones e manda a escolhida",
       ]}
       contas={CONTAS}
       categorias={[
-        { id: "viagem", nome: "Viagem", icone: "Plane", cor: 220 },
-        { id: "lazer", nome: "Lazer", icone: "PartyPopper", cor: 305 },
+        { id: "viagem", nome: "Viagem", icone: "Plane", cor: 220, tipo: "despesa" },
+        { id: "lazer", nome: "Lazer", icone: "PartyPopper", cor: 305, tipo: "despesa" },
       ]}
     />,
   );

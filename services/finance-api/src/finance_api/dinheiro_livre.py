@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import ROUND_FLOOR, Decimal
 from statistics import median
+from typing import Literal
 
 from finance_api.centavos import centavos as _centavos
 from finance_api.compromissos import parcelas, somar_meses
@@ -80,6 +81,7 @@ class DinheiroLivre:
     guardado_em: date | None
     da_para_guardar: Decimal | None
     falta_para_fechar: Decimal
+    savings_suggestion_reason: Literal["insufficient_history", "negative_estimate"] | None = None
 
 
 def contas_fixas_pendentes(
@@ -176,12 +178,20 @@ def calcular(
     )
 
     da_para_guardar = None
+    savings_suggestion_reason = "insufficient_history" if estimativa_por_dia is None else None
     if estimativa_por_dia is not None:
-        # O gasto de hoje já saiu do livre e faz parte do dia a dia de hoje.
-        sobra = max(livre + gasto_hoje - estimativa_por_dia * dias_restantes, Decimal(0))
-        da_para_guardar = _centavos(
-            (sobra / PASSO_DA_RECOMENDACAO).to_integral_value(ROUND_FLOOR) * PASSO_DA_RECOMENDACAO
-        )
+        if estimativa_por_dia < 0:
+            savings_suggestion_reason = "negative_estimate"
+        else:
+            # O gasto de hoje já saiu do livre. Devoluções e gasto acima
+            # da estimativa não podem sugerir guardar dinheiro indisponível.
+            sobra = min(
+                max(livre + gasto_hoje - estimativa_por_dia * dias_restantes, Decimal(0)),
+                max(livre, Decimal(0)),
+            )
+            da_para_guardar = _centavos(
+                (sobra / PASSO_DA_RECOMENDACAO).to_integral_value(ROUND_FLOOR) * PASSO_DA_RECOMENDACAO
+            )
     aplicacoes = [dia for dia, valor in guardado.items() if valor > 0]
 
     dias = {inicio + timedelta(days=indice): Decimal(0) for indice in range(dias_passados + 1)}
@@ -207,4 +217,5 @@ def calcular(
         guardado_em=max(aplicacoes) if aplicacoes and guardado_no_ciclo > 0 else None,
         da_para_guardar=da_para_guardar,
         falta_para_fechar=max(-livre, Decimal(0)),
+        savings_suggestion_reason=savings_suggestion_reason,
     )

@@ -192,6 +192,7 @@ export async function criarCategoria(dados: {
   nome: string;
   icone: string;
   cor: number;
+  tipo?: "despesa" | "receita";
 }): Promise<ResultadoDaAcao & { id: string | null }> {
   try {
     const resposta = await chamarApi(`/categorias`, {

@@ -589,17 +589,20 @@ async def nova_categoria(
 ) -> CategoriaOut:
     """Categoria criada pelo dono, no fim da lista."""
     try:
-        criada = await criar_categoria(sessao, categoria.nome, categoria.icone, categoria.cor)
+        criada = await criar_categoria(sessao, categoria.nome, categoria.icone, categoria.cor, categoria.tipo)
     except CategoriaInvalida as erro:
         raise HTTPException(status_code=422, detail=str(erro)) from erro
-    return CategoriaOut(id=criada.id, nome=criada.nome, icone=criada.icone, cor=criada.cor)
+    return CategoriaOut(id=criada.id, nome=criada.nome, icone=criada.icone, cor=criada.cor, tipo=criada.tipo)
 
 
 @app.get("/categorias", response_model=list[CategoriaOut])
 async def categorias(
     sessao: AsyncSession = Depends(obter_sessao),  # noqa: B008 (padrão do FastAPI)
 ) -> list[CategoriaOut]:
-    return [CategoriaOut(id=categoria.id, nome=categoria.nome, icone=categoria.icone, cor=categoria.cor) for categoria in await listar_categorias(sessao)]
+    return [
+        CategoriaOut(id=categoria.id, nome=categoria.nome, icone=categoria.icone, cor=categoria.cor, tipo=categoria.tipo)
+        for categoria in await listar_categorias(sessao)
+    ]
 
 
 @app.get("/movimentos/pagamentos-de-fatura", response_model=list[MovimentoOut])
@@ -838,6 +841,7 @@ async def dinheiro_livre(
         guardado_no_ciclo=resultado.guardado_no_ciclo,
         guardado_em=resultado.guardado_em,
         da_para_guardar=resultado.da_para_guardar,
+        savings_suggestion_reason=resultado.savings_suggestion_reason,
         falta_para_fechar=resultado.falta_para_fechar,
         gastos_por_dia=[
             GastoDoDiaOut(

@@ -72,6 +72,8 @@ export function HojeDaParaGastar({ dinheiro }: { dinheiro: DinheiroLivre }) {
     guardadoEm,
     daParaGuardar,
   } = dinheiro;
+  const hasNegativeEstimate =
+    dinheiro.savingsSuggestionReason === "negative_estimate";
   const acabou = livre < 0;
   const podiaHoje = gastoHoje + hojeDisponivel;
   const usado = acabou
@@ -205,10 +207,18 @@ export function HojeDaParaGastar({ dinheiro }: { dinheiro: DinheiroLivre }) {
             sobre: "dá para guardar",
             texto:
               daParaGuardar === null
-                ? "Precisa de pelo menos dois ciclos completos de histórico para saber quanto seu dia a dia costuma custar."
+                ? hasNegativeEstimate
+                  ? "As devoluções deixaram a média de gasto negativa. Esse histórico ainda não permite sugerir quanto guardar."
+                  : "Precisa de pelo menos dois ciclos completos de histórico para saber quanto seu dia a dia costuma custar."
                 : "Quanto sobra no ciclo depois do seu dia a dia de costume. É só sugestão.",
           }}
-          valor={daParaGuardar === null ? "Sem histórico" : moeda(daParaGuardar)}
+          valor={
+            daParaGuardar === null
+              ? hasNegativeEstimate
+                ? "Sem estimativa"
+                : "Sem histórico"
+              : moeda(daParaGuardar)
+          }
           corDoValor={daParaGuardar === null ? "text-tinta-3" : ""}
         />
       </div>

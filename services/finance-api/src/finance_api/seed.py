@@ -10,10 +10,12 @@ from pathlib import Path
 
 from ingestion_worker.extrato import carregar_extrato
 from mercurio_domain import Proveniencia
-from sqlalchemy import text
+from sqlalchemy import delete, text
 
+from finance_api.categorias import CATEGORIAS_DAS_MIGRACOES
 from finance_api.config import DATABASE_URL, validar_url_local_de_teste
 from finance_api.db import async_session
+from finance_api.models import CategoriaORM
 from finance_api.recorrencias import detectar_recorrencias
 from finance_api.repositorio import (
     classificar_movimentos,
@@ -47,8 +49,8 @@ async def semear(*, limpar_teste: bool = False) -> None:
                     "tags RESTART IDENTITY CASCADE"
                 )
             )
-            # As 20 das migrações têm ordem de 0 a 19; acima disso foi criada no e2e.
-            await sessao.execute(text("DELETE FROM categorias WHERE ordem > 19"))
+            # Fica só o que as migrações criam; o resto foi criado no e2e.
+            await sessao.execute(delete(CategoriaORM).where(CategoriaORM.id.not_in(CATEGORIAS_DAS_MIGRACOES)))
             await sessao.commit()
         await upsert_contas(sessao, seed_contas_ficticias())
         inseridos = await inserir_movimentos(

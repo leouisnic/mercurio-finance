@@ -12,6 +12,7 @@ os.environ["FINANCE_API_TOKEN"] = "token-ficticio-dos-testes"
 
 import pandas as pd
 import pytest
+from finance_api.categorias import CATEGORIAS_DAS_MIGRACOES
 from finance_api.ciclo import definir_feriados_locais
 from finance_api.config import DATABASE_URL, TEST_DATABASE_URL, validar_banco_de_teste
 from finance_api.db import obter_sessao
@@ -59,6 +60,8 @@ async def _obter_sessao_teste():
 app.dependency_overrides[obter_sessao] = _obter_sessao_teste
 
 
+
+
 async def _limpar_movimentos() -> None:
     async with _sessao_teste() as sessao:
         # Tudo que aponta para contas primeiro: as três tabelas têm chave
@@ -69,8 +72,9 @@ async def _limpar_movimentos() -> None:
         await sessao.execute(delete(CotaDoCicloORM))
         await sessao.execute(delete(RegraDeCategoriaORM))
         await sessao.execute(delete(TagORM))
-        # As 20 das migrações têm ordem de 0 a 19; acima disso é categoria criada num teste.
-        await sessao.execute(delete(CategoriaORM).where(CategoriaORM.ordem > 19))
+        # Fica só o que as migrações criam. Pela ordem não dá: a das categorias de
+        # entrada depende do que já existia no banco quando a migração rodou.
+        await sessao.execute(delete(CategoriaORM).where(CategoriaORM.id.not_in(CATEGORIAS_DAS_MIGRACOES)))
         await sessao.execute(delete(RecorrenciaORM))
         await sessao.execute(delete(CompromissoORM))
         await sessao.execute(delete(ContaORM))

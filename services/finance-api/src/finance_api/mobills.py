@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from finance_api.categorias import OrigemDaCategoria, categoria_do_mobills, chave_do_destinatario
 from finance_api.db import async_session
-from finance_api.models import MovimentoORM, RegraDeCategoriaORM
+from finance_api.models import CategoriaORM, MovimentoORM, RegraDeCategoriaORM
 from finance_api.repositorio import classificar_movimentos
 
 # O Mobills anota o dia em que a pessoa lançou; o banco, o dia em que
@@ -133,6 +133,15 @@ async def importar(sessao: AsyncSession, linhas: list[LinhaDoMobills]) -> dict[s
     # no Mobills não ir parar em outro de mesmo valor, mas não é regravado.
     do_dono = {linha.id for linha in gravados if linha.origem_da_categoria == OrigemDaCategoria.DONO.value}
     pares = casar(conhecidas, [MovimentoParaCasar(*linha[:5]) for linha in gravados])
+    # Receita só leva categoria de entrada: em categoria de despesa ela seria
+    # reembolso, que só o dono escolhe no painel. E Pix recebido não ensina a
+    # regra do destinatário, que vale para os Pix enviados a ele.
+    tipos = dict((await sessao.execute(select(CategoriaORM.id, CategoriaORM.tipo))).all())
+    pares = [
+        (linha, movimento)
+        for linha, movimento in pares
+        if tipos.get(categoria_do_mobills(linha.categoria)) == movimento.tipo
+    ]
 
     atualizacoes = [
         {

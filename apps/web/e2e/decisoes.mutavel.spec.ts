@@ -40,6 +40,38 @@ test.afterAll(() => {
   restaurarBaseFicticia();
 });
 
+test.describe("devolução pelo celular", () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+
+  test("salvar uma devolução abate o dia e persiste na categoria", async ({ page, request }) => {
+    const dailyUrl = `${API}/movimentos/gastos-diarios?data_inicio=2026-08-06&data_fim=2026-08-06`;
+    const before = await (await request.get(dailyUrl, COM_TOKEN)).json();
+    const previousTotal = Number(before[0]?.total ?? 0);
+
+    await page.goto("/movimentos/classificar");
+    await page.getByRole("button", { name: /Categoria de Pagamento cliente Beta/ }).click();
+    const dialog = page.getByRole("dialog", { name: "Categoria de Pagamento cliente Beta" });
+    await expect(dialog.getByText("Entradas", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("Devolveu um gasto", { exact: true })).toBeVisible();
+    await dialog.getByText("Farmácia", { exact: true }).click();
+    await expect(dialog.getByText("Vale para", { exact: true })).toHaveCount(0);
+    await dialog.getByRole("button", { name: "Salvar", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+
+    const movements = await (await request.get(`${API}/movimentos`, COM_TOKEN)).json();
+    const refund = movements.find((movement: { descricao: string }) => movement.descricao === "Pagamento cliente Beta");
+    expect(refund).toMatchObject({ categoria_propria: "farmacia", origem_da_categoria: "dono" });
+    const after = await (await request.get(dailyUrl, COM_TOKEN)).json();
+    expect(Number(after[0].total)).toBe(previousTotal - Number(refund.valor));
+
+    await page.goto("/movimentos");
+    await expect(page.getByText("Devolveu", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Categoria de Pagamento cliente Beta: Farmácia/ })).toBeVisible();
+    await page.reload();
+    await expect(page.getByText("Devolveu", { exact: true })).toBeVisible();
+  });
+});
+
 test("decidir como parcelamento grava o fim na API e muda a candidata de aba", async ({
   page,
   request,

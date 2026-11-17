@@ -2,6 +2,7 @@
 destinatário e importação do Mobills. Todo dado aqui é fictício."""
 
 import asyncio
+import runpy
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -11,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 from finance_api import config
 from finance_api.categorias import (
+    CATEGORIAS_DAS_MIGRACOES,
     DO_MOBILLS,
     TRADUCAO_DA_PLUGGY,
     Regra,
@@ -26,6 +28,16 @@ from ingestion_worker.extrato import processar_movimentos
 from mercurio_domain import Proveniencia
 
 client = TestClient(app, headers={"Authorization": f"Bearer {config.FINANCE_API_TOKEN}"})
+
+TIPOS = {
+    "viagem": "despesa",
+    "alimentacao": "despesa",
+    "supermercado": "despesa",
+    "pix-para-pessoas": "despesa",
+    "salario-e-extras": "receita",
+    "rendimentos": "receita",
+    "vendas": "receita",
+}
 
 PIX_PARA_ANA = "Transferência enviada|Ana Exemplo"
 PIX_PARA_BRUNO = "Transferência enviada|Bruno Exemplo"
@@ -84,15 +96,15 @@ def _corrigir(movimento_id: int, categoria: str, *, todos: bool = False):
 
 def test_ordem_de_decisao_correcao_vence_regra_que_vence_pluggy() -> None:
     regra = Regra("viagem")
-    assert decidir(tipo="despesa", fatura=False, regra=regra, categoria_id_da_pluggy="11010000") == (
+    assert decidir(tipo="despesa", fatura=False, regra=regra, categoria_id_da_pluggy="11010000", tipos_das_categorias=TIPOS) == (
         "viagem",
         "regra",
     )
-    assert decidir(tipo="despesa", fatura=False, regra=None, categoria_id_da_pluggy="11010000") == (
+    assert decidir(tipo="despesa", fatura=False, regra=None, categoria_id_da_pluggy="11010000", tipos_das_categorias=TIPOS) == (
         "alimentacao",
         "pluggy",
     )
-    assert decidir(tipo="despesa", fatura=False, regra=None, categoria_id_da_pluggy="05070000") == (
+    assert decidir(tipo="despesa", fatura=False, regra=None, categoria_id_da_pluggy="05070000", tipos_das_categorias=TIPOS) == (
         None,
         None,
     )
@@ -100,15 +112,13 @@ def test_ordem_de_decisao_correcao_vence_regra_que_vence_pluggy() -> None:
 
 def test_destinatario_misto_fica_para_classificar_mesmo_com_categoria_da_pluggy() -> None:
     assert decidir(
-        tipo="despesa", fatura=False, regra=Regra(None), categoria_id_da_pluggy="11010000"
-    ) == (None, None)
+        tipo="despesa", fatura=False, regra=Regra(None), categoria_id_da_pluggy="11010000", tipos_das_categorias=TIPOS) == (None, None)
 
 
 def test_transferencia_propria_e_fatura_nao_levam_categoria() -> None:
     assert decidir(
-        tipo="retirada_titular", fatura=False, regra=None, categoria_id_da_pluggy="10000000"
-    ) == (None, None)
-    assert decidir(tipo="despesa", fatura=True, regra=None, categoria_id_da_pluggy="10000000") == (
+        tipo="retirada_titular", fatura=False, regra=None, categoria_id_da_pluggy="10000000", tipos_das_categorias=TIPOS) == (None, None)
+    assert decidir(tipo="despesa", fatura=True, regra=None, categoria_id_da_pluggy="10000000", tipos_das_categorias=TIPOS) == (
         None,
         None,
     )
@@ -119,7 +129,7 @@ def test_traducao_usa_o_prefixo_mais_longo() -> None:
     assert traduzir_da_pluggy("18040000") == "saude"
     assert traduzir_da_pluggy("12020000") == "hospedagem"
     assert traduzir_da_pluggy("12010000") == "viagem"
-    assert traduzir_da_pluggy("03060000") == "investimento-e-reserva"
+    assert traduzir_da_pluggy("03060000") == "rendimentos"
     assert traduzir_da_pluggy("03020000") is None
     assert traduzir_da_pluggy(None) is None
 
@@ -141,7 +151,9 @@ def test_toda_categoria_usada_no_codigo_existe_na_tabela() -> None:
     errado aqui quebraria a chave estrangeira só na sincronização."""
     existentes = {categoria["id"] for categoria in client.get("/categorias").json()}
 
-    assert len(existentes) == 20
+    assert existentes == set(CATEGORIAS_DAS_MIGRACOES)
+    tipos = [categoria["tipo"] for categoria in client.get("/categorias").json()]
+    assert (tipos.count("despesa"), tipos.count("receita")) == (19, 5)
     assert set(TRADUCAO_DA_PLUGGY.values()) <= existentes
     assert set(DO_MOBILLS.values()) <= existentes
 
@@ -340,7 +352,7 @@ def test_criar_categoria_entra_no_fim_da_lista_e_pode_ser_usada(gravar) -> None:
     movimento = _por_descricao_e_data()[("Pet Shop Exemplo", "2026-10-01")]
 
     assert resposta.status_code == 201
-    assert resposta.json() == {"id": "pet", "nome": "Pet", "icone": "Dog", "cor": 75}
+    assert resposta.json() == {"id": "pet", "nome": "Pet", "icone": "Dog", "cor": 75, "tipo": "despesa"}
     assert repetida.status_code == 422
     assert client.get("/categorias").json()[-1]["id"] == "pet"
     assert _corrigir(movimento["id"], "pet").json()["categoria_propria"] == "pet"
@@ -422,3 +434,211 @@ def test_categoria_em_lote_vale_so_para_os_marcados_e_pula_transferencia(gravar)
     assert depois[(PIX_PARA_ANA, "2026-10-09")]["categoria_propria"] is None
     assert depois[("Para a outra conta", "2026-10-03")]["categoria_propria"] is None
     assert client.post("/movimentos/lote", json={"ids": marcados}).status_code == 422
+
+
+# Receita e reembolso. Ver docs/specs/2026-11-13-categorias-de-receita-e-reembolso.md.
+
+
+def test_categoria_automatica_tem_o_tipo_do_movimento() -> None:
+    """Regra de destinatário vem dos Pix enviados a ele; aplicada ao Pix que
+    ele devolve, viraria reembolso sem o dono escolher."""
+    assert decidir(
+        tipo="receita", fatura=False, regra=Regra("pix-para-pessoas"), categoria_id_da_pluggy=None, tipos_das_categorias=TIPOS
+    ) == (None, None)
+    assert decidir(
+        tipo="receita", fatura=False, regra=Regra("salario-e-extras"), categoria_id_da_pluggy=None, tipos_das_categorias=TIPOS
+    ) == ("salario-e-extras", "regra")
+    assert decidir(
+        tipo="despesa", fatura=False, regra=Regra("vendas"), categoria_id_da_pluggy=None, tipos_das_categorias=TIPOS
+    ) == (None, None)
+    assert decidir(
+        tipo="receita", fatura=False, regra=None, categoria_id_da_pluggy="03060000", tipos_das_categorias=TIPOS
+    ) == ("rendimentos", "pluggy")
+    # A regra do destinatário é de despesa: não vale para a receita, e a
+    # decisão segue para a Pluggy em vez de parar.
+    assert decidir(
+        tipo="receita",
+        fatura=False,
+        regra=Regra("pix-para-pessoas"),
+        categoria_id_da_pluggy="03060000",
+        tipos_das_categorias=TIPOS,
+    ) == ("rendimentos", "pluggy")
+    assert decidir(
+        tipo="receita", fatura=False, regra=None, categoria_id_da_pluggy="11010000", tipos_das_categorias=TIPOS
+    ) == (None, None)
+
+
+RECEBIDO_DE_ANA = "Transferência recebida|Ana Exemplo"
+RECEBIDO_DE_BRUNO = "Transferência recebida|Bruno Exemplo"
+
+
+@pytest.mark.usefixtures("banco_de_teste_limpo")
+def test_reembolso_abate_a_categoria_e_o_dia_em_que_chega(gravar, sessao_de_teste_factory) -> None:
+    """À mão: farmácia de 180 no dia 05 por três pessoas; Ana devolve 60 no
+    dia 05 e Bruno 60 no dia 06, quando houve mercado de 40. Gasto do dia 05:
+    180 - 60 = 120; do dia 06: 40 - 60 = -20. Farmácia: 60. Entradas do ciclo
+    sem os 120 devolvidos."""
+    from finance_api.ciclo import ciclo_de
+    from finance_api.repositorio import gasto_por_categoria_no_periodo, totais_dos_ciclos
+
+    gravar(
+        _movimento("F1", "2026-10-05", 180.0, "Drogaria Exemplo", "18020000"),
+        _movimento("R1", "2026-10-05", 60.0, RECEBIDO_DE_ANA, "05070000", tipo="receita"),
+        _movimento("R2", "2026-10-06", 60.0, RECEBIDO_DE_BRUNO, "05070000", tipo="receita"),
+        _movimento("M1", "2026-10-06", 40.0, "Mercado Exemplo", "10000000"),
+        _movimento("S1", "2026-10-06", 1000.0, "Salário Exemplo", "01000000", tipo="receita"),
+    )
+    movimentos = _por_descricao_e_data()
+    for chave in [(RECEBIDO_DE_ANA, "2026-10-05"), (RECEBIDO_DE_BRUNO, "2026-10-06")]:
+        assert _corrigir(movimentos[chave]["id"], "farmacia").status_code == 200
+
+    dias = client.get("/movimentos/gastos-diarios", params={"data_inicio": "2026-10-05", "data_fim": "2026-10-06"}).json()
+    assert {dia["data"]: dia["total"] for dia in dias} == {"2026-10-05": "120.00", "2026-10-06": "-20.00"}
+
+    async def somas():
+        async with sessao_de_teste_factory() as sessao:
+            categorias = await gasto_por_categoria_no_periodo(
+                sessao, inicio=date(2026, 10, 5), fim=date(2026, 10, 6)
+            )
+            ciclo = ciclo_de(date(2026, 10, 5))
+            return categorias, (await totais_dos_ciclos(sessao, [ciclo]))[ciclo]
+
+    categorias, totais = asyncio.run(somas())
+    assert categorias == {"farmacia": Decimal("60.00"), "supermercado": Decimal("40.00")}
+    assert (totais.gasto, totais.entrou) == (Decimal("100.00"), Decimal("1000.00"))
+
+
+@pytest.mark.usefixtures("banco_de_teste_limpo")
+def test_reembolso_nao_vira_regra_nem_deixa_a_do_destinatario_mista(gravar) -> None:
+    """Ana recebe Pix por "Pix para pessoas", regra do dono. O Pix que ela
+    devolveu marcado como Farmácia, mesmo pedindo "todos", não muda a regra:
+    o próximo Pix para ela continua em "Pix para pessoas"."""
+    gravar(
+        _movimento("P1", "2026-10-01", 50.0, PIX_PARA_ANA),
+        _movimento("R1", "2026-10-02", 30.0, RECEBIDO_DE_ANA, tipo="receita"),
+    )
+    movimentos = _por_descricao_e_data()
+    assert _corrigir(movimentos[(PIX_PARA_ANA, "2026-10-01")]["id"], "pix-para-pessoas", todos=True).status_code == 200
+    assert _corrigir(movimentos[(RECEBIDO_DE_ANA, "2026-10-02")]["id"], "farmacia", todos=True).status_code == 200
+
+    gravar(_movimento("P2", "2026-10-10", 70.0, PIX_PARA_ANA))
+    depois = _por_descricao_e_data()
+
+    assert depois[(PIX_PARA_ANA, "2026-10-10")]["categoria_propria"] == "pix-para-pessoas"
+    assert depois[(RECEBIDO_DE_ANA, "2026-10-02")]["categoria_propria"] == "farmacia"
+
+
+@pytest.mark.usefixtures("banco_de_teste_limpo")
+def test_despesa_nao_aceita_categoria_de_entrada(gravar) -> None:
+    gravar(_movimento("P1", "2026-10-01", 50.0, "Loja Exemplo", "08000000"))
+    movimento = _por_descricao_e_data()[("Loja Exemplo", "2026-10-01")]
+
+    assert _corrigir(movimento["id"], "vendas").status_code == 422
+
+
+@pytest.mark.usefixtures("banco_de_teste_limpo")
+def test_categoria_de_entrada_criada_pelo_dono() -> None:
+    resposta = client.post("/categorias", json={"nome": "Aluguel recebido", "icone": "House", "cor": 40, "tipo": "receita"})
+
+    assert resposta.status_code == 201
+    assert resposta.json()["tipo"] == "receita"
+
+
+@pytest.mark.usefixtures("banco_de_teste_limpo")
+def test_legacy_received_pix_migration_preserves_other_choices(gravar, sessao_de_teste_factory) -> None:
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+
+    gravar(
+        _movimento("L1", "2026-10-05", 40, "Entrada saude exemplo", tipo="receita"),
+        _movimento("L2", "2026-10-05", 50, "Entrada pix exemplo", tipo="receita"),
+        _movimento("L3", "2026-10-05", 60, "Devolucao farmacia exemplo", tipo="receita"),
+        _movimento("L4", "2026-10-05", 25, "Consulta exemplo"),
+    )
+    expected_categories = {
+        "Entrada saude exemplo": "saude", "Entrada pix exemplo": "pix-para-pessoas",
+        "Devolucao farmacia exemplo": "farmacia", "Consulta exemplo": "saude",
+    }
+    for (description, _), movement in _por_descricao_e_data().items():
+        assert _corrigir(movement["id"], expected_categories[description]).status_code == 200
+    before = _por_descricao_e_data()
+    migration = runpy.run_path(str(
+        Path(__file__).parents[1] / "alembic/versions/d9e4c6a1b732_reset_legacy_received_pix.py"
+    ))
+
+    async def apply(direction):
+        async with sessao_de_teste_factory() as session:
+            connection = await session.connection()
+
+            def execute(sync_connection):
+                with Operations.context(MigrationContext.configure(sync_connection)):
+                    migration[direction]()
+
+            await connection.run_sync(execute)
+            await session.commit()
+
+    asyncio.run(apply("upgrade"))
+    after = _por_descricao_e_data()
+    for key, movement in after.items():
+        assert movement["valor"] == before[key]["valor"]
+        if key[0].startswith("Entrada"):
+            assert movement["categoria_propria"] is None
+            assert movement["origem_da_categoria"] is None
+        else:
+            assert movement["categoria_propria"] == expected_categories[key[0]]
+            assert movement["origem_da_categoria"] == "dono"
+    asyncio.run(apply("upgrade"))
+    assert _por_descricao_e_data() == after
+    asyncio.run(apply("downgrade"))
+    assert _por_descricao_e_data() == after
+
+
+@pytest.mark.usefixtures("banco_de_teste_limpo")
+def test_refund_in_the_next_cycle_preserves_the_purchase_cycle(gravar, sessao_de_teste_factory) -> None:
+    from finance_api.ciclo import ciclo_de
+    from finance_api.repositorio import medias_do_dia_a_dia, totais_dos_ciclos
+
+    gravar(
+        _movimento("C1", "2026-10-14", 180, "Farmacia exemplo", "18020000"),
+        _movimento("C2", "2026-10-15", 60, "Pix de volta exemplo", tipo="receita"),
+    )
+    movements = _por_descricao_e_data()
+    ids = [movement["id"] for movement in movements.values()]
+    refund = movements[("Pix de volta exemplo", "2026-10-15")]
+    assert _corrigir(refund["id"], "farmacia").status_code == 200
+    assert client.post("/movimentos/lote", json={"ids": ids, "tag": "Compra compartilhada"}).status_code == 200
+    tag = client.get("/tags").json()[0]
+    assert tag["gasto"] == "120.00"
+
+    async def totals():
+        async with sessao_de_teste_factory() as session:
+            cycles = [ciclo_de(date(2026, 10, 14)), ciclo_de(date(2026, 10, 15))]
+            return await totais_dos_ciclos(session, cycles), await medias_do_dia_a_dia(session, cycles)
+
+    cycle_totals, averages = asyncio.run(totals())
+    previous = cycle_totals[ciclo_de(date(2026, 10, 14))]
+    following = cycle_totals[ciclo_de(date(2026, 10, 15))]
+    assert (previous.gasto, following.gasto, following.entrou) == (Decimal(180), Decimal(-60), Decimal(0))
+    assert averages == [Decimal(-60) / Decimal(21)]
+    free = client.get("/dinheiro-livre", params={"hoje": "2026-10-15"}).json()
+    assert free["gasto_hoje"] == "-60.00"
+    assert free["saldo_contas"] == "1000.00"
+
+
+@pytest.mark.usefixtures("banco_de_teste_limpo")
+def test_api_explains_suspended_savings_after_negative_refund_history(gravar) -> None:
+    gravar(
+        _movimento("H1", "2026-06-01", 1, "Compra inicial exemplo", "08000000"),
+        _movimento("H2", "2026-06-20", 300, "Devolucao junho exemplo", tipo="receita"),
+        _movimento("H3", "2026-07-20", 300, "Devolucao julho exemplo", tipo="receita"),
+    )
+    for (description, _), movement in _por_descricao_e_data().items():
+        if description.startswith("Devolucao"):
+            assert _corrigir(movement["id"], "farmacia").status_code == 200
+
+    response = client.get("/dinheiro-livre", params={"hoje": "2026-08-10"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["da_para_guardar"] is None
+    assert body["savings_suggestion_reason"] == "negative_estimate"

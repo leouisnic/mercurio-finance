@@ -29,6 +29,7 @@ export type DinheiroLivre = {
   guardadoNoCiclo: number;
   guardadoEm: string | null;
   daParaGuardar: number | null;
+  savingsSuggestionReason?: "insufficient_history" | "negative_estimate" | null;
   faltaParaFechar: number;
   gastosPorDia: { data: string; total: number; maiores: GastoDoDetalhe[] }[];
 };
@@ -58,6 +59,7 @@ type Resposta = {
   guardado_no_ciclo: string;
   guardado_em: string | null;
   da_para_guardar: string | null;
+  savings_suggestion_reason?: "insufficient_history" | "negative_estimate" | null;
   falta_para_fechar: string;
   gastos_por_dia: {
     data: string;
@@ -101,6 +103,7 @@ export async function buscarDinheiroLivre(
     guardadoEm: corpo.guardado_em,
     daParaGuardar:
       corpo.da_para_guardar === null ? null : paraNumero(corpo.da_para_guardar),
+    savingsSuggestionReason: corpo.savings_suggestion_reason ?? null,
     faltaParaFechar: paraNumero(corpo.falta_para_fechar),
     gastosPorDia: corpo.gastos_por_dia.map((dia) => ({
       data: dia.data,

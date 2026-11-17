@@ -117,6 +117,16 @@ export function Lista({
       {selecionados.size > 0 && (
         <BarraDeAcao
           ids={[...selecionados]}
+          // Só receitas selecionadas veem as entradas; com despesa no meio,
+          // só as de despesa, que nas receitas valem como reembolso.
+          tipoDosSelecionados={
+            movimentos.every(
+              (movimento) =>
+                !selecionados.has(movimento.id) || movimento.tipo === "receita",
+            )
+              ? "receita"
+              : "despesa"
+          }
           categorias={categorias}
           tags={tags}
           concluir={cancelar}
@@ -341,11 +351,13 @@ function EscolhaDeTag({
  *  da lista; no celular flutua sobre a navegação de baixo. */
 function BarraDeAcao({
   ids,
+  tipoDosSelecionados,
   categorias,
   tags,
   concluir,
 }: {
   ids: number[];
+  tipoDosSelecionados: "despesa" | "receita";
   categorias: Categoria[] | null;
   tags: Tag[];
   concluir: () => void;
@@ -513,6 +525,7 @@ function BarraDeAcao({
                       : `${ids.length} movimentos`}
                   </strong>
                   <EscolhaDeCategoria
+                    tipo={tipoDosSelecionados}
                     categorias={categorias}
                     busca={busca}
                     buscar={setBusca}

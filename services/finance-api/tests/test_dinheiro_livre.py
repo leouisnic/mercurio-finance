@@ -308,3 +308,34 @@ def test_estimativa_precisa_de_dois_ciclos() -> None:
     assert estimar_dia_a_dia([]) is None
     assert estimar_dia_a_dia([D("70")]) is None
     assert estimar_dia_a_dia([D("70"), D("90")]) == D("80.00")
+
+
+def test_negative_estimate_suspends_savings_without_changing_the_quota() -> None:
+    result = _recomendando("1100.00", "-10.00")
+    without_estimate = _recomendando("1100.00", None)
+
+    assert result.da_para_guardar is None
+    assert result.savings_suggestion_reason == "negative_estimate"
+    assert without_estimate.savings_suggestion_reason == "insufficient_history"
+    assert (result.cota_do_dia, result.cofrinho, result.hoje_disponivel) == (
+        without_estimate.cota_do_dia, without_estimate.cofrinho, without_estimate.hoje_disponivel
+    )
+
+
+def test_savings_suggestion_cannot_exceed_the_remaining_free_money() -> None:
+    result = _exemplo(
+        saldo_contas=D("109.99"), cartao_usado=D(0), contas_fixas=[], caixinha=D(0),
+        gastos_por_dia={HOJE: D("200")}, estimativa_por_dia=D("10"),
+    )
+
+    assert result.da_para_guardar == D("100.00")
+    assert result.savings_suggestion_reason is None
+
+
+def test_zero_estimate_preserves_zero_and_negative_free_money() -> None:
+    for free in (D("0"), D("-50")):
+        result = _exemplo(
+            saldo_contas=free, cartao_usado=D(0), contas_fixas=[], caixinha=D(0),
+            gastos_por_dia={HOJE: D("200")}, estimativa_por_dia=D(0),
+        )
+        assert result.da_para_guardar == D("0.00")

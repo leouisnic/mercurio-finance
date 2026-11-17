@@ -1,13 +1,14 @@
 "use client";
 
 import { ArrowLeft, Plus, Search, Tag as IconeDeTag, X } from "lucide-react";
-import { Popover } from "radix-ui";
+import { Dialog, Popover } from "radix-ui";
 import {
   type CSSProperties,
   type FormEvent,
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   useTransition,
 } from "react";
 import { classificarMovimento, criarCategoria, definirTags } from "../acoes";
@@ -26,6 +27,24 @@ import {
 // por dentro, como os de marcar vários.
 const BALAO =
   "bg-superficie border-borda text-tinta z-50 flex max-h-[min(560px,var(--radix-popover-content-available-height))] w-[380px] max-w-[calc(100vw-24px)] flex-col gap-3 rounded-2xl border p-4 shadow-xl";
+
+// No celular a escolha ocupa a tela: o balão encolhia até sobrar quase nada
+// quando o teclado da busca abria. Mesmo limite do `md` do Tailwind.
+const CELULAR = "(max-width: 767px)";
+
+function assinarCelular(avisar: () => void) {
+  const consulta = window.matchMedia(CELULAR);
+  consulta.addEventListener("change", avisar);
+  return () => consulta.removeEventListener("change", avisar);
+}
+
+function useCelular(): boolean {
+  return useSyncExternalStore(
+    assinarCelular,
+    () => window.matchMedia(CELULAR).matches,
+    () => false,
+  );
+}
 
 const semAcento = (texto: string) =>
   texto
@@ -49,6 +68,7 @@ export function CategoriaDoMovimento({
   tagsExistentes?: string[];
 }) {
   const [aberto, setAberto] = useState(false);
+  const celular = useCelular();
   const {
     gatilho: gatilhoBalao,
     lado: ladoBalao,
@@ -71,54 +91,100 @@ export function CategoriaDoMovimento({
       ? movimento.categoriaPropria
       : "Para classificar");
 
-  return (
-    <Popover.Root
-      open={aberto}
-      onOpenChange={(abrir) => {
-        if (abrir) decidirBalao();
-        setAberto(abrir);
-      }}
+  // Receita numa categoria de despesa: alguém devolveu parte desse gasto.
+  const selo = movimento.tipo === "receita" && atual?.tipo === "despesa" && (
+    <span className="bg-positivo-fundo text-positivo shrink-0 rounded-full px-2 py-0.5 text-[11.5px] font-bold">
+      Devolveu
+    </span>
+  );
+
+  // O próprio botão é o gatilho: num elemento por fora dele, o Radix poria
+  // `aria-haspopup` e `aria-expanded` onde eles não valem.
+  const gatilho = (
+    <button
+      ref={celular ? undefined : gatilhoBalao}
+      type="button"
+      aria-label={`Categoria de ${nome}: ${rotulo}. Alterar`}
+      disabled={categorias === null}
+      className={`hover:border-marca inline-flex max-w-full cursor-pointer items-center gap-1.5 truncate rounded-full border text-[12.5px] font-semibold whitespace-nowrap transition-colors ${
+        atual
+          ? "border-borda bg-superficie-2 text-tinta-2 py-0.5 pr-2.5 pl-0.5"
+          : "border-aviso-borda bg-aviso-fundo text-aviso px-2.5 py-1"
+      } ${aberto ? "border-marca" : ""}`}
     >
-      <Popover.Trigger asChild>
-        <button
-          ref={gatilhoBalao}
-          type="button"
-          aria-label={`Categoria de ${nome}: ${rotulo}. Alterar`}
-          disabled={categorias === null}
-          className={`hover:border-marca inline-flex max-w-full cursor-pointer items-center gap-1.5 truncate rounded-full border text-[12.5px] font-semibold whitespace-nowrap transition-colors ${
-            atual
-              ? "border-borda bg-superficie-2 text-tinta-2 py-0.5 pr-2.5 pl-0.5"
-              : "border-aviso-borda bg-aviso-fundo text-aviso px-2.5 py-1"
-          } ${aberto ? "border-marca" : ""}`}
-        >
-          {atual && <BolaDaCategoria categoria={atual} tamanho={22} />}
-          <span className="truncate">{rotulo}</span>
-        </button>
-      </Popover.Trigger>
-      {categorias && (
-        <Popover.Portal>
-          <Popover.Content
-            align="start"
-            alignOffset={deslocamentoBalao}
-            side={ladoBalao}
-            style={{ maxHeight: alturaMaximaBalao }}
-            avoidCollisions={false}
-            sideOffset={8}
-            collisionPadding={12}
-            aria-label={`Categoria de ${nome}`}
-            className={BALAO}
-          >
-            <Painel
-              movimento={movimento}
-              nome={nome}
-              categorias={categorias}
-              tagsExistentes={tagsExistentes}
-              fechar={() => setAberto(false)}
-            />
-          </Popover.Content>
-        </Popover.Portal>
-      )}
-    </Popover.Root>
+      {atual && <BolaDaCategoria categoria={atual} tamanho={22} />}
+      <span className="truncate">{rotulo}</span>
+    </button>
+  );
+
+  if (celular) {
+    // Decisão visual da spec de categorias de receita: tela cheia no celular.
+    return (
+      <>
+        {selo}
+        <Dialog.Root open={aberto} onOpenChange={setAberto}>
+          <Dialog.Trigger asChild>{gatilho}</Dialog.Trigger>
+          {categorias && (
+            <Dialog.Portal>
+              <Dialog.Content
+                aria-describedby={undefined}
+                className="bg-superficie text-tinta fixed inset-0 z-50 flex flex-col gap-3 px-4 pt-[max(16px,env(safe-area-inset-top))] pb-[max(16px,env(safe-area-inset-bottom))]"
+              >
+                <Dialog.Title className="sr-only">
+                  Categoria de {nome}
+                </Dialog.Title>
+                <Painel
+                  movimento={movimento}
+                  nome={nome}
+                  categorias={categorias}
+                  tagsExistentes={tagsExistentes}
+                  fechar={() => setAberto(false)}
+                  telaCheia
+                />
+              </Dialog.Content>
+            </Dialog.Portal>
+          )}
+        </Dialog.Root>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {selo}
+      <Popover.Root
+        open={aberto}
+        onOpenChange={(abrir) => {
+          if (abrir) decidirBalao();
+          setAberto(abrir);
+        }}
+      >
+        <Popover.Trigger asChild>{gatilho}</Popover.Trigger>
+        {categorias && (
+          <Popover.Portal>
+            <Popover.Content
+              align="start"
+              alignOffset={deslocamentoBalao}
+              side={ladoBalao}
+              style={{ maxHeight: alturaMaximaBalao }}
+              avoidCollisions={false}
+              sideOffset={8}
+              collisionPadding={12}
+              aria-label={`Categoria de ${nome}`}
+              className={BALAO}
+            >
+              <Painel
+                movimento={movimento}
+                nome={nome}
+                categorias={categorias}
+                tagsExistentes={tagsExistentes}
+                fechar={() => setAberto(false)}
+              />
+            </Popover.Content>
+          </Popover.Portal>
+        )}
+      </Popover.Root>
+    </>
   );
 }
 
@@ -128,12 +194,14 @@ function Painel({
   categorias,
   tagsExistentes,
   fechar,
+  telaCheia = false,
 }: {
   movimento: Movimento;
   nome: string;
   categorias: Categoria[];
   tagsExistentes: string[];
   fechar: () => void;
+  telaCheia?: boolean;
 }) {
   const [escolhida, setEscolhida] = useState(movimento.categoriaPropria ?? "");
   // Começa sempre em "só este": virar regra para o destinatário é escolha
@@ -150,6 +218,13 @@ function Painel({
     painel.current?.querySelector<HTMLInputElement>("input")?.focus();
   }, [criando]);
 
+  const tipo = movimento.tipo === "receita" ? "receita" : "despesa";
+  // Reembolso vale só para este movimento: a regra do destinatário mudaria
+  // também os Pix enviados a ele.
+  const reembolso =
+    tipo === "receita" &&
+    categorias.find((categoria) => categoria.id === escolhida)?.tipo ===
+      "despesa";
   const usadas = movimento.historico.flatMap(({ categoria, vezes }) => {
     const encontrada = categorias.find((item) => item.id === categoria);
     return encontrada ? [{ categoria: encontrada, vezes }] : [];
@@ -160,7 +235,7 @@ function Painel({
     const dados = new FormData();
     dados.set("movimento_id", String(movimento.id));
     dados.set("categoria", escolhida);
-    dados.set("alcance", alcance);
+    dados.set("alcance", reembolso ? "este" : alcance);
     const mudouCategoria = escolhida !== (movimento.categoriaPropria ?? "");
     const mudouTags = tags.join("\u0000") !== movimento.tags.join("\u0000");
     iniciar(async () => {
@@ -181,6 +256,7 @@ function Painel({
     <div ref={painel} className="flex min-h-0 flex-1 flex-col gap-3">
       {criando ? (
         <NovaCategoria
+          tipo={tipo}
           nomeInicial={busca}
           voltar={() => setCriando(false)}
           criada={(id) => {
@@ -191,8 +267,24 @@ function Painel({
         />
       ) : (
         <form onSubmit={salvar} className="flex min-h-0 flex-1 flex-col gap-3">
-          <strong className="text-[14px]">Categoria de {nome}</strong>
+          <div className="flex items-center gap-2">
+            <strong className="flex-1 text-[14px] max-md:text-[15px]">
+              Categoria de {nome}
+            </strong>
+            {telaCheia && (
+              <button
+                type="button"
+                onClick={fechar}
+                aria-label="Fechar"
+                className="border-borda text-tinta-2 grid size-9 place-items-center rounded-[10px] border"
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            )}
+          </div>
           <EscolhaDeCategoria
+            tipo={tipo}
+            grande={telaCheia}
             categorias={categorias}
             usadas={usadas}
             para={nome}
@@ -219,34 +311,40 @@ function Painel({
           )}
 
           <div className="border-borda-sutil flex items-end gap-2 border-t pt-3">
-            <fieldset className="flex min-w-0 flex-1 flex-col gap-1">
-              <legend className="text-tinta-3 mb-1 text-[12px]">
-                Vale para
-              </legend>
-              <div className="border-borda grid grid-cols-[1.4fr_1fr] rounded-[10px] border p-[3px] text-[12.5px]">
-                {(
-                  [
-                    ["todos", `Todos de ${nome}`],
-                    ["este", "Só este"],
-                  ] as const
-                ).map(([valor, texto]) => (
-                  <label
-                    key={valor}
-                    className="text-tinta-2 hover:bg-superficie-2 has-checked:bg-marca has-checked:text-sobre-cor has-focus-visible:outline-marca cursor-pointer truncate rounded-lg px-1.5 py-1.5 text-center has-checked:font-bold has-focus-visible:outline-2"
-                  >
-                    <input
-                      type="radio"
-                      name="alcance"
-                      value={valor}
-                      checked={alcance === valor}
-                      onChange={() => setAlcance(valor)}
-                      className="sr-only"
-                    />
-                    {texto}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
+            {reembolso ? (
+              <p className="text-tinta-3 min-w-0 flex-1 text-[12.5px]">
+                Vale só para este movimento.
+              </p>
+            ) : (
+              <fieldset className="flex min-w-0 flex-1 flex-col gap-1">
+                <legend className="text-tinta-3 mb-1 text-[12px]">
+                  Vale para
+                </legend>
+                <div className="border-borda grid grid-cols-[1.4fr_1fr] rounded-[10px] border p-[3px] text-[12.5px]">
+                  {(
+                    [
+                      ["todos", `Todos de ${nome}`],
+                      ["este", "Só este"],
+                    ] as const
+                  ).map(([valor, texto]) => (
+                    <label
+                      key={valor}
+                      className="text-tinta-2 hover:bg-superficie-2 has-checked:bg-marca has-checked:text-sobre-cor has-focus-visible:outline-marca cursor-pointer truncate rounded-lg px-1.5 py-1.5 text-center has-checked:font-bold has-focus-visible:outline-2"
+                    >
+                      <input
+                        type="radio"
+                        name="alcance"
+                        value={valor}
+                        checked={alcance === valor}
+                        onChange={() => setAlcance(valor)}
+                        className="sr-only"
+                      />
+                      {texto}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            )}
             <button
               type="submit"
               disabled={enviando || !escolhida}
@@ -267,6 +365,8 @@ function Painel({
  */
 export function EscolhaDeCategoria({
   categorias,
+  tipo = "despesa",
+  grande = false,
   usadas = [],
   para,
   busca,
@@ -276,6 +376,10 @@ export function EscolhaDeCategoria({
   criar,
 }: {
   categorias: Categoria[];
+  /** De receita: entradas e, depois, as de despesa como reembolso. */
+  tipo?: "despesa" | "receita";
+  /** Na tela cheia do celular: duas colunas com alvo maior. */
+  grande?: boolean;
   usadas?: { categoria: Categoria; vezes: number }[];
   para?: string;
   busca: string;
@@ -285,14 +389,40 @@ export function EscolhaDeCategoria({
   criar?: () => void;
 }) {
   const filtro = semAcento(busca);
-  const visiveis = categorias.filter((categoria) =>
+  const permitidas =
+    tipo === "receita"
+      ? categorias
+      : categorias.filter((categoria) => categoria.tipo === "despesa");
+  const visiveis = permitidas.filter((categoria) =>
     semAcento(categoria.nome).includes(filtro),
   );
+  // O histórico mistura Pix recebidos e enviados. Nas receitas, cada
+  // categoria permanece no seu grupo em vez de antecipar uma despesa.
+  const previouslyUsed =
+    tipo === "despesa"
+      ? usadas.filter(({ categoria }) => categoria.tipo === "despesa")
+      : [];
   const outras = filtro
     ? visiveis
     : visiveis.filter(
-        (categoria) => !usadas.some((u) => u.categoria.id === categoria.id),
+        (categoria) => !previouslyUsed.some((u) => u.categoria.id === categoria.id),
       );
+  const entradas = outras.filter((categoria) => categoria.tipo === "receita");
+  const despesas = outras.filter((categoria) => categoria.tipo === "despesa");
+  const grade = grande ? "grid grid-cols-2 gap-1.5" : "flex flex-col gap-0.5";
+  const opcoes = (lista: Categoria[]) => (
+    <div className={grade}>
+      {lista.map((categoria) => (
+        <Opcao
+          key={categoria.id}
+          categoria={categoria}
+          marcada={escolhida === categoria.id}
+          escolher={escolher}
+          grande={grande}
+        />
+      ))}
+    </div>
+  );
 
   return (
     <>
@@ -314,29 +444,45 @@ export function EscolhaDeCategoria({
         aria-label="Categoria"
         className="-mx-1 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-1"
       >
-        {!filtro && usadas.length > 0 && (
+        {!filtro && previouslyUsed.length > 0 && (
           <>
             <Secao>Já usadas para {para}</Secao>
-            {usadas.map(({ categoria, vezes }) => (
-              <Opcao
-                key={categoria.id}
-                categoria={categoria}
-                marcada={escolhida === categoria.id}
-                escolher={escolher}
-                detalhe={vezes === 1 ? "1 vez" : `${vezes} vezes`}
-              />
-            ))}
-            <Secao>Todas</Secao>
+            <div className={grade}>
+              {previouslyUsed.map(({ categoria, vezes }) => (
+                <Opcao
+                  key={categoria.id}
+                  categoria={categoria}
+                  marcada={escolhida === categoria.id}
+                  escolher={escolher}
+                  grande={grande}
+                  detalhe={vezes === 1 ? "1 vez" : `${vezes} vezes`}
+                />
+              ))}
+            </div>
+            {tipo === "despesa" && <Secao>Todas</Secao>}
           </>
         )}
-        {outras.map((categoria) => (
-          <Opcao
-            key={categoria.id}
-            categoria={categoria}
-            marcada={escolhida === categoria.id}
-            escolher={escolher}
-          />
-        ))}
+        {tipo === "receita" ? (
+          <>
+            {entradas.length > 0 && (
+              <>
+                <Secao>Entradas</Secao>
+                {opcoes(entradas)}
+              </>
+            )}
+            {despesas.length > 0 && (
+              <>
+                <Secao>Devolveu um gasto</Secao>
+                <p className="text-tinta-3 px-1 pb-1 text-[12.5px]">
+                  Abate do gasto da categoria escolhida e não conta como renda.
+                </p>
+                {opcoes(despesas)}
+              </>
+            )}
+          </>
+        ) : (
+          opcoes(outras)
+        )}
         {criar && (
           <button
             type="button"
@@ -367,14 +513,22 @@ function Opcao({
   marcada,
   escolher,
   detalhe,
+  grande = false,
 }: {
   categoria: Categoria;
   marcada: boolean;
   escolher: (id: string) => void;
   detalhe?: string;
+  grande?: boolean;
 }) {
   return (
-    <label className="has-checked:bg-marca-clara has-checked:text-marca hover:bg-superficie-2 has-focus-visible:outline-marca flex shrink-0 cursor-pointer items-center gap-2.5 rounded-[9px] px-2 py-1.5 text-[13.5px] has-checked:font-bold has-focus-visible:outline-2">
+    <label
+      className={`has-checked:bg-marca-clara has-checked:text-marca hover:bg-superficie-2 has-focus-visible:outline-marca flex min-w-0 shrink-0 cursor-pointer items-center gap-2.5 text-[13.5px] has-checked:font-bold has-focus-visible:outline-2 ${
+        grande
+          ? "border-borda-sutil has-checked:border-marca min-h-[52px] rounded-xl border px-2.5 py-2 text-[14px]"
+          : "rounded-[9px] px-2 py-1.5"
+      }`}
+    >
       <input
         type="radio"
         name="categoria"
@@ -492,11 +646,14 @@ function CampoDeTags({
   );
 }
 
+/** Categoria nova do tipo do movimento: receita cria categoria de entrada. */
 function NovaCategoria({
+  tipo,
   nomeInicial,
   voltar,
   criada,
 }: {
+  tipo: "despesa" | "receita";
   nomeInicial: string;
   voltar: () => void;
   criada: (id: string) => void;
@@ -510,7 +667,12 @@ function NovaCategoria({
   function criar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     iniciar(async () => {
-      const resultado = await criarCategoria({ nome: nome.trim(), icone, cor });
+      const resultado = await criarCategoria({
+        nome: nome.trim(),
+        icone,
+        cor,
+        tipo,
+      });
       setErro(resultado.erro);
       if (resultado.id) {
         criada(resultado.id);

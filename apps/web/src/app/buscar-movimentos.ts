@@ -61,6 +61,8 @@ export type Categoria = {
   nome: string;
   icone: string;
   cor: number;
+  /** Receita numa categoria de despesa é reembolso: abate o gasto dela. */
+  tipo: "despesa" | "receita";
 };
 
 /** `icone` e `cor` como na categoria; `teto`, `inicio` e `fim` são opcionais. */

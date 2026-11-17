@@ -138,6 +138,9 @@ class CategoriaORM(Base):
     # `scripts/contraste.py`, e não daqui.
     icone: Mapped[str] = mapped_column(String(40))
     cor: Mapped[int] = mapped_column(Integer)
+    # "despesa" ou "receita". Receita que o dono põe numa categoria de despesa
+    # é reembolso: abate o gasto dela, ver `finance_api.repositorio`.
+    tipo: Mapped[str] = mapped_column(String(10), server_default="despesa")
 
 
 class TagORM(Base):

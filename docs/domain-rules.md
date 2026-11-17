@@ -86,7 +86,8 @@ recorrência rejeitada não volta automaticamente para a fila.
 
 ## Categorias
 
-Receita e despesa recebem uma das 19 categorias do Mercúrio. Transferência
+Receita e despesa recebem uma categoria do Mercúrio, com tipo de receita ou
+despesa. Despesa só aceita categoria de despesa. Transferência
 entre contas do titular, aplicação, resgate e pagamento de fatura não recebem
 categoria, porque não são gasto nem renda.
 
@@ -102,6 +103,18 @@ cobrem o ciclo atual e os cinco anteriores, uns três meses: a média por
 categoria usa os ciclos recentes. Transferência da
 Pluggy não tem tradução, porque não diz para que o dinheiro foi. A categoria da
 Pluggy continua guardada como veio.
+
+O dono pode marcar uma receita em categoria de despesa como devolução. Ela
+abate o gasto da categoria no dia em que o dinheiro chega e sai das somas de
+renda. Uma devolução recebida em outro ciclo preserva o ciclo da compra.
+Somente a escolha do dono cria devolução; regra e tradução automática respeitam
+o tipo do movimento. A escolha de devolução vale só para aquele movimento.
+O fluxo bancário continua mostrando a entrada para fechar com o saldo.
+
+Se as devoluções deixarem a estimativa histórica negativa, a sugestão de
+quanto guardar fica indisponível, com motivo distinto de histórico insuficiente.
+Qualquer sugestão válida respeita o livre atual, limitado a zero como mínimo,
+antes de arredondar para baixo em dezenas.
 
 Destinatário que já recebeu por categorias diferentes é misto e não tem regra:
 cada movimento novo dele fica para classificar, mesmo que a Pluggy sugira
@@ -133,8 +146,9 @@ centavos. Percentual aparece inteiro.
 
 Tag agrupa movimentos, como uma viagem ou uma reforma, e não muda nenhum
 outro número. Um movimento pode ter várias tags, e o nome da tag é único sem
-distinção de caixa. O gasto de uma tag soma só as despesas marcadas, sem
-pagamento de fatura, como o gasto por dia; a divisão é pela categoria do
+distinção de caixa. O gasto de uma tag soma as despesas marcadas, sem pagamento
+de fatura, menos as devoluções marcadas com ela, como o gasto por dia;
+a divisão é pela categoria do
 Mercúrio.
 
 A tag pode ter ícone e cor, teto e período, todos opcionais, e pode ser
